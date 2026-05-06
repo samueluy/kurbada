@@ -1,0 +1,15 @@
+:root {
+  --app-background: #f4f4f2;
+  --app-surface: #ffffff;
+  --app-text: #1a1a1a;
+  --app-muted: #6b6b6b;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  background: var(--app-background);
+  color: var(--app-text);
+}
