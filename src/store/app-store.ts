@@ -55,6 +55,10 @@ type AppStore = {
   onboardingSyncedBikeId: string | null;
   onboardingSyncedEmergencyId: string | null;
   customFuelPricePerLiter: number | null;
+  crashAlertsEnabled: boolean;
+  maintenanceRemindersEnabled: boolean;
+  maintenanceReminderThresholds: number[];
+  maintenanceReminderLastNotified: Record<string, number>;
   setHasSeenSplash: () => void;
   completeOnboarding: () => void;
   completeBikeSetup: () => void;
@@ -64,6 +68,10 @@ type AppStore = {
   setPendingReferralCode: (code: string) => void;
   setOnboardingData: (data: Partial<OnboardingData>) => void;
   setCustomFuelPricePerLiter: (price: number | null) => void;
+  setCrashAlertsEnabled: (value: boolean) => void;
+  setMaintenanceRemindersEnabled: (value: boolean) => void;
+  setMaintenanceReminderThresholds: (thresholds: number[]) => void;
+  setMaintenanceReminderLastNotified: (taskId: string, threshold: number) => void;
   markOnboardingSyncing: () => void;
   markOnboardingSyncComplete: (payload: { userId: string; bikeId?: string | null; emergencyId?: string | null }) => void;
   markOnboardingSyncFailed: () => void;
@@ -86,6 +94,10 @@ export const useAppStore = create<AppStore>()(
       onboardingSyncedBikeId: null,
       onboardingSyncedEmergencyId: null,
       customFuelPricePerLiter: null,
+      crashAlertsEnabled: true,
+      maintenanceRemindersEnabled: true,
+      maintenanceReminderThresholds: [50, 80, 90, 95, 100],
+      maintenanceReminderLastNotified: {},
       setHasSeenSplash: () => set({ hasSeenSplash: true }),
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
       completeBikeSetup: () => set({ hasCompletedBikeSetup: true }),
@@ -99,6 +111,13 @@ export const useAppStore = create<AppStore>()(
           onboardingSyncStatus: 'pending',
         })),
       setCustomFuelPricePerLiter: (customFuelPricePerLiter) => set({ customFuelPricePerLiter }),
+      setCrashAlertsEnabled: (crashAlertsEnabled) => set({ crashAlertsEnabled }),
+      setMaintenanceRemindersEnabled: (maintenanceRemindersEnabled) => set({ maintenanceRemindersEnabled }),
+      setMaintenanceReminderThresholds: (maintenanceReminderThresholds) => set({ maintenanceReminderThresholds }),
+      setMaintenanceReminderLastNotified: (taskId, threshold) =>
+        set((state) => ({
+          maintenanceReminderLastNotified: { ...state.maintenanceReminderLastNotified, [taskId]: threshold },
+        })),
       markOnboardingSyncing: () => set({ onboardingSyncStatus: 'syncing' }),
       markOnboardingSyncComplete: ({ userId, bikeId = null, emergencyId = null }) =>
         set({
@@ -147,6 +166,10 @@ export const useAppStore = create<AppStore>()(
         onboardingSyncedBikeId: state.onboardingSyncedBikeId,
         onboardingSyncedEmergencyId: state.onboardingSyncedEmergencyId,
         customFuelPricePerLiter: state.customFuelPricePerLiter,
+        crashAlertsEnabled: state.crashAlertsEnabled,
+        maintenanceRemindersEnabled: state.maintenanceRemindersEnabled,
+        maintenanceReminderThresholds: state.maintenanceReminderThresholds,
+        maintenanceReminderLastNotified: state.maintenanceReminderLastNotified,
       }),
     },
   ),

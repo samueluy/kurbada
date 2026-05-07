@@ -28,7 +28,7 @@ function SpeedHero({ speedKmh, mode }: { speedKmh: number; mode: RideMode }) {
         <AppText variant="heroMetric" style={{ fontSize: 88, color: palette.text, lineHeight: 92 }}>
           {displaySpeed}
         </AppText>
-        <AppText variant="label" style={{ color, fontSize: 16, letterSpacing: 3 }}>
+        <AppText variant="label" style={{ color, fontSize: 16, lineHeight: 20, letterSpacing: 3 }}>
           KM/H
         </AppText>
       </View>
@@ -43,7 +43,7 @@ function SpeedHero({ speedKmh, mode }: { speedKmh: number; mode: RideMode }) {
       <AppText variant="heroMetric" style={{ fontSize: 52, color: palette.textSecondary, lineHeight: 56 }}>
         {displaySpeed}
       </AppText>
-      <AppText variant="label" style={{ color: palette.textTertiary, fontSize: 14, letterSpacing: 2 }}>
+      <AppText variant="label" style={{ color: palette.textTertiary, fontSize: 14, lineHeight: 18, letterSpacing: 2 }}>
         KM/H
       </AppText>
     </View>
@@ -59,7 +59,7 @@ function EconomyHero({ telemetry }: { telemetry: ReturnType<typeof useRideSessio
       <AppText variant="heroMetric" style={{ fontSize: 72, color: palette.lime, lineHeight: 78 }}>
         {formatCurrencyPhp(telemetry.estimatedFuelCost)}
       </AppText>
-      <AppText variant="label" style={{ color: palette.textTertiary, fontSize: 14 }}>
+      <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 14, lineHeight: 18 }}>
         burned so far
       </AppText>
     </View>
@@ -135,20 +135,20 @@ export default function ActiveRideScreen() {
               speed={ride.telemetry.speedKmh}
               calibrating={ride.state === 'calibrating'}
             />
-            <AppText variant="label" style={{ color: palette.danger, fontSize: 14 }}>
+            <AppText variant="label" style={{ color: palette.danger, fontSize: 14, lineHeight: 18 }}>
               MAX {ride.telemetry.maxLeanAngleDeg.toFixed(0)}°
             </AppText>
           </View>
         ) : (
           <View style={{ flexDirection: 'row', gap: 16 }}>
             <View style={{ alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: radius.lg, paddingHorizontal: 24, paddingVertical: 16 }}>
-              <AppText variant="label" style={{ color: palette.lime, fontSize: 32 }}>
+              <AppText variant="bodyBold" style={{ color: palette.lime, fontSize: 32 }}>
                 {ride.telemetry.estimatedFuelLiters.toFixed(1)}
               </AppText>
               <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 12 }}>LITERS</AppText>
             </View>
             <View style={{ alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: radius.lg, paddingHorizontal: 24, paddingVertical: 16 }}>
-              <AppText variant="label" style={{ color: palette.text, fontSize: 32 }}>
+              <AppText variant="bodyBold" style={{ color: palette.text, fontSize: 32 }}>
                 {ride.telemetry.distanceKm > 0
                   ? (ride.telemetry.distanceKm / Math.max(ride.telemetry.estimatedFuelLiters, 0.01)).toFixed(1)
                   : '0.0'}

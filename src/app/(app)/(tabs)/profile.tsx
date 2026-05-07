@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Alert, Modal, Pressable, View } from 'react-native';
+import { Modal, Pressable, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScrollScreen } from '@/components/ui/app-screen';
@@ -89,7 +89,7 @@ export default function ProfileTabScreen() {
           icon="notifications-outline"
           title="Notifications"
           subtitle="Crash alerts and reminders"
-          onPress={() => Alert.alert('Coming Soon', 'Push notification settings will be available in a future update.')}
+          onPress={() => router.push('/(app)/profile/notifications' as any)}
         />
         <ListRow
           icon="cash-outline"

@@ -58,7 +58,7 @@ export default function BoardTabScreen() {
         ListHeaderComponent={
           <View style={{ paddingTop: 8, gap: 8 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View style={{ gap: 4 }}>
+              <View style={{ gap: 4, flex: 1 }}>
                 <AppText variant="eyebrow">Public Rides</AppText>
                 <AppText variant="screenTitle">The lobby is open.</AppText>
                 <AppText variant="body">Join group rides and coordinate via Messenger or Telegram.</AppText>

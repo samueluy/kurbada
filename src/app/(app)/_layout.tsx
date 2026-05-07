@@ -7,6 +7,7 @@ import { palette } from '@/constants/theme';
 import { env } from '@/lib/env';
 import { useAuth } from '@/hooks/use-auth';
 import { useReferralMutations, useReferrals } from '@/hooks/use-kurbada-data';
+import { useMaintenanceReminders } from '@/hooks/use-maintenance-reminders';
 import { useUserAccess } from '@/hooks/use-user-access';
 import { useAppStore } from '@/store/app-store';
 
@@ -18,6 +19,8 @@ export default function AppLayout() {
   const { markReferralNotified } = useReferralMutations(session?.user.id);
   const bypassGate = env.devBypassAppGate;
   const shownReferralIdRef = useRef<string | null>(null);
+
+  useMaintenanceReminders();
 
   useEffect(() => {
     if (!session?.user.id || !referrals.data?.length) return;
@@ -80,6 +83,7 @@ export default function AppLayout() {
       <Stack.Screen name="board/create" options={{ presentation: 'modal' }} />
       <Stack.Screen name="fuel/reports" />
       <Stack.Screen name="profile/emergency" />
+      <Stack.Screen name="profile/notifications" />
     </Stack>
   );
 }

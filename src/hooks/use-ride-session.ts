@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useRideMutations } from '@/hooks/use-kurbada-data';
 import { useRideStore } from '@/store/ride-store';
 import { clearStoredCoords, getStoredCoords, LOCATION_TASK_NAME } from '@/tasks/location-task';
+import { useAppStore } from '@/store/app-store';
 import type { LeanCalibration, RideMode, RidePoint } from '@/types/domain';
 
 Accelerometer.setUpdateInterval(16);
@@ -21,6 +22,7 @@ export function useRideSession() {
   const { session } = useAuth();
   const { saveRide } = useRideMutations(session?.user.id);
   const store = useRideStore();
+  const crashAlertsEnabled = useAppStore((state) => state.crashAlertsEnabled);
   const latestAccelRef = useRef({ x: 0, y: 0, z: 1 });
   const filteredAccelRef = useRef({ x: 0, y: 0, z: 1 });
   const rollRef = useRef(0);
@@ -279,6 +281,7 @@ export function useRideSession() {
   };
 
   function maybeTriggerCrashAlert(gForce: number) {
+    if (!crashAlertsEnabled) return;
     if (gForce > 4.5) {
       if (!crashThresholdSinceRef.current) {
         crashThresholdSinceRef.current = Date.now();
