@@ -1,3 +1,5 @@
+create extension if not exists pgcrypto;
+
 create or replace function public.generate_referral_code(source_display_name text default null)
 returns text
 language plpgsql
@@ -16,7 +18,7 @@ begin
   end if;
 
   loop
-    candidate := cleaned || upper(substr(md5(random()::text || clock_timestamp()::text || uuid_generate_v4()::text), 1, 4));
+    candidate := cleaned || upper(substr(md5(random()::text || clock_timestamp()::text || gen_random_uuid()::text), 1, 4));
     exit when not exists (
       select 1
       from public.profiles
@@ -52,7 +54,7 @@ add constraint profiles_access_override_check
 check (access_override in ('none', 'development', 'apple_review', 'closed_testing'));
 
 create table if not exists public.referrals (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   referrer_user_id uuid not null references public.profiles (id) on delete cascade,
   referred_user_id uuid not null unique references public.profiles (id) on delete cascade,
   referral_code text not null,
