@@ -16,7 +16,7 @@ export function EmergencyQRCard({
   onPress?: () => void;
 }) {
   return (
-    <GlassCard style={{ padding: 18, gap: 16, borderColor: palette.danger }}>
+    <GlassCard style={{ padding: 18, gap: 16, borderWidth: 0.5, borderColor: palette.danger }}>
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: palette.danger }} />
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
         <View style={{ flex: 1, gap: 8 }}>
@@ -32,7 +32,10 @@ export function EmergencyQRCard({
         </View>
         <View style={{ width: 60, height: 60, borderRadius: radius.sm, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}>
           {emergency?.full_name ? (
-            <QRCode value={JSON.stringify(emergency)} size={46} />
+            <QRCode
+              value={`EMERGENCY INFO\nName: ${emergency.full_name}\nBlood: ${emergency.blood_type}\nAllergies: ${emergency.allergies || 'None'}\nConditions: ${emergency.conditions || 'None'}\nContact 1: ${emergency.contact1_name} (${emergency.contact1_phone})\nContact 2: ${emergency.contact2_name || 'None'} (${emergency.contact2_phone || 'None'})`}
+              size={46}
+            />
           ) : (
             <ShieldAlert size={20} color={palette.textSecondary} />
           )}

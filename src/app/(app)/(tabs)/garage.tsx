@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { FloatingField } from '@/components/ui/floating-field';
 import { GlassCard } from '@/components/ui/glass-card';
 import { SectionHeader } from '@/components/ui/section-header';
+import { palette } from '@/constants/theme';
 import { BikeCard } from '@/features/garage/components/bike-card';
 import { useAuth } from '@/hooks/use-auth';
 import { useBikeMutations, useBikes } from '@/hooks/use-kurbada-data';
@@ -42,6 +43,8 @@ export default function GarageTabScreen() {
           <FloatingField label="Engine CC" value={engineCc} onChangeText={setEngineCc} placeholder="399" keyboardType="number-pad" />
           <Button
             title="Save Bike"
+            variant="secondary"
+            style={{ backgroundColor: palette.danger, borderColor: palette.danger }}
             onPress={async () => {
               if (isSubmittingRef.current) {
                 return;
@@ -85,11 +88,11 @@ export default function GarageTabScreen() {
             }}
           />
         ))
-      ) : (
+      ) : !showForm ? (
         <GlassCard style={{ padding: 18 }}>
           <EmptyState icon="bicycle-outline" title="Add your first bike" body="Start your garage with one machine and maintenance tracking will unlock automatically." actionTitle="Add bike" onAction={() => setShowForm(true)} />
         </GlassCard>
-      )}
+      ) : null}
 
     </AppScrollScreen>
   );

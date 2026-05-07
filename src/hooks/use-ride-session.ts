@@ -17,10 +17,6 @@ import type { LeanCalibration, RideMode, RidePoint } from '@/types/domain';
 Accelerometer.setUpdateInterval(16);
 Gyroscope.setUpdateInterval(16);
 
-function fuelRateForMode(mode: RideMode) {
-  return mode === 'hustle' ? 28 : 22;
-}
-
 export function useRideSession() {
   const { session } = useAuth();
   const { saveRide } = useRideMutations(session?.user.id);
@@ -60,7 +56,7 @@ export function useRideSession() {
 
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store]);
+  }, []);
 
   useEffect(() => {
     if (!['calibrating', 'active'].includes(store.state)) {
@@ -116,7 +112,7 @@ export function useRideSession() {
 
   const latestPosition = foregroundPointsRef.current[foregroundPointsRef.current.length - 1];
 
-  const startRide = async (mode: RideMode, bikeId: string, fuelPricePerLiter: number) => {
+  const startRide = async (mode: RideMode, bikeId: string, fuelPricePerLiter: number, fuelRateKmPerLiter: number) => {
     const fgPerm = await Location.requestForegroundPermissionsAsync();
     if (!fgPerm.granted) {
       throw new Error('Location permission is required to start a ride.');
@@ -133,6 +129,7 @@ export function useRideSession() {
     store.setMode(mode);
     store.setBikeId(bikeId);
     store.setFuelPricePerLiter(fuelPricePerLiter);
+    store.setFuelRateKmPerLiter(fuelRateKmPerLiter);
     store.setDashboardView(mode === 'weekend' ? 'speed' : 'economy');
     store.setStartedAt(Date.now());
 
@@ -263,6 +260,7 @@ export function useRideSession() {
     try {
       await saveRide.mutateAsync(ride);
       await clearStoredCoords();
+      store.resetRide();
       return ride;
     } catch {
       store.setState('active');
@@ -317,7 +315,7 @@ export function useRideSession() {
         store.appendForegroundPoint(point);
 
         const newDistance = store.telemetry.distanceKm + distanceDelta;
-        const fuelRate = fuelRateForMode(store.mode);
+        const fuelRate = store.fuelRateKmPerLiter;
         const fuelLiters = newDistance / fuelRate;
         const fuelCost = fuelLiters * store.fuelPricePerLiter;
 

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { AppText } from '@/components/ui/app-text';
 import { palette } from '@/constants/theme';
@@ -41,8 +42,8 @@ function buildDateGrid(rides: RideRecord[], numDays: number) {
 
 export function CustomCalendarHeatmap({ rides, numDays = 90 }: { rides: RideRecord[]; numDays?: number }) {
   const dates = useMemo(() => buildDateGrid(rides, numDays), [rides, numDays]);
-  const cellSize = 8;
-  const cellGap = 2;
+  const cellSize = 6;
+  const cellGap = 1;
 
   const totalWeeks = Math.ceil(dates.length / 7);
   const weeks = useMemo(() => {
@@ -71,23 +72,29 @@ export function CustomCalendarHeatmap({ rides, numDays = 90 }: { rides: RideReco
 
   const totalRides = rides.length;
   const totalDistance = rides.reduce((sum, r) => sum + r.distance_km, 0);
+  const gridWidth = totalWeeks * cellSize + Math.max(totalWeeks - 1, 0) * cellGap;
+  const monthCellWidth = cellSize + cellGap;
 
   return (
-    <View style={{ paddingTop: 8, paddingBottom: 10, alignItems: 'center' }}>
+    <View style={{ paddingTop: 8, paddingBottom: 10, alignItems: 'center', maxHeight: 110 }}>
       {/* Month labels row */}
       <View
         style={{
           flexDirection: 'row',
-          width: 184,
+          width: gridWidth + 18,
           paddingLeft: 18,
-          marginBottom: 4,
+          marginBottom: 3,
         }}>
         {Array.from({ length: totalWeeks }).map((_, col) => {
           const pos = monthPositions.find((p) => p.col === col);
           return (
-            <View key={`mh-${col}`} style={{ width: cellSize + cellGap }}>
+            <View key={`mh-${col}`} style={{ width: monthCellWidth }}>
               {pos ? (
-                <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 7 }}>
+                <AppText
+                  numberOfLines={1}
+                  ellipsizeMode="clip"
+                  variant="meta"
+                  style={{ color: palette.textTertiary, fontSize: 7, lineHeight: 8, width: monthCellWidth * 2.8 }}>
                   {pos.label}
                 </AppText>
               ) : null}
@@ -97,7 +104,7 @@ export function CustomCalendarHeatmap({ rides, numDays = 90 }: { rides: RideReco
       </View>
 
       {/* Grid row: day labels + cells */}
-      <View style={{ flexDirection: 'row', width: 184, justifyContent: 'center' }}>
+      <View style={{ flexDirection: 'row', width: gridWidth + 18, justifyContent: 'center' }}>
         <View style={{ width: 12, justifyContent: 'space-between', paddingVertical: 1, marginRight: 6 }}>
           {DAY_LABELS.map((day, i) => (
             <AppText
@@ -114,11 +121,14 @@ export function CustomCalendarHeatmap({ rides, numDays = 90 }: { rides: RideReco
           ))}
         </View>
 
-        <View style={{ width: 166 }}>
-          <View style={{ gap: cellGap }}>
-            {Array.from({ length: 7 }).map((_, row) => (
-              <View key={`row-${row}`} style={{ flexDirection: 'row', gap: cellGap }}>
-                {weeks.map((week, col) => {
+        <View style={{ width: gridWidth }}>
+          <View style={{ flexDirection: 'row', gap: cellGap }}>
+            {weeks.map((week, col) => (
+              <Animated.View
+                key={`column-${col}`}
+                entering={FadeIn.delay(col * 12).duration(200)}
+                style={{ width: cellSize, gap: cellGap }}>
+                {Array.from({ length: 7 }).map((_, row) => {
                   const cell = week[row];
                   const isRidden = cell && cell.distance > 0;
                   return (
@@ -135,7 +145,7 @@ export function CustomCalendarHeatmap({ rides, numDays = 90 }: { rides: RideReco
                     />
                   );
                 })}
-              </View>
+              </Animated.View>
             ))}
           </View>
         </View>
@@ -153,32 +163,6 @@ export function CustomCalendarHeatmap({ rides, numDays = 90 }: { rides: RideReco
         {totalRides} ride{totalRides !== 1 ? 's' : ''} · {totalDistance.toFixed(0)} km · last {numDays} days
       </AppText>
 
-      {/* Legend */}
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'center',
-          gap: 4,
-          alignItems: 'center',
-          paddingHorizontal: 12,
-          paddingTop: 6,
-          paddingBottom: 10,
-        }}>
-        {[
-          { label: '0', dist: 0 },
-          { label: '≤10', dist: 5 },
-          { label: '≤50', dist: 30 },
-          { label: '≤100', dist: 75 },
-          { label: '100+', dist: 150 },
-        ].map((item) => (
-          <View key={item.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-            <View style={{ width: 6, height: 6, borderRadius: 1.5, backgroundColor: getColor(item.dist) }} />
-            <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 8 }}>
-              {item.label}
-            </AppText>
-          </View>
-        ))}
-      </View>
     </View>
   );
 }

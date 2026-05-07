@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
-import { Alert, View } from 'react-native';
+import { Alert, Modal, Pressable, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScrollScreen } from '@/components/ui/app-screen';
 import { Button } from '@/components/ui/button';
+import { FloatingField } from '@/components/ui/floating-field';
 import { GlassCard } from '@/components/ui/glass-card';
 import { ListRow } from '@/components/ui/list-row';
 import { SectionHeader } from '@/components/ui/section-header';
@@ -13,6 +14,8 @@ import { formatCurrencyPhp } from '@/lib/format';
 import { useAuth } from '@/hooks/use-auth';
 import { useBikes, useEmergencyInfo, useFuelLogs, useRides } from '@/hooks/use-kurbada-data';
 import { useUserProfile } from '@/hooks/use-user-access';
+import { useAppStore } from '@/store/app-store';
+import { useState } from 'react';
 
 export default function ProfileTabScreen() {
   const { session, signOut } = useAuth();
@@ -21,11 +24,25 @@ export default function ProfileTabScreen() {
   const fuelLogs = useFuelLogs(session?.user.id);
   const bikes = useBikes(session?.user.id);
   const emergency = useEmergencyInfo(session?.user.id);
+  const customFuelPrice = useAppStore((state) => state.customFuelPricePerLiter);
+  const setCustomFuelPrice = useAppStore((state) => state.setCustomFuelPricePerLiter);
+
+  const [showFuelPrice, setShowFuelPrice] = useState(false);
+  const [fuelPriceInput, setFuelPriceInput] = useState('');
 
   const totalDistance = (rides.data ?? []).reduce((sum, ride) => sum + ride.distance_km, 0);
   const totalFuel = (fuelLogs.data ?? []).reduce((sum, log) => sum + log.total_cost, 0);
+  const memberSince = profile.data?.created_at
+    ? new Date(profile.data.created_at).toLocaleDateString('en-PH', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    })
+    : 'May 1, 2026';
+  const statValueColor = (value: number) => (value > 0 ? palette.text : palette.textTertiary);
 
   return (
+    <>
     <AppScrollScreen>
       <View style={{ gap: 8 }}>
         <AppText variant="eyebrow">Profile</AppText>
@@ -34,32 +51,32 @@ export default function ProfileTabScreen() {
       </View>
 
       <GlassCard style={{ alignItems: 'center', gap: 12, padding: 22 }}>
-        <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: palette.surfaceMuted, alignItems: 'center', justifyContent: 'center' }}>
-          <AppText variant="bodyBold" style={{ fontSize: 24 }}>{(profile.data?.display_name ?? 'KR').slice(0, 2).toUpperCase()}</AppText>
+        <View style={{ width: 72, height: 72, borderRadius: 36, overflow: 'hidden', backgroundColor: palette.surfaceMuted, alignItems: 'center', justifyContent: 'center' }}>
+          <AppText variant="bodyBold" style={{ fontSize: 20 }}>{(profile.data?.display_name ?? 'KR').slice(0, 2).toUpperCase()}</AppText>
         </View>
         <AppText variant="title" style={{ fontSize: 22 }}>
           {profile.data?.display_name ?? 'Kurbada Rider'}
         </AppText>
-        <AppText variant="meta">Member since {profile.data?.created_at?.slice(0, 10) ?? '2026-05-01'}</AppText>
+        <AppText variant="meta">Member since {memberSince}</AppText>
       </GlassCard>
 
       <SectionHeader title="Your Stats" />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
         <GlassCard style={{ width: '47%', padding: 14, borderRadius: 14 }}>
           <AppText variant="label">Rides</AppText>
-          <AppText variant="cardMetric">{rides.data?.length ?? 0}</AppText>
+          <AppText variant="cardMetric" style={{ color: statValueColor(rides.data?.length ?? 0) }}>{rides.data?.length ?? 0}</AppText>
         </GlassCard>
         <GlassCard style={{ width: '47%', padding: 14, borderRadius: 14 }}>
           <AppText variant="label">Distance</AppText>
-          <AppText variant="cardMetric">{totalDistance.toFixed(1)} km</AppText>
+          <AppText variant="cardMetric" style={{ color: statValueColor(totalDistance) }}>{totalDistance.toFixed(1)} km</AppText>
         </GlassCard>
         <GlassCard style={{ width: '47%', padding: 14, borderRadius: 14 }}>
           <AppText variant="label">Fuel Logged</AppText>
-          <AppText variant="cardMetric" style={{ fontSize: 22 }}>{formatCurrencyPhp(totalFuel)}</AppText>
+          <AppText variant="cardMetric" style={{ fontSize: 22, color: statValueColor(totalFuel) }}>{formatCurrencyPhp(totalFuel)}</AppText>
         </GlassCard>
         <GlassCard style={{ width: '47%', padding: 14, borderRadius: 14 }}>
           <AppText variant="label">Bikes</AppText>
-          <AppText variant="cardMetric">{bikes.data?.length ?? 0}</AppText>
+          <AppText variant="cardMetric" style={{ color: statValueColor(bikes.data?.length ?? 0) }}>{bikes.data?.length ?? 0}</AppText>
         </GlassCard>
       </View>
 
@@ -73,6 +90,15 @@ export default function ProfileTabScreen() {
           title="Notifications"
           subtitle="Crash alerts and reminders"
           onPress={() => Alert.alert('Coming Soon', 'Push notification settings will be available in a future update.')}
+        />
+        <ListRow
+          icon="cash-outline"
+          title="Fuel Price"
+          subtitle={customFuelPrice ? `₱${customFuelPrice.toFixed(2)}/L` : 'Use fuel log average'}
+          onPress={() => {
+            setFuelPriceInput(customFuelPrice?.toString() ?? '');
+            setShowFuelPrice(true);
+          }}
         />
         <ListRow
           icon="card-outline"
@@ -90,5 +116,52 @@ export default function ProfileTabScreen() {
         </AppText>
       </View>
     </AppScrollScreen>
-  );
+
+      <Modal visible={showFuelPrice} transparent animationType="fade">
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }} onPress={() => setShowFuelPrice(false)}>
+          <Pressable onPress={() => undefined}>
+            <View style={{ backgroundColor: '#1E1E1E', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 16 }}>
+              <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: palette.surfaceStrong, alignSelf: 'center' }} />
+              <AppText variant="sectionTitle" style={{ fontSize: 20 }}>Fuel Price per Liter</AppText>
+              <AppText variant="body" style={{ color: palette.textSecondary }}>Set a custom fuel price. Leave blank to use your latest fuel log average.</AppText>
+              <FloatingField
+                label="PRICE PER LITER (PHP)"
+                value={fuelPriceInput}
+                onChangeText={setFuelPriceInput}
+                placeholder="65.00"
+                keyboardType="decimal-pad"
+              />
+              <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 11 }}>Defaults to your latest fuel log price if left blank.</AppText>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    title="Clear"
+                    variant="ghost"
+                    onPress={() => {
+                      setCustomFuelPrice(null);
+                      setShowFuelPrice(false);
+                    }}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    title="Save"
+                    onPress={() => {
+                      const value = parseFloat(fuelPriceInput);
+                      if (fuelPriceInput.trim() && !isNaN(value) && value > 0) {
+                        setCustomFuelPrice(value);
+                      } else {
+                        setCustomFuelPrice(null);
+                      }
+                      setShowFuelPrice(false);
+                    }}
+                    style={{ backgroundColor: '#C0392B', borderRadius: 13, minHeight: 48 }}
+                  />
+                </View>
+              </View>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>  );
 }

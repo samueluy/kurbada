@@ -1,4 +1,3 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useEffect } from 'react';
@@ -68,7 +67,7 @@ function EconomyHero({ telemetry }: { telemetry: ReturnType<typeof useRideSessio
 }
 
 export default function ActiveRideScreen() {
-  const params = useLocalSearchParams<{ mode?: RideMode; bikeId?: string; fuelPrice?: string }>();
+  const params = useLocalSearchParams<{ mode?: RideMode; bikeId?: string; fuelPrice?: string; fuelRate?: string }>();
   const ride = useRideSession();
   const insets = useSafeAreaInsets();
   const isWeekend = ride.mode === 'weekend';
@@ -76,21 +75,11 @@ export default function ActiveRideScreen() {
   useEffect(() => {
     if (ride.state === 'idle' && params.bikeId) {
       const fuelPrice = Number(params.fuelPrice) || 65;
-      ride.startRide((params.mode as RideMode) ?? 'weekend', params.bikeId, fuelPrice).catch(() => undefined);
+      const fuelRate = Number(params.fuelRate) || 28;
+      ride.startRide((params.mode as RideMode) ?? 'weekend', params.bikeId, fuelPrice, fuelRate).catch(() => undefined);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.bikeId, params.mode, params.fuelPrice]);
-
-  const handleCancel = () => {
-    if (ride.state === 'active' || ride.state === 'calibrating') {
-      Alert.alert('Discard ride?', 'Current telemetry will be lost.', [
-        { text: 'Keep Riding', style: 'cancel' },
-        { text: 'Discard', style: 'destructive', onPress: () => { ride.resetRide(); router.back(); } },
-      ]);
-    } else {
-      router.back();
-    }
-  };
+  }, [params.bikeId, params.mode, params.fuelPrice, params.fuelRate]);
 
   const handleStop = async () => {
     try {
@@ -121,9 +110,6 @@ export default function ActiveRideScreen() {
         <AppText variant="label" style={{ color: palette.textTertiary, fontSize: 14, letterSpacing: 5 }}>
           KURBADA
         </AppText>
-        <Pressable onPress={handleCancel} hitSlop={12} style={{ padding: 4 }}>
-          <MaterialCommunityIcons name="close" size={22} color={palette.textTertiary} />
-        </Pressable>
       </View>
 
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20, gap: 24 }}>

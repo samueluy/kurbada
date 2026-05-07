@@ -10,6 +10,7 @@ import { GlassCard } from '@/components/ui/glass-card';
 import { palette, radius } from '@/constants/theme';
 import { env } from '@/lib/env';
 import { normalizeReferralCode, validateReferralCode } from '@/lib/referrals';
+import { purchasePremium } from '@/services/revenuecat';
 import { useAuth } from '@/hooks/use-auth';
 import { useReferralMutations } from '@/hooks/use-kurbada-data';
 import { useUserProfile } from '@/hooks/use-user-access';
@@ -89,7 +90,6 @@ export default function PaywallScreen() {
     }
 
     if (!env.revenueCatEnabled) {
-      // Dev bypass: simulate successful purchase
       setPurchaseCompleted(true);
       setOnboardingStep(8);
       router.replace('/(public)/success' as any);
@@ -99,10 +99,16 @@ export default function PaywallScreen() {
     const purchases = getPurchases();
     if (!purchases) return;
 
-    try {
-      await handleRevenuCatPaywall();
-    } catch {
-      // Fall through to custom UI if RC paywall fails
+    // Try RevenueCat native paywall first
+    const usedNativePaywall = await handleRevenuCatPaywall();
+    if (usedNativePaywall) return;
+
+    // Fallback: use direct purchasePremium (works with test store)
+    const result = await purchasePremium();
+    if (result.success) {
+      setPurchaseCompleted(true);
+      setOnboardingStep(8);
+      router.replace('/(public)/success' as any);
     }
   };
 

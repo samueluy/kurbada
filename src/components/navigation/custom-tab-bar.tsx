@@ -1,7 +1,9 @@
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/app-text';
@@ -27,6 +29,46 @@ const labelMap = {
 
 export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const [tabLayouts, setTabLayouts] = useState<Record<string, { x: number; width: number }>>({});
+  const activeKey = state.routes[state.index]?.key;
+  const activeLayout = activeKey ? tabLayouts[activeKey] : undefined;
+  const pillX = useSharedValue(activeLayout?.x ?? 0);
+  const pillWidth = useSharedValue(activeLayout?.width ?? 0);
+
+  useEffect(() => {
+    if (!activeLayout) {
+      return;
+    }
+
+    pillX.value = withSpring(activeLayout.x, {
+      stiffness: 280,
+      damping: 28,
+      mass: 1,
+    });
+    pillWidth.value = withSpring(activeLayout.width, {
+      stiffness: 280,
+      damping: 28,
+      mass: 1,
+    });
+  }, [activeLayout, pillWidth, pillX]);
+
+  const pillStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: pillX.value }],
+    width: pillWidth.value,
+    opacity: pillWidth.value > 0 ? 1 : 0,
+  }));
+
+  const tabSlots = useMemo(
+    () =>
+      state.routes.map((route, index) => ({
+        route,
+        index,
+        focused: state.index === index,
+        icon: iconMap[route.name as keyof typeof iconMap],
+        label: labelMap[route.name as keyof typeof labelMap],
+      })),
+    [state.index, state.routes],
+  );
 
   return (
     <View
@@ -41,17 +83,38 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        position: 'relative',
       }}>
-      {state.routes.map((route, index) => {
-        const focused = state.index === index;
-        const icon = iconMap[route.name as keyof typeof iconMap];
-        const label = labelMap[route.name as keyof typeof labelMap];
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          {
+            position: 'absolute',
+            top: 8,
+            bottom: Math.max(insets.bottom, 8),
+            backgroundColor: Colors.s3,
+            borderRadius: radius.pill,
+          },
+          pillStyle,
+        ]}
+      />
+      {tabSlots.map(({ route, focused, icon, label }) => {
 
         return (
           <Pressable
             key={route.key}
             accessibilityRole="button"
             accessibilityLabel={descriptors[route.key].options.tabBarAccessibilityLabel}
+            onLayout={(event) => {
+              const { x, width } = event.nativeEvent.layout;
+              setTabLayouts((current) => {
+                const existing = current[route.key];
+                if (existing?.x === x && existing?.width === width) {
+                  return current;
+                }
+                return { ...current, [route.key]: { x, width } };
+              });
+            }}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
               navigation.navigate(route.name);
@@ -61,11 +124,11 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
               minHeight: 44,
               alignItems: 'center',
               justifyContent: 'center',
+              zIndex: 1,
             }}>
             {focused ? (
               <View
                 style={{
-                  backgroundColor: Colors.s3,
                   borderRadius: radius.pill,
                   paddingHorizontal: 14,
                   paddingVertical: 6,

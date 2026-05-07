@@ -54,6 +54,7 @@ type AppStore = {
   onboardingSyncedUserId: string | null;
   onboardingSyncedBikeId: string | null;
   onboardingSyncedEmergencyId: string | null;
+  customFuelPricePerLiter: number | null;
   setHasSeenSplash: () => void;
   completeOnboarding: () => void;
   completeBikeSetup: () => void;
@@ -62,6 +63,7 @@ type AppStore = {
   setPurchaseCompleted: (value: boolean) => void;
   setPendingReferralCode: (code: string) => void;
   setOnboardingData: (data: Partial<OnboardingData>) => void;
+  setCustomFuelPricePerLiter: (price: number | null) => void;
   markOnboardingSyncing: () => void;
   markOnboardingSyncComplete: (payload: { userId: string; bikeId?: string | null; emergencyId?: string | null }) => void;
   markOnboardingSyncFailed: () => void;
@@ -83,6 +85,7 @@ export const useAppStore = create<AppStore>()(
       onboardingSyncedUserId: null,
       onboardingSyncedBikeId: null,
       onboardingSyncedEmergencyId: null,
+      customFuelPricePerLiter: null,
       setHasSeenSplash: () => set({ hasSeenSplash: true }),
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
       completeBikeSetup: () => set({ hasCompletedBikeSetup: true }),
@@ -95,6 +98,7 @@ export const useAppStore = create<AppStore>()(
           onboardingData: { ...state.onboardingData, ...data },
           onboardingSyncStatus: 'pending',
         })),
+      setCustomFuelPricePerLiter: (customFuelPricePerLiter) => set({ customFuelPricePerLiter }),
       markOnboardingSyncing: () => set({ onboardingSyncStatus: 'syncing' }),
       markOnboardingSyncComplete: ({ userId, bikeId = null, emergencyId = null }) =>
         set({
@@ -117,6 +121,18 @@ export const useAppStore = create<AppStore>()(
     {
       name: 'kurbada-app',
       storage: createJSONStorage(() => appStorage),
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState ?? {}) as Partial<AppStore>;
+
+        return {
+          ...currentState,
+          ...persisted,
+          onboardingData: {
+            ...defaultOnboardingData,
+            ...(persisted.onboardingData ?? {}),
+          },
+        };
+      },
       partialize: (state) => ({
         hasSeenSplash: state.hasSeenSplash,
         hasCompletedOnboarding: state.hasCompletedOnboarding,
@@ -130,6 +146,7 @@ export const useAppStore = create<AppStore>()(
         onboardingSyncedUserId: state.onboardingSyncedUserId,
         onboardingSyncedBikeId: state.onboardingSyncedBikeId,
         onboardingSyncedEmergencyId: state.onboardingSyncedEmergencyId,
+        customFuelPricePerLiter: state.customFuelPricePerLiter,
       }),
     },
   ),

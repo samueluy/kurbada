@@ -66,7 +66,10 @@ export default function EmergencyScreen() {
         <AppText variant="meta">Crash detection in MVP works while an active ride is open in the foreground.</AppText>
         <ViewShot ref={shotRef} options={{ result: 'tmpfile', quality: 1, width: 1080, height: 1920, format: 'png' }}>
           <View style={{ width: '100%', minHeight: 420, backgroundColor: '#111', borderRadius: radius.lg, justifyContent: 'center', alignItems: 'center', gap: 16, padding: 24 }}>
-            <QRCode value={JSON.stringify(form)} size={180} />
+            <QRCode
+              value={`EMERGENCY INFO\nName: ${form.full_name}\nBlood: ${form.blood_type}\nAllergies: ${form.allergies || 'None'}\nConditions: ${form.conditions || 'None'}\nContact 1: ${form.contact1_name} (${form.contact1_phone})\nContact 2: ${form.contact2_name || 'None'} (${form.contact2_phone || 'None'})`}
+              size={180}
+            />
             <AppText variant="screenTitle" style={{ color: '#fff', fontSize: 28 }}>{form.full_name}</AppText>
             <AppText variant="meta" style={{ color: '#fff', textAlign: 'center' }}>
               Emergency QR for Kurbada riders. Save to Photos, then set it manually as your lock screen wallpaper.

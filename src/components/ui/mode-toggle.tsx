@@ -2,10 +2,10 @@ import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Pressable, View, useWindowDimensions } from 'react-native';
 import { useEffect } from 'react';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { AppText } from '@/components/ui/app-text';
-import { motion, palette, radius } from '@/constants/theme';
+import { palette, radius } from '@/constants/theme';
 import type { RideMode } from '@/types/domain';
 
 export function ModeToggle({ value, onChange }: { value: RideMode; onChange: (mode: RideMode) => void }) {
@@ -15,9 +15,10 @@ export function ModeToggle({ value, onChange }: { value: RideMode; onChange: (mo
   const translateX = useSharedValue(value === 'weekend' ? 0 : pillWidth);
 
   useEffect(() => {
-    translateX.value = withTiming(value === 'weekend' ? 0 : pillWidth, {
-      duration: motion.base,
-      easing: Easing.out(Easing.cubic),
+    translateX.value = withSpring(value === 'weekend' ? 0 : pillWidth, {
+      stiffness: 300,
+      damping: 30,
+      mass: 0.9,
     });
   }, [pillWidth, translateX, value]);
 

@@ -31,6 +31,7 @@ type RideStore = {
   crashCountdown: number | null;
   dashboardView: DashboardView;
   fuelPricePerLiter: number;
+  fuelRateKmPerLiter: number;
   setState: (state: RideSessionState) => void;
   setMode: (mode: RideMode) => void;
   setBikeId: (bikeId?: string) => void;
@@ -45,6 +46,7 @@ type RideStore = {
   updateTelemetry: (patch: Partial<TelemetrySnapshot>) => void;
   setDashboardView: (view: DashboardView) => void;
   setFuelPricePerLiter: (price: number) => void;
+  setFuelRateKmPerLiter: (rate: number) => void;
 };
 
 const initialTelemetry: TelemetrySnapshot = {
@@ -74,6 +76,7 @@ export const useRideStore = create<RideStore>((set, get) => ({
   crashCountdown: null,
   dashboardView: 'speed',
   fuelPricePerLiter: 65,
+  fuelRateKmPerLiter: 28,
   setState: (state) => set({ state }),
   setMode: (mode) => set({ mode }),
   setBikeId: (bikeId) => set({ bikeId }),
@@ -94,6 +97,7 @@ export const useRideStore = create<RideStore>((set, get) => ({
     })),
   setDashboardView: (dashboardView) => set({ dashboardView }),
   setFuelPricePerLiter: (fuelPricePerLiter) => set({ fuelPricePerLiter }),
+  setFuelRateKmPerLiter: (fuelRateKmPerLiter) => set({ fuelRateKmPerLiter }),
   resetRide: () =>
     set({
       state: 'idle',
@@ -108,5 +112,6 @@ export const useRideStore = create<RideStore>((set, get) => ({
       crashCountdown: null,
       dashboardView: 'speed',
       fuelPricePerLiter: 65,
+      fuelRateKmPerLiter: 28,
     }),
 }));

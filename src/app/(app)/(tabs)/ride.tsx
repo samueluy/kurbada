@@ -21,6 +21,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useBikes, useFuelLogs, useRides } from '@/hooks/use-kurbada-data';
 import { useWeather } from '@/hooks/use-weather';
 import { useAppStore } from '@/store/app-store';
+import { estimateFuelRate } from '@/lib/fuel-estimate';
 
 export default function RideTabScreen() {
   const { session } = useAuth();
@@ -29,16 +30,25 @@ export default function RideTabScreen() {
   const bikes = useBikes(session?.user.id);
   const rides = useRides(session?.user.id);
   const fuelLogs = useFuelLogs(session?.user.id);
+  const customFuelPrice = useAppStore((state) => state.customFuelPricePerLiter);
   const weather = useWeather();
   const latestRide = rides.data?.[0];
   const primaryBike = bikes.data?.[0];
 
-  const avgFuelPrice = useMemo(() => {
+  const fuelPrice = useMemo(() => {
+    if (customFuelPrice && customFuelPrice > 0) return customFuelPrice;
     const logs = fuelLogs.data ?? [];
     if (logs.length === 0) return 65;
-    const latest = logs[0];
-    return latest.price_per_liter || 65;
-  }, [fuelLogs.data]);
+    return logs[0].price_per_liter || 65;
+  }, [customFuelPrice, fuelLogs.data]);
+
+  const fuelRate = useMemo(() => {
+    return estimateFuelRate(
+      primaryBike?.engine_cc,
+      primaryBike?.category,
+      preferredMode,
+    );
+  }, [primaryBike?.engine_cc, primaryBike?.category, preferredMode]);
 
   const isWeekend = preferredMode === 'weekend';
 
@@ -95,15 +105,16 @@ export default function RideTabScreen() {
             }
             router.push({
               pathname: '/(app)/ride/active',
-              params: { mode: preferredMode, bikeId: primaryBike.id, fuelPrice: avgFuelPrice },
+              params: { mode: preferredMode, bikeId: primaryBike.id, fuelPrice: fuelPrice, fuelRate: fuelRate },
             });
           }}
           style={{
-            backgroundColor: '#C0392B',
+            backgroundColor: '#FFFFFF',
+            borderColor: '#FFFFFF',
             borderRadius: 13,
             minHeight: 50,
             marginTop: 14,
-            shadowColor: 'rgba(192,57,43,0.35)',
+            shadowColor: 'rgba(255,255,255,0.18)',
             shadowOpacity: 1,
             shadowRadius: 16,
             shadowOffset: { width: 0, height: 4 },

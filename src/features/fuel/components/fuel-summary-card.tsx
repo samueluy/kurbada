@@ -11,10 +11,13 @@ export function FuelSummaryCard({
   value: string;
   caption?: string;
 }) {
+  const numericValue = Number(value.replace(/[^\d.-]/g, ''));
+  const valueColor = Number.isFinite(numericValue) && numericValue > 0 ? palette.text : palette.textTertiary;
+
   return (
     <GlassCard style={{ flex: 1, padding: 14, gap: 6, borderRadius: 14 }}>
       <AppText variant="label">{label}</AppText>
-      <AppText variant="cardMetric" style={{ fontSize: 22, lineHeight: 24 }}>{value}</AppText>
+      <AppText variant="cardMetric" style={{ fontSize: 22, lineHeight: 24, color: valueColor }}>{value}</AppText>
       {caption ? <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 11 }}>{caption}</AppText> : null}
     </GlassCard>
   );

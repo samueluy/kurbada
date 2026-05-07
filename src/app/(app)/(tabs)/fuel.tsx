@@ -107,7 +107,16 @@ export default function FuelTabScreen() {
         </GlassCard>
       ) : null}
 
-      <SectionHeader title="Entries" action={<Button title="Reports" variant="ghost" onPress={() => router.push('/(app)/fuel/reports')} />} />
+      <SectionHeader
+        title="Entries"
+        action={(
+          <Pressable onPress={() => router.push('/(app)/fuel/reports')}>
+            <AppText variant="button" style={{ color: palette.textTertiary, fontSize: 13 }}>
+              Reports
+            </AppText>
+          </Pressable>
+        )}
+      />
       {fuelLogs.data?.length ? (
         <View style={{ gap: 12 }}>
           {fuelLogs.data.map((item) => (

@@ -57,12 +57,7 @@ export default function OnboardingEmergencyScreen() {
   }, []);
 
   const qrValue = useMemo(
-    () => JSON.stringify({
-      name: form.full_name,
-      blood: form.blood_type,
-      contact: form.contact1_name,
-      phone: form.contact1_phone,
-    }),
+    () => `EMERGENCY INFO\nName: ${form.full_name}\nBlood: ${form.blood_type}\nContact: ${form.contact1_name} (${form.contact1_phone})`,
     [form],
   );
 

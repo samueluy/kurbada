@@ -1,31 +1,26 @@
 import { Redirect, Stack } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { ActivityIndicator, Alert, View } from 'react-native';
+import { ActivityIndicator, Alert } from 'react-native';
 
 import { AppScreen } from '@/components/ui/app-screen';
-import { AppText } from '@/components/ui/app-text';
 import { palette } from '@/constants/theme';
 import { env } from '@/lib/env';
 import { useAuth } from '@/hooks/use-auth';
-import { useOnboardingSync, useReferralMutations, useReferrals } from '@/hooks/use-kurbada-data';
+import { useReferralMutations, useReferrals } from '@/hooks/use-kurbada-data';
 import { useUserAccess } from '@/hooks/use-user-access';
 import { useAppStore } from '@/store/app-store';
 
 export default function AppLayout() {
   const { session, loading } = useAuth();
   const hasCompletedBikeSetup = useAppStore((state) => state.hasCompletedBikeSetup);
-  const hasCompletedOnboarding = useAppStore((state) => state.hasCompletedOnboarding);
   const access = useUserAccess(session?.user.id);
   const referrals = useReferrals(session?.user.id);
-  const onboardingSync = useOnboardingSync(session?.user.id);
   const { markReferralNotified } = useReferralMutations(session?.user.id);
   const bypassGate = env.devBypassAppGate;
   const shownReferralIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!session?.user.id || !referrals.data?.length) {
-      return;
-    }
+    if (!session?.user.id || !referrals.data?.length) return;
 
     const reward = referrals.data.find(
       (item) =>
@@ -34,9 +29,7 @@ export default function AppLayout() {
         && !item.notified_at,
     );
 
-    if (!reward || shownReferralIdRef.current === reward.id) {
-      return;
-    }
+    if (!reward || shownReferralIdRef.current === reward.id) return;
 
     shownReferralIdRef.current = reward.id;
 
@@ -55,7 +48,11 @@ export default function AppLayout() {
   }, [markReferralNotified, referrals.data, session?.user.id]);
 
   if (loading && !bypassGate) {
-    return null;
+    return (
+      <AppScreen style={{ justifyContent: 'center', alignItems: 'center' }} showWordmark={false}>
+        <ActivityIndicator size="large" color={palette.text} />
+      </AppScreen>
+    );
   }
 
   if (!bypassGate && !session) {
@@ -68,22 +65,6 @@ export default function AppLayout() {
 
   if (!hasCompletedBikeSetup) {
     return <Redirect href="/(public)/bike-setup" />;
-  }
-
-  if (hasCompletedOnboarding && onboardingSync.isSyncing) {
-    return (
-      <AppScreen style={{ justifyContent: 'center', alignItems: 'center', gap: 16 }} showWordmark={false}>
-        <ActivityIndicator size="large" color={palette.text} />
-        <View style={{ gap: 6, alignItems: 'center' }}>
-          <AppText variant="screenTitle" style={{ textAlign: 'center', fontSize: 26 }}>
-            Syncing your garage
-          </AppText>
-          <AppText variant="meta" style={{ color: palette.textSecondary, textAlign: 'center' }}>
-            Saving your bike setup and emergency card before you drop into the app.
-          </AppText>
-        </View>
-      </AppScreen>
-    );
   }
 
   return (

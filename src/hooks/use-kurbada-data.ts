@@ -131,6 +131,10 @@ function useRemoteMode(userId?: string) {
   return Boolean(userId) && isSupabaseConfigured;
 }
 
+function cleanDraftValue(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 export function useBikes(userId?: string) {
   const localBikes = useLocalAppStore((state) => state.bikes);
   const useRemote = useRemoteMode(userId);
@@ -696,19 +700,29 @@ export function useOnboardingSync(userId?: string) {
   const emergency = useEmergencyInfo(userId);
   const { saveBike } = useBikeMutations(userId);
   const { saveEmergencyInfo } = useEmergencyMutations(userId);
+  const bikeBrand = cleanDraftValue(onboardingData.bikeBrand);
+  const bikeModel = cleanDraftValue(onboardingData.bikeModel);
+  const bikeYear = cleanDraftValue(onboardingData.bikeYear);
+  const bikeEngineCc = cleanDraftValue(onboardingData.bikeEngineCc);
+  const bikeOdometerKm = cleanDraftValue(onboardingData.bikeOdometerKm);
+  const fullName = cleanDraftValue(onboardingData.fullName);
+  const emergencyContactName = cleanDraftValue(onboardingData.emergencyContactName);
+  const emergencyContactPhone = cleanDraftValue(onboardingData.emergencyContactPhone);
+  const allergies = cleanDraftValue(onboardingData.allergies);
+  const conditions = cleanDraftValue(onboardingData.conditions);
 
   const localKey = userId ?? 'local';
   const hasBikeDraft = Boolean(
-    onboardingData.bikeBrand.trim()
-      && onboardingData.bikeModel.trim()
-      && onboardingData.bikeYear.trim()
-      && onboardingData.bikeEngineCc.trim()
-      && onboardingData.bikeOdometerKm.trim(),
+    bikeBrand
+      && bikeModel
+      && bikeYear
+      && bikeEngineCc
+      && bikeOdometerKm,
   );
   const hasEmergencyMinimum = Boolean(
-    onboardingData.fullName.trim()
-      && onboardingData.emergencyContactName.trim()
-      && onboardingData.emergencyContactPhone.trim(),
+    fullName
+      && emergencyContactName
+      && emergencyContactPhone,
   );
 
   const needsSync =
@@ -734,18 +748,18 @@ export function useOnboardingSync(userId?: string) {
         if (hasBikeDraft) {
           const existingBike = bikes.data?.find(
             (item) =>
-              item.make.toLowerCase() === onboardingData.bikeBrand.trim().toLowerCase()
-              && item.model.toLowerCase() === onboardingData.bikeModel.trim().toLowerCase()
-              && item.year === Number(onboardingData.bikeYear),
+              item.make.toLowerCase() === bikeBrand.toLowerCase()
+              && item.model.toLowerCase() === bikeModel.toLowerCase()
+              && item.year === Number(bikeYear),
           );
 
           const bike = await saveBike.mutateAsync({
             id: existingBike?.id ?? '',
-            make: onboardingData.bikeBrand.trim(),
-            model: onboardingData.bikeModel.trim(),
-            year: Number(onboardingData.bikeYear),
-            engine_cc: Number(onboardingData.bikeEngineCc),
-            current_odometer_km: Number(onboardingData.bikeOdometerKm),
+            make: bikeBrand,
+            model: bikeModel,
+            year: Number(bikeYear),
+            engine_cc: Number(bikeEngineCc),
+            current_odometer_km: Number(bikeOdometerKm),
             category: onboardingData.bikeCategory,
             maintenancePresetKeys: onboardingData.maintenancePresetKeys,
           });
@@ -757,12 +771,12 @@ export function useOnboardingSync(userId?: string) {
         if (hasEmergencyMinimum) {
           const savedEmergency = await saveEmergencyInfo.mutateAsync({
             id: emergency.data?.id ?? '',
-            full_name: onboardingData.fullName.trim(),
+            full_name: fullName,
             blood_type: onboardingData.bloodType,
-            allergies: onboardingData.allergies.trim(),
-            conditions: onboardingData.conditions.trim(),
-            contact1_name: onboardingData.emergencyContactName.trim(),
-            contact1_phone: onboardingData.emergencyContactPhone.trim(),
+            allergies,
+            conditions,
+            contact1_name: emergencyContactName,
+            contact1_phone: emergencyContactPhone,
             contact2_name: emergency.data?.contact2_name ?? '',
             contact2_phone: emergency.data?.contact2_phone ?? '',
           });
