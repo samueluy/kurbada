@@ -41,6 +41,8 @@ function buildDateGrid(rides: RideRecord[], numDays: number) {
 
 export function CustomCalendarHeatmap({ rides, numDays = 90 }: { rides: RideRecord[]; numDays?: number }) {
   const dates = useMemo(() => buildDateGrid(rides, numDays), [rides, numDays]);
+  const cellSize = 8;
+  const cellGap = 2;
 
   const totalWeeks = Math.ceil(dates.length / 7);
   const weeks = useMemo(() => {
@@ -71,15 +73,21 @@ export function CustomCalendarHeatmap({ rides, numDays = 90 }: { rides: RideReco
   const totalDistance = rides.reduce((sum, r) => sum + r.distance_km, 0);
 
   return (
-    <View style={{ paddingTop: 8, paddingBottom: 10 }}>
+    <View style={{ paddingTop: 8, paddingBottom: 10, alignItems: 'center' }}>
       {/* Month labels row */}
-      <View style={{ flexDirection: 'row', paddingLeft: 28, paddingRight: 12, marginBottom: 4 }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          width: 184,
+          paddingLeft: 18,
+          marginBottom: 4,
+        }}>
         {Array.from({ length: totalWeeks }).map((_, col) => {
           const pos = monthPositions.find((p) => p.col === col);
           return (
-            <View key={`mh-${col}`} style={{ flex: 1 }}>
+            <View key={`mh-${col}`} style={{ width: cellSize + cellGap }}>
               {pos ? (
-                <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 8 }}>
+                <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 7 }}>
                   {pos.label}
                 </AppText>
               ) : null}
@@ -89,27 +97,27 @@ export function CustomCalendarHeatmap({ rides, numDays = 90 }: { rides: RideReco
       </View>
 
       {/* Grid row: day labels + cells */}
-      <View style={{ flexDirection: 'row' }}>
-        <View style={{ width: 16, paddingLeft: 12, justifyContent: 'space-between', paddingVertical: 1 }}>
+      <View style={{ flexDirection: 'row', width: 184, justifyContent: 'center' }}>
+        <View style={{ width: 12, justifyContent: 'space-between', paddingVertical: 1, marginRight: 6 }}>
           {DAY_LABELS.map((day, i) => (
             <AppText
               key={`${day}-${i}`}
               variant="meta"
               style={{
                 color: palette.textTertiary,
-                fontSize: 8,
+                fontSize: 7,
                 textAlign: 'center',
-                lineHeight: 9,
+                lineHeight: 8,
               }}>
               {day}
             </AppText>
           ))}
         </View>
 
-        <View style={{ flex: 1, paddingRight: 12 }}>
-          <View style={{ gap: 2 }}>
+        <View style={{ width: 166 }}>
+          <View style={{ gap: cellGap }}>
             {Array.from({ length: 7 }).map((_, row) => (
-              <View key={`row-${row}`} style={{ flexDirection: 'row', gap: 2 }}>
+              <View key={`row-${row}`} style={{ flexDirection: 'row', gap: cellGap }}>
                 {weeks.map((week, col) => {
                   const cell = week[row];
                   const isRidden = cell && cell.distance > 0;
@@ -117,13 +125,12 @@ export function CustomCalendarHeatmap({ rides, numDays = 90 }: { rides: RideReco
                     <View
                       key={cell?.key ?? `empty-${col}-${row}`}
                       style={{
-                        flex: 1,
-                        aspectRatio: 1,
+                        width: cellSize,
+                        height: cellSize,
                         borderRadius: 1.5,
                         backgroundColor: cell ? getColor(cell.distance) : '#1E1E1E',
                         borderWidth: isRidden ? 0 : 0.5,
                         borderColor: isRidden ? 'transparent' : 'rgba(255,255,255,0.04)',
-                        margin: 1,
                       }}
                     />
                   );
@@ -139,7 +146,7 @@ export function CustomCalendarHeatmap({ rides, numDays = 90 }: { rides: RideReco
         variant="meta"
         style={{
           color: palette.textTertiary,
-          fontSize: 11,
+          fontSize: 10,
           textAlign: 'center',
           marginTop: 8,
         }}>
@@ -165,8 +172,8 @@ export function CustomCalendarHeatmap({ rides, numDays = 90 }: { rides: RideReco
           { label: '100+', dist: 150 },
         ].map((item) => (
           <View key={item.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-            <View style={{ width: 7, height: 7, borderRadius: 1.5, backgroundColor: getColor(item.dist) }} />
-            <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 9 }}>
+            <View style={{ width: 6, height: 6, borderRadius: 1.5, backgroundColor: getColor(item.dist) }} />
+            <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 8 }}>
               {item.label}
             </AppText>
           </View>

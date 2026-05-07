@@ -24,6 +24,7 @@ type LocalAppState = {
   upsertReferral: (referral: ReferralRecord) => void;
   markReferralNotified: (referralId: string, notifiedAt?: string) => void;
   addMaintenanceTasks: (tasks: MaintenanceTask[]) => void;
+  setMaintenanceTasksForBike: (bikeId: string, tasks: MaintenanceTask[]) => void;
   addMaintenanceTask: (task: MaintenanceTask) => void;
   updateMaintenanceTask: (task: MaintenanceTask) => void;
   deleteMaintenanceTask: (taskId: string) => void;
@@ -101,6 +102,13 @@ export const useLocalAppStore = create<LocalAppState>()(
       addMaintenanceTasks: (tasks: MaintenanceTask[]) =>
         set((state) => ({
           maintenanceTasks: [...tasks, ...state.maintenanceTasks],
+        })),
+      setMaintenanceTasksForBike: (bikeId: string, tasks: MaintenanceTask[]) =>
+        set((state) => ({
+          maintenanceTasks: [
+            ...tasks,
+            ...state.maintenanceTasks.filter((item) => item.bike_id !== bikeId),
+          ],
         })),
       addMaintenanceTask: (task: MaintenanceTask) =>
         set((state) => ({

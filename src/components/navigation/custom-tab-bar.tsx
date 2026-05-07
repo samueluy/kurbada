@@ -8,12 +8,12 @@ import { AppText } from '@/components/ui/app-text';
 import { Colors, layout, radius } from '@/constants/theme';
 
 const iconMap = {
-  ride: (focused: boolean) => <Ionicons name="speedometer-outline" size={22} color={focused ? Colors.t1 : Colors.t3} />,
+  ride: (focused: boolean) => <Ionicons name="speedometer" size={22} color={focused ? Colors.t1 : Colors.t3} />,
   garage: (focused: boolean) => (
     <MaterialCommunityIcons name="garage-variant" size={22} color={focused ? Colors.t1 : Colors.t3} />
   ),
   board: (focused: boolean) => <Ionicons name="radio-outline" size={22} color={focused ? Colors.t1 : Colors.t3} />,
-  fuel: (focused: boolean) => <Ionicons name="car-outline" size={22} color={focused ? Colors.t1 : Colors.t3} />,
+  fuel: (focused: boolean) => <MaterialCommunityIcons name="gas-station-outline" size={22} color={focused ? Colors.t1 : Colors.t3} />,
   profile: (focused: boolean) => <Ionicons name="shield-outline" size={22} color={focused ? Colors.t1 : Colors.t3} />,
 };
 

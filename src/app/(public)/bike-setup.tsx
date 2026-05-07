@@ -1,36 +1,20 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScrollScreen } from '@/components/ui/app-screen';
 import { Button } from '@/components/ui/button';
+import { FloatingField } from '@/components/ui/floating-field';
 import { GlassCard } from '@/components/ui/glass-card';
 import { ProgressDots } from '@/components/ui/progress-dots';
 import { palette, radius } from '@/constants/theme';
+import {
+  bikeCategoryOptions,
+  getDefaultMaintenancePresets,
+  rideStyleOptions,
+} from '@/lib/onboarding';
 import { useAppStore } from '@/store/app-store';
-import type { RideMode } from '@/types/domain';
-
-const bikeBrands = [
-  'Honda', 'Yamaha', 'Kawasaki', 'Suzuki', 'KTM',
-  'Ducati', 'BMW', 'Harley-Davidson', 'Royal Enfield', 'CFMoto',
-  'Other',
-];
-
-const ccClasses = [
-  'Under 150',
-  '150–200',
-  '250–400',
-  '500–650',
-  '700–1000',
-  '1000+',
-];
-
-const ridingStyles: { mode: RideMode; label: string; subtitle: string; icon: string }[] = [
-  { mode: 'weekend', label: 'Weekend Twisties', subtitle: 'Cinematic telemetry, curves, max lean', icon: 'speedometer-outline' },
-  { mode: 'hustle', label: 'Daily Ride', subtitle: 'Traffic efficiency, fuel tracking, battery smart', icon: 'timer-outline' },
-];
 
 export default function BikeSetupScreen() {
   const params = useLocalSearchParams<{ flow?: string }>();
@@ -39,150 +23,178 @@ export default function BikeSetupScreen() {
   const setOnboardingData = useAppStore((state) => state.setOnboardingData);
   const onboardingData = useAppStore((state) => state.onboardingData);
   const completeBikeSetup = useAppStore((state) => state.completeBikeSetup);
-
-  const [brand, setBrand] = useState(onboardingData.bikeBrand || 'Kawasaki');
-  const [brandDropdown, setBrandDropdown] = useState(false);
-  const [brandCustom, setBrandCustom] = useState('');
-  const [ccClass, setCcClass] = useState(onboardingData.ccClass || '250–400');
-  const [ccDropdown, setCcDropdown] = useState(false);
-  const [ridingStyle, setRidingStyle] = useState<RideMode>(onboardingData.ridingStyle || 'weekend');
   const isOnboarding = params.flow === 'onboarding';
 
   const handleNext = () => {
-    const finalBrand = brand === 'Other' ? brandCustom.trim() || 'Other' : brand;
-
-    setOnboardingData({
-      bikeBrand: finalBrand,
-      ccClass,
-      ridingStyle,
-    });
-    setPreferredMode(ridingStyle);
     completeBikeSetup();
+    setPreferredMode(onboardingData.ridingStyle);
 
     if (isOnboarding) {
       setOnboardingStep(3);
-      router.replace('/(public)/emergency?flow=onboarding');
-    } else {
-      router.replace('/(app)/(tabs)/ride');
+      router.replace('/(public)/maintenance');
+      return;
     }
+
+    router.replace('/(app)/(tabs)/ride');
   };
+
+  const isComplete = Boolean(
+    onboardingData.bikeBrand.trim()
+      && onboardingData.bikeModel.trim()
+      && onboardingData.bikeYear.trim()
+      && onboardingData.bikeEngineCc.trim()
+      && onboardingData.bikeOdometerKm.trim(),
+  );
 
   return (
     <AppScrollScreen contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
       <GlassCard style={{ gap: 18, padding: 22 }}>
         {isOnboarding ? (
           <>
-            <ProgressDots total={7} current={2} />
+            <ProgressDots total={8} current={2} />
             <AppText variant="label" style={{ color: palette.textSecondary }}>
-              Step 2 of 7
+              Step 2 of 8
             </AppText>
           </>
         ) : null}
+
         <View style={{ gap: 8 }}>
           <AppText variant="screenTitle" style={{ fontSize: 30 }}>
             What do you ride?
           </AppText>
           <AppText variant="meta" style={{ color: palette.textSecondary }}>
             {isOnboarding
-              ? 'Set up your machine and riding style so Kurbada tailors your experience.'
-              : 'Add your bike now, or come back from the Garage tab.'}
+              ? 'Set up your machine now so Kurbada can save your Garage and telemetry profile the moment your account goes live.'
+              : 'Add your bike now and we’ll sync it straight into your Garage.'}
           </AppText>
         </View>
 
-        <View style={{ gap: 6 }}>
-          <AppText variant="label" style={{ color: palette.textSecondary, fontSize: 12 }}>Bike Brand</AppText>
-          <Pressable
-            onPress={() => { setBrandDropdown(!brandDropdown); setCcDropdown(false); }}
-            style={{ paddingVertical: 14, paddingHorizontal: 16, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 0.5, borderColor: palette.border }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <AppText variant="body">{brand === 'Other' && brandCustom ? brandCustom : brand}</AppText>
-              <MaterialCommunityIcons name={brandDropdown ? 'chevron-up' : 'chevron-down'} size={20} color={palette.textSecondary} />
-            </View>
-          </Pressable>
-          {brandDropdown && (
-            <View style={{ borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-              {bikeBrands.map((b) => (
-                <Pressable
-                  key={b}
-                  onPress={() => { setBrand(b); setBrandDropdown(false); if (b !== 'Other') setBrandCustom(''); }}
-                  style={{ paddingVertical: 12, paddingHorizontal: 16, backgroundColor: brand === b ? 'rgba(255,255,255,0.08)' : 'transparent' }}>
-                  <AppText variant="body" style={{ color: brand === b ? palette.text : palette.textSecondary }}>{b}</AppText>
-                </Pressable>
-              ))}
-            </View>
-          )}
-          {brand === 'Other' && (
-            <TextInput
-              value={brandCustom}
-              onChangeText={setBrandCustom}
-              placeholder="Enter brand name"
-              placeholderTextColor={palette.textTertiary}
-              style={{ minHeight: 48, borderRadius: radius.md, borderWidth: 0.5, borderColor: palette.border, paddingHorizontal: 16, backgroundColor: 'rgba(255,255,255,0.04)', color: palette.text }}
+        <FloatingField
+          label="Bike Brand"
+          value={onboardingData.bikeBrand}
+          onChangeText={(value) => setOnboardingData({ bikeBrand: value })}
+          placeholder="Kawasaki"
+        />
+        <FloatingField
+          label="Model"
+          value={onboardingData.bikeModel}
+          onChangeText={(value) => setOnboardingData({ bikeModel: value })}
+          placeholder="Ninja 400"
+        />
+
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <FloatingField
+              label="Year"
+              value={onboardingData.bikeYear}
+              onChangeText={(value) => setOnboardingData({ bikeYear: value.replace(/[^0-9]/g, '') })}
+              placeholder="2024"
+              keyboardType="number-pad"
             />
-          )}
+          </View>
+          <View style={{ flex: 1 }}>
+            <FloatingField
+              label="Engine CC"
+              value={onboardingData.bikeEngineCc}
+              onChangeText={(value) => setOnboardingData({ bikeEngineCc: value.replace(/[^0-9]/g, '') })}
+              placeholder="399"
+              keyboardType="number-pad"
+            />
+          </View>
         </View>
 
-        <View style={{ gap: 6 }}>
-          <AppText variant="label" style={{ color: palette.textSecondary, fontSize: 12 }}>CC Class</AppText>
-          <Pressable
-            onPress={() => { setCcDropdown(!ccDropdown); setBrandDropdown(false); }}
-            style={{ paddingVertical: 14, paddingHorizontal: 16, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 0.5, borderColor: palette.border }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <AppText variant="body">{ccClass}</AppText>
-              <MaterialCommunityIcons name={ccDropdown ? 'chevron-up' : 'chevron-down'} size={20} color={palette.textSecondary} />
-            </View>
-          </Pressable>
-          {ccDropdown && (
-            <View style={{ borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-              {ccClasses.map((cc) => (
+        <FloatingField
+          label="Current Odometer (km)"
+          value={onboardingData.bikeOdometerKm}
+          onChangeText={(value) => setOnboardingData({ bikeOdometerKm: value.replace(/[^0-9]/g, '') })}
+          placeholder="12450"
+          keyboardType="number-pad"
+        />
+
+        <View style={{ gap: 8 }}>
+          <AppText variant="label" style={{ color: palette.textSecondary, fontSize: 12 }}>
+            Category
+          </AppText>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {bikeCategoryOptions.map((option) => {
+              const active = onboardingData.bikeCategory === option.value;
+              return (
                 <Pressable
-                  key={cc}
-                  onPress={() => { setCcClass(cc); setCcDropdown(false); }}
-                  style={{ paddingVertical: 12, paddingHorizontal: 16, backgroundColor: ccClass === cc ? 'rgba(255,255,255,0.08)' : 'transparent' }}>
-                  <AppText variant="body" style={{ color: ccClass === cc ? palette.text : palette.textSecondary }}>{cc}</AppText>
+                  key={option.value}
+                  onPress={() =>
+                    setOnboardingData({
+                      bikeCategory: option.value,
+                      maintenancePresetKeys: getDefaultMaintenancePresets(option.value),
+                    })
+                  }
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    borderRadius: radius.pill,
+                    borderWidth: 0.5,
+                    borderColor: active ? palette.text : palette.border,
+                    backgroundColor: active ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
+                  }}>
+                  <MaterialCommunityIcons
+                  name={option.icon}
+                    size={18}
+                    color={active ? palette.text : palette.textSecondary}
+                  />
+                  <AppText variant="button" style={{ color: active ? palette.text : palette.textSecondary, fontSize: 13 }}>
+                    {option.label}
+                  </AppText>
                 </Pressable>
-              ))}
-            </View>
-          )}
+              );
+            })}
+          </View>
         </View>
 
         <View style={{ gap: 8 }}>
           <AppText variant="label" style={{ color: palette.textSecondary, fontSize: 12 }}>
             Riding Style
           </AppText>
-          {ridingStyles.map((style) => (
-            <Pressable
-              key={style.mode}
-              onPress={() => setRidingStyle(style.mode)}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 12,
-                borderRadius: radius.md,
-                borderWidth: ridingStyle === style.mode ? 0 : 1.5,
-                borderColor: palette.border,
-                backgroundColor: ridingStyle === style.mode ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
-                paddingHorizontal: 16,
-                paddingVertical: 14,
-              }}>
-              <MaterialCommunityIcons
-                name={style.icon as any}
-                size={22}
-                color={ridingStyle === style.mode ? palette.text : palette.textSecondary}
-              />
-              <View style={{ flex: 1, gap: 2 }}>
-                <AppText variant="bodyBold" style={{ color: ridingStyle === style.mode ? palette.text : palette.textSecondary }}>
-                  {style.label}
-                </AppText>
-                <AppText variant="meta" style={{ fontSize: 12, color: palette.textTertiary }}>
-                  {style.subtitle}
-                </AppText>
-              </View>
-            </Pressable>
-          ))}
+          {rideStyleOptions.map((style) => {
+            const active = onboardingData.ridingStyle === style.mode;
+            return (
+              <Pressable
+                key={style.mode}
+                onPress={() => {
+                  setOnboardingData({ ridingStyle: style.mode });
+                  setPreferredMode(style.mode);
+                }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                  borderRadius: radius.md,
+                  borderWidth: 0.5,
+                  borderColor: active ? palette.text : palette.border,
+                  backgroundColor: active ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
+                  paddingHorizontal: 16,
+                  paddingVertical: 14,
+                }}>
+                <MaterialCommunityIcons
+                  name={style.icon}
+                  size={22}
+                  color={active ? palette.text : palette.textSecondary}
+                />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <AppText variant="bodyBold" style={{ color: active ? palette.text : palette.textSecondary }}>
+                    {style.label}
+                  </AppText>
+                  <AppText variant="meta" style={{ fontSize: 12, color: palette.textTertiary }}>
+                    {style.subtitle}
+                  </AppText>
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
 
-        <Button title="Next →" onPress={handleNext} />
+        <Button title={isOnboarding ? 'Next →' : 'Save Bike →'} onPress={handleNext} disabled={!isComplete} />
       </GlassCard>
     </AppScrollScreen>
   );

@@ -69,7 +69,7 @@ export default function PaywallScreen() {
 
       if (result === rc.PURCHASE_RESULT?.PURCHASED) {
         setPurchaseCompleted(true);
-        setOnboardingStep(7);
+        setOnboardingStep(8);
         router.replace('/(public)/success' as any);
         return true;
       }
@@ -91,7 +91,7 @@ export default function PaywallScreen() {
     if (!env.revenueCatEnabled) {
       // Dev bypass: simulate successful purchase
       setPurchaseCompleted(true);
-      setOnboardingStep(7);
+      setOnboardingStep(8);
       router.replace('/(public)/success' as any);
       return;
     }
@@ -141,7 +141,7 @@ export default function PaywallScreen() {
     <AppScrollScreen contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
       <View style={{ gap: 18 }}>
         <AppText variant="label" style={{ color: palette.textSecondary, textAlign: 'center' }}>
-          Step 6 of 7
+          Step 7 of 8
         </AppText>
         <View style={{ gap: 0 }}>
           <View style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: 20, gap: 12 }}>
@@ -255,7 +255,7 @@ export default function PaywallScreen() {
             try {
               await purchases.default.restorePurchases();
               setPurchaseCompleted(true);
-              setOnboardingStep(7);
+              setOnboardingStep(8);
               router.replace('/(public)/success' as any);
             } catch {
               // ignore

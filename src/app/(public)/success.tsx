@@ -76,7 +76,7 @@ export default function OnboardingSuccessScreen() {
             }}
           />
           <AppText variant="label" style={{ color: palette.textTertiary, textAlign: 'center', fontSize: 11 }}>
-            Step 7 of 7
+            Step 8 of 8
           </AppText>
         </View>
       </View>

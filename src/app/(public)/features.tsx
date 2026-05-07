@@ -69,7 +69,7 @@ export default function OnboardingFeaturesScreen() {
         <View style={{ gap: 28 }}>
           <View style={{ alignItems: 'center', gap: 10 }}>
             <AppText variant="label" style={{ color: palette.textSecondary }}>
-              Step 4 of 7
+              Step 5 of 8
             </AppText>
             <AppText variant="screenTitle" style={{ textAlign: 'center', fontSize: 28 }}>
               {isWeekend ? 'Weekend Arsenal' : 'Daily Arsenal'}
@@ -93,7 +93,7 @@ export default function OnboardingFeaturesScreen() {
             <Button
               title="Next →"
               onPress={() => {
-                setOnboardingStep(5);
+                setOnboardingStep(6);
                 router.replace('/(public)/permissions' as any);
               }}
             />

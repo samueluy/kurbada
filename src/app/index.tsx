@@ -16,7 +16,11 @@ export default function IndexScreen() {
   const bypassGate = env.devBypassAppGate;
 
   if (loading && !bypassGate) {
-    return <Redirect href="/(public)/splash" />;
+    if (!hasSeenSplash) {
+      return <Redirect href="/(public)/splash" />;
+    }
+
+    return null;
   }
 
   if (!hasSeenSplash) {
@@ -26,11 +30,12 @@ export default function IndexScreen() {
   if (!bypassGate && !hasCompletedOnboarding) {
     if (onboardingStep === 1) return <Redirect href="/(public)/onboarding" />;
     if (onboardingStep === 2) return <Redirect href="/(public)/bike-setup?flow=onboarding" />;
-    if (onboardingStep === 3) return <Redirect href="/(public)/emergency?flow=onboarding" />;
-    if (onboardingStep === 4) return <Redirect href={'/(public)/features' as any} />;
-    if (onboardingStep === 5) return <Redirect href={'/(public)/permissions' as any} />;
-    if (onboardingStep === 6) return <Redirect href="/(public)/paywall" />;
-    if (onboardingStep === 7 && purchaseCompleted) return <Redirect href={'/(public)/success' as any} />;
+    if (onboardingStep === 3) return <Redirect href="/(public)/maintenance" />;
+    if (onboardingStep === 4) return <Redirect href="/(public)/emergency?flow=onboarding" />;
+    if (onboardingStep === 5) return <Redirect href={'/(public)/features' as any} />;
+    if (onboardingStep === 6) return <Redirect href={'/(public)/permissions' as any} />;
+    if (onboardingStep === 7) return <Redirect href="/(public)/paywall" />;
+    if (onboardingStep === 8 && purchaseCompleted) return <Redirect href={'/(public)/success' as any} />;
   }
 
   if (!bypassGate && !session) {

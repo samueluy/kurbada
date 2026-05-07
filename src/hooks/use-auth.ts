@@ -1,3 +1,4 @@
+import * as Linking from 'expo-linking';
 import { useEffect, useState } from 'react';
 
 import { claimPendingReferralForUser } from '@/lib/referrals';
@@ -56,16 +57,23 @@ export function useAuth() {
       throw new Error('Supabase environment variables are not configured.');
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { display_name: displayName },
+        emailRedirectTo: Linking.createURL('/auth/confirmed'),
       },
     });
     if (error) {
       throw error;
     }
+
+    if (!data.session) {
+      return { requiresEmailVerification: true };
+    }
+
+    return { requiresEmailVerification: false };
   };
 
   const signOut = async () => {

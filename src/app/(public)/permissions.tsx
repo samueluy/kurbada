@@ -36,12 +36,12 @@ export default function PermissionsScreen() {
     if (!permissionsDone) return;
 
     const interval = setInterval(() => {
-      setLoadIndex((prev) => {
-        const next = prev + 1;
-        if (next >= loadingTexts.length) {
-          clearInterval(interval);
-          setTimeout(() => {
-            setOnboardingStep(6);
+          setLoadIndex((prev) => {
+            const next = prev + 1;
+            if (next >= loadingTexts.length) {
+              clearInterval(interval);
+              setTimeout(() => {
+            setOnboardingStep(7);
             router.replace('/(public)/paywall');
           }, 500);
         }
@@ -63,7 +63,7 @@ export default function PermissionsScreen() {
             </View>
             <View style={{ alignItems: 'center', gap: 14 }}>
               <AppText variant="label" style={{ color: palette.textSecondary }}>
-                Step 5 of 7
+                Step 6 of 8
               </AppText>
               <AppText variant="screenTitle" style={{ textAlign: 'center', fontSize: 32, lineHeight: 38 }}>
                 We need to connect{'\n'}to your sensors.

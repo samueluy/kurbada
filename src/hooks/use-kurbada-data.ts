@@ -1,21 +1,131 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { createId } from '@/lib/id';
+import {
+  getDefaultMaintenancePresets,
+  maintenancePresetCatalog,
+} from '@/lib/onboarding';
 import { claimReferralCodeForUser, normalizeReferralCode, toReferralRecord } from '@/lib/referrals';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { queryClient } from '@/lib/query-client';
+import { useAppStore } from '@/store/app-store';
 import { useLocalAppStore } from '@/store/local-app-store';
 import { useBlockedUsersStore } from '@/store/blocked-users-store';
-import type { Bike, EmergencyInfo, FuelLog, MaintenanceTask, Profile, ReferralRecord, RideListing, RideRecord } from '@/types/domain';
+import type { Bike, EmergencyInfo, FuelLog, MaintenancePresetKey, MaintenanceTask, Profile, ReferralRecord, RideListing, RideRecord } from '@/types/domain';
 
-const defaultMaintenanceTemplates: Omit<MaintenanceTask, 'id' | 'bike_id' | 'last_done_odometer_km' | 'last_done_date'>[] = [
-  { task_name: 'Engine Oil Change', interval_km: 3000, interval_days: 180 },
-  { task_name: 'Chain Tension & Lube', interval_km: 600, interval_days: 90 },
-  { task_name: 'Brake Fluid', interval_km: 12000, interval_days: 730 },
-  { task_name: 'Air Filter', interval_km: 9000, interval_days: 365 },
-  { task_name: 'Spark Plugs', interval_km: 12000, interval_days: 730 },
-  { task_name: 'Coolant', interval_km: 18000, interval_days: 730 },
-  { task_name: 'Tire Pressure reminder', interval_km: 200, interval_days: 14 },
-];
+function toMaintenanceTemplates(keys: MaintenancePresetKey[], category: Bike['category']) {
+  const fallbackKeys = keys.length ? keys : getDefaultMaintenancePresets(category);
+  return fallbackKeys.map((key) => {
+    const preset = maintenancePresetCatalog[key];
+    return {
+      task_name: preset.taskName,
+      interval_km: preset.intervalKm,
+      interval_days: preset.intervalDays,
+    };
+  });
+}
+
+async function reconcileMaintenanceTemplates({
+  bikeId,
+  category,
+  currentOdometerKm,
+  selectedPresetKeys,
+  userId,
+  setMaintenanceTasksForBike,
+}: {
+  bikeId: string;
+  category: Bike['category'];
+  currentOdometerKm: number;
+  selectedPresetKeys: MaintenancePresetKey[];
+  userId?: string;
+  setMaintenanceTasksForBike: (bikeId: string, tasks: MaintenanceTask[]) => void;
+}) {
+  const desiredTemplates = toMaintenanceTemplates(selectedPresetKeys, category);
+  const desiredByName = new Map(desiredTemplates.map((template) => [template.task_name, template]));
+
+  if (supabase && userId) {
+    const client = supabase as any;
+    const { data, error } = await client.from('maintenance_tasks').select('*').eq('bike_id', bikeId);
+    if (error) {
+      throw error;
+    }
+
+    const existingTasks = (data as MaintenanceTask[]) ?? [];
+    const existingByName = new Map(existingTasks.map((task) => [task.task_name, task]));
+
+    const toDelete = existingTasks.filter((task) => !desiredByName.has(task.task_name));
+    const toInsert = desiredTemplates.filter((template) => !existingByName.has(template.task_name));
+    const toUpdate = existingTasks.filter((task) => desiredByName.has(task.task_name));
+
+    if (toDelete.length) {
+      const { error: deleteError } = await client.from('maintenance_tasks').delete().in(
+        'id',
+        toDelete.map((task) => task.id),
+      );
+      if (deleteError) {
+        throw deleteError;
+      }
+    }
+
+    for (const task of toUpdate) {
+      const template = desiredByName.get(task.task_name)!;
+      if (task.interval_km === template.interval_km && task.interval_days === template.interval_days) {
+        continue;
+      }
+
+      const { error: updateError } = await client
+        .from('maintenance_tasks')
+        .update({
+          interval_km: template.interval_km,
+          interval_days: template.interval_days,
+        } as any)
+        .eq('id', task.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+    }
+
+    if (toInsert.length) {
+      const { error: insertError } = await client.from('maintenance_tasks').insert(
+        toInsert.map((template) => ({
+          bike_id: bikeId,
+          task_name: template.task_name,
+          interval_km: template.interval_km,
+          interval_days: template.interval_days ?? null,
+          last_done_odometer_km: currentOdometerKm,
+          last_done_date: new Date().toISOString().slice(0, 10),
+        })) as any,
+      );
+      if (insertError) {
+        throw insertError;
+      }
+    }
+
+    const { data: refreshedData, error: refreshedError } = await client
+      .from('maintenance_tasks')
+      .select('*')
+      .eq('bike_id', bikeId);
+    if (refreshedError) {
+      throw refreshedError;
+    }
+    setMaintenanceTasksForBike(bikeId, refreshedData as MaintenanceTask[]);
+    await queryClient.invalidateQueries({ queryKey: ['maintenance', bikeId] });
+    return;
+  }
+
+  const localTasks: MaintenanceTask[] = desiredTemplates.map((template) => ({
+    id: createId(),
+    bike_id: bikeId,
+    task_name: template.task_name,
+    interval_km: template.interval_km,
+    interval_days: template.interval_days,
+    last_done_odometer_km: currentOdometerKm,
+    last_done_date: new Date().toISOString().slice(0, 10),
+  }));
+
+  setMaintenanceTasksForBike(bikeId, localTasks);
+}
 
 function useRemoteMode(userId?: string) {
   return Boolean(userId) && isSupabaseConfigured;
@@ -46,7 +156,7 @@ export function useBikes(userId?: string) {
 export function useMaintenanceTasks(bikeId?: string) {
   const localTasks = useLocalAppStore((state) => state.maintenanceTasks);
   const filteredLocal = bikeId ? localTasks.filter((task) => task.bike_id === bikeId) : [];
-  const useRemote = useRemoteMode(undefined);
+  const useRemote = Boolean(bikeId) && isSupabaseConfigured;
 
   const query = useQuery({
     queryKey: ['maintenance', bikeId ?? 'local'],
@@ -289,10 +399,10 @@ export function useBikeMutations(userId?: string) {
   const queryClient = useQueryClient();
   const upsertBikeLocal = useLocalAppStore((state) => state.upsertBike);
   const deleteBikeLocal = useLocalAppStore((state) => state.deleteBike);
-  const addMaintenanceTasks = useLocalAppStore((state) => state.addMaintenanceTasks);
+  const setMaintenanceTasksForBike = useLocalAppStore((state) => state.setMaintenanceTasksForBike);
 
   const saveBike = useMutation({
-    mutationFn: async (bike: Bike) => {
+    mutationFn: async (bike: Bike & { maintenancePresetKeys?: MaintenancePresetKey[] }) => {
       if (supabase && userId) {
         const payload = {
           make: bike.make,
@@ -314,51 +424,30 @@ export function useBikeMutations(userId?: string) {
 
         const savedBike = data as Bike;
         upsertBikeLocal(savedBike);
+        await reconcileMaintenanceTemplates({
+          bikeId: savedBike.id,
+          category: savedBike.category,
+          currentOdometerKm: savedBike.current_odometer_km,
+          selectedPresetKeys: bike.maintenancePresetKeys ?? [],
+          userId,
+          setMaintenanceTasksForBike,
+        });
         return savedBike;
       }
 
       const localBike = { ...bike, id: bike.id || createId() };
       upsertBikeLocal(localBike);
+      await reconcileMaintenanceTemplates({
+        bikeId: localBike.id,
+        category: localBike.category,
+        currentOdometerKm: localBike.current_odometer_km,
+        selectedPresetKeys: bike.maintenancePresetKeys ?? [],
+        setMaintenanceTasksForBike,
+      });
       return localBike;
     },
     onSuccess: async (bike) => {
       await queryClient.invalidateQueries({ queryKey: ['bikes', userId ?? 'local'] });
-
-      const existingTasks = queryClient.getQueryData<MaintenanceTask[]>(['maintenance', bike.id]) ?? [];
-      if (existingTasks.length) return;
-
-      const baseTasks = defaultMaintenanceTemplates.map((template) => ({
-        bike_id: bike.id,
-        task_name: template.task_name,
-        interval_km: template.interval_km,
-        interval_days: template.interval_days ?? null,
-        last_done_odometer_km: bike.current_odometer_km,
-        last_done_date: new Date().toISOString().slice(0, 10),
-      }));
-
-      if (supabase && userId) {
-        const { data, error } = await supabase
-          .from('maintenance_tasks')
-          .insert(baseTasks.map((t) => ({
-            bike_id: t.bike_id,
-            task_name: t.task_name,
-            interval_km: t.interval_km,
-            interval_days: t.interval_days ?? null,
-            last_done_odometer_km: t.last_done_odometer_km,
-            last_done_date: t.last_done_date,
-          })) as any)
-          .select();
-        if (error) throw error;
-        addMaintenanceTasks(data as MaintenanceTask[]);
-      } else {
-        addMaintenanceTasks(
-          baseTasks.map((task) => ({
-            ...task,
-            id: createId(),
-          })) as MaintenanceTask[],
-        );
-      }
-
       await queryClient.invalidateQueries({ queryKey: ['maintenance', bike.id] });
     },
   });
@@ -593,6 +682,116 @@ export function useEmergencyMutations(userId?: string) {
   });
 
   return { saveEmergencyInfo };
+}
+
+export function useOnboardingSync(userId?: string) {
+  const onboardingData = useAppStore((state) => state.onboardingData);
+  const onboardingSyncStatus = useAppStore((state) => state.onboardingSyncStatus);
+  const onboardingSyncedUserId = useAppStore((state) => state.onboardingSyncedUserId);
+  const markOnboardingSyncing = useAppStore((state) => state.markOnboardingSyncing);
+  const markOnboardingSyncComplete = useAppStore((state) => state.markOnboardingSyncComplete);
+  const markOnboardingSyncFailed = useAppStore((state) => state.markOnboardingSyncFailed);
+  const completeBikeSetup = useAppStore((state) => state.completeBikeSetup);
+  const bikes = useBikes(userId);
+  const emergency = useEmergencyInfo(userId);
+  const { saveBike } = useBikeMutations(userId);
+  const { saveEmergencyInfo } = useEmergencyMutations(userId);
+
+  const localKey = userId ?? 'local';
+  const hasBikeDraft = Boolean(
+    onboardingData.bikeBrand.trim()
+      && onboardingData.bikeModel.trim()
+      && onboardingData.bikeYear.trim()
+      && onboardingData.bikeEngineCc.trim()
+      && onboardingData.bikeOdometerKm.trim(),
+  );
+  const hasEmergencyMinimum = Boolean(
+    onboardingData.fullName.trim()
+      && onboardingData.emergencyContactName.trim()
+      && onboardingData.emergencyContactPhone.trim(),
+  );
+
+  const needsSync =
+    onboardingSyncStatus !== 'completed'
+    || onboardingSyncedUserId !== localKey;
+
+  useQuery({
+    queryKey: ['onboarding-sync', localKey, onboardingSyncStatus, onboardingSyncedUserId, onboardingData],
+    enabled:
+      needsSync
+      && onboardingSyncStatus !== 'syncing'
+      && (hasBikeDraft || hasEmergencyMinimum)
+      && !bikes.isLoading
+      && !emergency.isLoading,
+    retry: false,
+    queryFn: async () => {
+      markOnboardingSyncing();
+
+      let syncedBikeId: string | null = null;
+      let syncedEmergencyId: string | null = null;
+
+      try {
+        if (hasBikeDraft) {
+          const existingBike = bikes.data?.find(
+            (item) =>
+              item.make.toLowerCase() === onboardingData.bikeBrand.trim().toLowerCase()
+              && item.model.toLowerCase() === onboardingData.bikeModel.trim().toLowerCase()
+              && item.year === Number(onboardingData.bikeYear),
+          );
+
+          const bike = await saveBike.mutateAsync({
+            id: existingBike?.id ?? '',
+            make: onboardingData.bikeBrand.trim(),
+            model: onboardingData.bikeModel.trim(),
+            year: Number(onboardingData.bikeYear),
+            engine_cc: Number(onboardingData.bikeEngineCc),
+            current_odometer_km: Number(onboardingData.bikeOdometerKm),
+            category: onboardingData.bikeCategory,
+            maintenancePresetKeys: onboardingData.maintenancePresetKeys,
+          });
+
+          syncedBikeId = bike.id;
+          completeBikeSetup();
+        }
+
+        if (hasEmergencyMinimum) {
+          const savedEmergency = await saveEmergencyInfo.mutateAsync({
+            id: emergency.data?.id ?? '',
+            full_name: onboardingData.fullName.trim(),
+            blood_type: onboardingData.bloodType,
+            allergies: onboardingData.allergies.trim(),
+            conditions: onboardingData.conditions.trim(),
+            contact1_name: onboardingData.emergencyContactName.trim(),
+            contact1_phone: onboardingData.emergencyContactPhone.trim(),
+            contact2_name: emergency.data?.contact2_name ?? '',
+            contact2_phone: emergency.data?.contact2_phone ?? '',
+          });
+          syncedEmergencyId = savedEmergency.id;
+        }
+
+        markOnboardingSyncComplete({
+          userId: localKey,
+          bikeId: syncedBikeId,
+          emergencyId: syncedEmergencyId,
+        });
+
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['bikes', userId ?? 'local'] }),
+          queryClient.invalidateQueries({ queryKey: ['emergency', userId ?? 'local'] }),
+        ]);
+
+        return { syncedBikeId, syncedEmergencyId };
+      } catch (error) {
+        markOnboardingSyncFailed();
+        throw error;
+      }
+    },
+  });
+
+  return {
+    isSyncing: onboardingSyncStatus === 'pending' || onboardingSyncStatus === 'syncing',
+    hasPendingDraft: hasBikeDraft || hasEmergencyMinimum,
+  };
 }
 
 export function useRideListings(userId?: string) {

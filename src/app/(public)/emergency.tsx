@@ -47,8 +47,11 @@ export default function OnboardingEmergencyScreen() {
     if (onboardingData.fullName) {
       setForm((prev) => ({ ...prev, full_name: onboardingData.fullName }));
     }
-    if (onboardingData.emergencyContact) {
-      setForm((prev) => ({ ...prev, contact1_phone: onboardingData.emergencyContact }));
+    if (onboardingData.emergencyContactName) {
+      setForm((prev) => ({ ...prev, contact1_name: onboardingData.emergencyContactName }));
+    }
+    if (onboardingData.emergencyContactPhone) {
+      setForm((prev) => ({ ...prev, contact1_phone: onboardingData.emergencyContactPhone }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -57,10 +60,10 @@ export default function OnboardingEmergencyScreen() {
     () => JSON.stringify({
       name: form.full_name,
       blood: form.blood_type,
-      contact: isOnboarding ? form.contact1_phone : form.contact1_name,
+      contact: form.contact1_name,
       phone: form.contact1_phone,
     }),
-    [form, isOnboarding],
+    [form],
   );
 
   const handleContinue = async (skip = false) => {
@@ -68,7 +71,10 @@ export default function OnboardingEmergencyScreen() {
       setOnboardingData({
         fullName: form.full_name,
         bloodType: form.blood_type,
-        emergencyContact: form.contact1_phone,
+        emergencyContactName: form.contact1_name,
+        emergencyContactPhone: form.contact1_phone,
+        allergies: form.allergies,
+        conditions: form.conditions,
       });
 
       if (session?.user.id) {
@@ -77,7 +83,7 @@ export default function OnboardingEmergencyScreen() {
     }
 
     if (isOnboarding) {
-      setOnboardingStep(4);
+      setOnboardingStep(5);
       router.replace('/(public)/features' as any);
     }
   };
@@ -93,7 +99,7 @@ export default function OnboardingEmergencyScreen() {
               </View>
               <View style={{ alignItems: 'center', gap: 8 }}>
                 <AppText variant="label" style={{ color: palette.textSecondary }}>
-                  Step 3 of 7
+                  Step 4 of 8
                 </AppText>
                 <AppText variant="screenTitle" style={{ fontSize: 30, textAlign: 'center' }}>
                   Ride with peace of mind.
@@ -137,6 +143,12 @@ export default function OnboardingEmergencyScreen() {
         </View>
 
         <FloatingField label="Full Name" value={form.full_name} onChangeText={(value) => setForm({ ...form, full_name: value })} placeholder="Juan dela Cruz" />
+        <FloatingField
+          label="Emergency Contact Name"
+          value={form.contact1_name}
+          onChangeText={(value) => setForm({ ...form, contact1_name: value })}
+          placeholder="Mark dela Cruz"
+        />
 
         <View style={{ gap: 8 }}>
           <AppText variant="label" style={{ color: palette.textSecondary, fontSize: 12 }}>Blood Type</AppText>
@@ -172,6 +184,20 @@ export default function OnboardingEmergencyScreen() {
           onChangeText={(value) => setForm({ ...form, contact1_phone: value })}
           placeholder="+63917..."
           keyboardType="phone-pad"
+        />
+
+        <FloatingField
+          label="Allergies (Optional)"
+          value={form.allergies}
+          onChangeText={(value) => setForm({ ...form, allergies: value })}
+          placeholder="Penicillin"
+        />
+
+        <FloatingField
+          label="Conditions (Optional)"
+          value={form.conditions}
+          onChangeText={(value) => setForm({ ...form, conditions: value })}
+          placeholder="Asthma"
         />
 
         <AppText variant="meta" style={{ color: palette.textSecondary, textAlign: 'center', fontSize: 12 }}>

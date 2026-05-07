@@ -13,6 +13,13 @@ export type SubscriptionStatus = 'inactive' | 'trialing' | 'active' | 'grace_per
 export type AccessOverride = 'none' | 'development' | 'apple_review' | 'closed_testing';
 
 export type ReferralStatus = 'pending' | 'rewarded' | 'rejected';
+export type MaintenancePresetKey =
+  | 'oil_change'
+  | 'chain_lube'
+  | 'brake_pad_wear'
+  | 'air_filter_service'
+  | 'tire_wear'
+  | 'cvt_belt_cleaning';
 
 export type UnitsPreference = 'metric' | 'imperial';
 

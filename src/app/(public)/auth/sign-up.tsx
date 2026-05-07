@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { GlassCard } from '@/components/ui/glass-card';
 import { palette, radius } from '@/constants/theme';
 import { env } from '@/lib/env';
+import { getRideModeLabel } from '@/lib/onboarding';
 import { useAuth } from '@/hooks/use-auth';
 import { useAppStore } from '@/store/app-store';
 
@@ -35,7 +36,6 @@ function Field({ value, onChangeText, placeholder, secureTextEntry = false }: { 
 export default function SignUpScreen() {
   const { session, signUp } = useAuth();
   const onboardingData = useAppStore((state) => state.onboardingData);
-  const resetOnboardingData = useAppStore((state) => state.resetOnboardingData);
   const [displayName, setDisplayName] = useState(onboardingData.fullName || '');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -55,7 +55,7 @@ export default function SignUpScreen() {
         <View style={{ gap: 6 }}>
           <AppText variant="screenTitle" style={{ fontSize: 30 }}>Create account</AppText>
           <AppText variant="meta" style={{ color: palette.textSecondary }}>
-            Your onboarding data is saved. Sign up to complete your profile.
+            Your onboarding data is saved. Create your account to drop straight into Kurbada.
           </AppText>
         </View>
 
@@ -63,7 +63,9 @@ export default function SignUpScreen() {
           <View style={{ padding: 12, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.04)', gap: 4 }}>
             <AppText variant="label" style={{ color: palette.textTertiary, fontSize: 11 }}>Your setup</AppText>
             <AppText variant="meta" style={{ color: palette.textSecondary }}>
-              {onboardingData.bikeBrand} · {onboardingData.ccClass} · {onboardingData.ridingStyle === 'weekend' ? 'Weekend Twisties' : 'Daily Ride'}
+              {onboardingData.bikeBrand} {onboardingData.bikeModel ? `· ${onboardingData.bikeModel}` : ''}
+              {onboardingData.bikeEngineCc ? ` · ${onboardingData.bikeEngineCc}cc` : ''}
+              {` · ${getRideModeLabel(onboardingData.ridingStyle)}`}
             </AppText>
           </View>
         ) : null}
@@ -78,8 +80,11 @@ export default function SignUpScreen() {
           onPress={async () => {
             try {
               setBusy(true);
-              await signUp(email.trim(), password, displayName.trim() || onboardingData.fullName || 'Kurbada Rider');
-              resetOnboardingData();
+              const result = await signUp(email.trim(), password, displayName.trim() || onboardingData.fullName || 'Kurbada Rider');
+              if (result.requiresEmailVerification) {
+                router.replace('/(public)/auth/confirmed?mode=pending');
+                return;
+              }
               router.replace('/');
             } catch (error) {
               Alert.alert('Sign up failed', error instanceof Error ? error.message : 'Please try again.');

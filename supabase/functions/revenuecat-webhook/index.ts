@@ -1,9 +1,14 @@
 // @ts-nocheck
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-const revenueCatSecretApiKey = Deno.env.get('REVENUECAT_SECRET_API_KEY') ?? '';
+const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? Deno.env.get('KURBADA_SUPABASE_URL') ?? '';
+const serviceRoleKey = Deno.env.get('KURBADA_SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY') ?? '';
+const revenueCatSecretApiKey = Deno.env.get('RC_SECRET_PROMO_KEY') ?? Deno.env.get('REVENUECAT_SECRET_API_KEY') ?? '';
+const revenueCatSecretApiKeySource = Deno.env.get('RC_SECRET_PROMO_KEY')
+  ? 'RC_SECRET_PROMO_KEY'
+  : Deno.env.get('REVENUECAT_SECRET_API_KEY')
+    ? 'REVENUECAT_SECRET_API_KEY'
+    : 'missing';
 const webhookAuthorization = Deno.env.get('REVENUECAT_WEBHOOK_AUTHORIZATION') ?? '';
 const premiumEntitlementId = Deno.env.get('REVENUECAT_PREMIUM_ENTITLEMENT_ID') ?? 'premium';
 
@@ -37,6 +42,17 @@ function json(status: number, body: Record<string, unknown>) {
 }
 
 async function grantPromotionalEntitlement(appUserId: string) {
+  console.log(
+    JSON.stringify({
+      scope: 'revenuecat-webhook',
+      step: 'grant-promotional-entitlement',
+      keySource: revenueCatSecretApiKeySource,
+      keyPrefix: revenueCatSecretApiKey.slice(0, 4),
+      entitlementId: premiumEntitlementId,
+      appUserId,
+    }),
+  );
+
   const response = await fetch(
     `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(appUserId)}/entitlements/${encodeURIComponent(premiumEntitlementId)}/promotional`,
     {
@@ -53,6 +69,16 @@ async function grantPromotionalEntitlement(appUserId: string) {
 
   if (!response.ok) {
     const body = await response.text();
+    console.error(
+      JSON.stringify({
+        scope: 'revenuecat-webhook',
+        step: 'grant-promotional-entitlement-failed',
+        keySource: revenueCatSecretApiKeySource,
+        keyPrefix: revenueCatSecretApiKey.slice(0, 4),
+        status: response.status,
+        body,
+      }),
+    );
     throw new Error(`RevenueCat promotional entitlement grant failed: ${response.status} ${body}`);
   }
 }
