@@ -21,7 +21,8 @@ import { palette } from '@/constants/theme';
 import { env } from '@/lib/env';
 import { getMapboxModule } from '@/lib/mapbox';
 import { queryClient } from '@/lib/query-client';
-import { configureRevenueCat } from '@/services/revenuecat';
+import { supabase } from '@/lib/supabase';
+import { configureRevenueCat, syncRevenueCatIdentity } from '@/services/revenuecat';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
@@ -54,6 +55,22 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         Mapbox?.setAccessToken(env.mapboxToken);
       }
     }
+
+    if (!supabase) {
+      return undefined;
+    }
+
+    supabase.auth.getSession().then(({ data }) => {
+      void syncRevenueCatIdentity(data.session?.user.id ?? null);
+    });
+
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      void syncRevenueCatIdentity(session?.user.id ?? null);
+    });
+
+    return () => {
+      data.subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {

@@ -32,6 +32,7 @@ export function useUserProfile(userId?: string) {
         subscription_status: profile.subscription_status,
         subscription_expires_at: profile.subscription_expires_at,
         access_override: profile.access_override,
+        referral_code: profile.referral_code,
       };
     },
     initialData: useRemote ? undefined : localProfile,

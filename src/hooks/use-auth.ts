@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { claimPendingReferralForUser } from '@/lib/referrals';
 import { isSupabaseConfigured, supabase, type SupabaseSession } from '@/lib/supabase';
 
 export function useAuth() {
@@ -24,6 +25,13 @@ export function useAuth() {
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
       setLoading(false);
+
+      if (nextSession?.user?.id) {
+        void claimPendingReferralForUser(
+          nextSession.user.id,
+          (nextSession.user.user_metadata?.display_name as string | undefined) ?? nextSession.user.email ?? undefined,
+        );
+      }
     });
 
     return () => {

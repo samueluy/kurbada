@@ -14,6 +14,7 @@ export type Database = {
           subscription_status: SubscriptionStatus;
           subscription_expires_at: string | null;
           access_override: AccessOverride;
+          referral_code: string;
         };
         Insert: {
           id: string;
@@ -23,8 +24,38 @@ export type Database = {
           subscription_status?: SubscriptionStatus;
           subscription_expires_at?: string | null;
           access_override?: AccessOverride;
+          referral_code?: string;
         };
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>;
+      };
+      referrals: {
+        Row: {
+          id: string;
+          referrer_user_id: string;
+          referred_user_id: string;
+          referral_code: string;
+          referred_display_name: string | null;
+          status: 'pending' | 'rewarded' | 'rejected';
+          rewarded_at: string | null;
+          notified_at: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['referrals']['Row'], 'id' | 'created_at'> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['referrals']['Insert']>;
+      };
+      revenuecat_webhook_events: {
+        Row: {
+          event_id: string;
+          event_type: string;
+          app_user_id: string;
+          processed_at: string;
+          payload: Json;
+        };
+        Insert: Database['public']['Tables']['revenuecat_webhook_events']['Row'];
+        Update: Partial<Database['public']['Tables']['revenuecat_webhook_events']['Insert']>;
       };
       bikes: {
         Row: {

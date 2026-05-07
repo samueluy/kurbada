@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { sampleBikes, sampleEmergencyInfo, sampleFuelLogs, sampleMaintenanceTasks, sampleProfile, sampleRideListings, sampleRides } from '@/lib/mock-data';
+import { sampleBikes, sampleEmergencyInfo, sampleFuelLogs, sampleMaintenanceTasks, sampleProfile, sampleReferrals, sampleRideListings, sampleRides } from '@/lib/mock-data';
 import { appStorage } from '@/lib/storage';
-import type { Bike, EmergencyInfo, FuelLog, MaintenanceTask, Profile, RideListing, RideRecord } from '@/types/domain';
+import type { Bike, EmergencyInfo, FuelLog, MaintenanceTask, Profile, ReferralRecord, RideListing, RideRecord } from '@/types/domain';
 
 type LocalAppState = {
   profile: Profile;
@@ -12,13 +12,17 @@ type LocalAppState = {
   rides: RideRecord[];
   fuelLogs: FuelLog[];
   emergencyInfo: EmergencyInfo;
+  referrals: ReferralRecord[];
   rideListings: RideListing[];
+  updateProfile: (updates: Partial<Profile>) => void;
   upsertBike: (bike: Bike) => void;
   deleteBike: (bikeId: string) => void;
   saveRide: (ride: RideRecord) => void;
   saveFuelLog: (fuelLog: FuelLog) => void;
   deleteFuelLog: (fuelLogId: string) => void;
   updateEmergencyInfo: (info: EmergencyInfo) => void;
+  upsertReferral: (referral: ReferralRecord) => void;
+  markReferralNotified: (referralId: string, notifiedAt?: string) => void;
   addMaintenanceTasks: (tasks: MaintenanceTask[]) => void;
   addMaintenanceTask: (task: MaintenanceTask) => void;
   updateMaintenanceTask: (task: MaintenanceTask) => void;
@@ -37,6 +41,11 @@ export const useLocalAppStore = create<LocalAppState>()(
       rides: sampleRides,
       fuelLogs: sampleFuelLogs,
       emergencyInfo: sampleEmergencyInfo,
+      referrals: sampleReferrals,
+      updateProfile: (updates) =>
+        set((state) => ({
+          profile: { ...state.profile, ...updates },
+        })),
       upsertBike: (bike) =>
         set((state) => ({
           bikes: state.bikes.some((item) => item.id === bike.id)
@@ -62,6 +71,18 @@ export const useLocalAppStore = create<LocalAppState>()(
           fuelLogs: state.fuelLogs.filter((item) => item.id !== fuelLogId),
         })),
       updateEmergencyInfo: (emergencyInfo) => set({ emergencyInfo }),
+      upsertReferral: (referral) =>
+        set((state) => ({
+          referrals: state.referrals.some((item) => item.id === referral.id)
+            ? state.referrals.map((item) => (item.id === referral.id ? referral : item))
+            : [referral, ...state.referrals],
+        })),
+      markReferralNotified: (referralId, notifiedAt = new Date().toISOString()) =>
+        set((state) => ({
+          referrals: state.referrals.map((item) =>
+            item.id === referralId ? { ...item, notified_at: notifiedAt } : item,
+          ),
+        })),
       rideListings: sampleRideListings,
       addRideListing: (listing) =>
         set((state) => ({

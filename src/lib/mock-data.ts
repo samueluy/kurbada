@@ -1,4 +1,4 @@
-import type { Bike, EmergencyInfo, FuelLog, MaintenanceTask, Profile, RideListing, RideRecord } from '@/types/domain';
+import type { Bike, EmergencyInfo, FuelLog, MaintenanceTask, Profile, ReferralRecord, RideListing, RideRecord } from '@/types/domain';
 import { buildRouteGeoJson, computeRouteBounds } from '@/lib/route';
 
 const samplePoints = [
@@ -19,6 +19,7 @@ export const sampleProfile: Profile = {
   member_since: '2026-05-01',
   subscription_status: 'trialing',
   access_override: 'development',
+  referral_code: 'SAMUEL9F71',
 };
 
 export const sampleBikes: Bike[] = [
@@ -125,5 +126,19 @@ export const sampleRideListings: RideListing[] = [
     is_reported: false,
     display_name: 'Maria Rider',
     created_at: new Date().toISOString(),
+  },
+];
+
+export const sampleReferrals: ReferralRecord[] = [
+  {
+    id: '5c80d07f-5ca6-4aa7-aa49-a3f808b387f6',
+    referrer_user_id: sampleProfile.id,
+    referred_user_id: 'b1b4d693-d6a9-4ec9-bca7-9b44d695730d',
+    referral_code: sampleProfile.referral_code,
+    referred_display_name: 'Leo Rider',
+    status: 'rewarded',
+    rewarded_at: new Date(Date.now() - 86_400_000).toISOString(),
+    notified_at: null,
+    created_at: new Date(Date.now() - 172_800_000).toISOString(),
   },
 ];

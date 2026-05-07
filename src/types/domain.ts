@@ -10,7 +10,9 @@ export type RideSessionState =
 
 export type SubscriptionStatus = 'inactive' | 'trialing' | 'active' | 'grace_period' | 'canceled';
 
-export type AccessOverride = 'none' | 'development' | 'apple_review';
+export type AccessOverride = 'none' | 'development' | 'apple_review' | 'closed_testing';
+
+export type ReferralStatus = 'pending' | 'rewarded' | 'rejected';
 
 export type UnitsPreference = 'metric' | 'imperial';
 
@@ -122,6 +124,19 @@ export type Profile = {
   subscription_status: SubscriptionStatus;
   subscription_expires_at?: string | null;
   access_override: AccessOverride;
+  referral_code: string;
+};
+
+export type ReferralRecord = {
+  id: string;
+  referrer_user_id: string;
+  referred_user_id: string;
+  referral_code: string;
+  referred_display_name?: string | null;
+  status: ReferralStatus;
+  rewarded_at?: string | null;
+  notified_at?: string | null;
+  created_at: string;
 };
 
 export type RidePoint = {

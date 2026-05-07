@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { createId } from '@/lib/id';
+import { claimReferralCodeForUser, normalizeReferralCode, toReferralRecord } from '@/lib/referrals';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { useLocalAppStore } from '@/store/local-app-store';
-import type { Bike, EmergencyInfo, FuelLog, MaintenanceTask, RideListing, RideRecord } from '@/types/domain';
 import { useBlockedUsersStore } from '@/store/blocked-users-store';
+import type { Bike, EmergencyInfo, FuelLog, MaintenanceTask, Profile, ReferralRecord, RideListing, RideRecord } from '@/types/domain';
 
 const defaultMaintenanceTemplates: Omit<MaintenanceTask, 'id' | 'bike_id' | 'last_done_odometer_km' | 'last_done_date'>[] = [
   { task_name: 'Engine Oil Change', interval_km: 3000, interval_days: 180 },
@@ -129,6 +130,159 @@ export function useEmergencyInfo(userId?: string) {
   }
 
   return query;
+}
+
+export function useReferrals(userId?: string) {
+  const localReferrals = useLocalAppStore((state) => state.referrals);
+  const useRemote = useRemoteMode(userId);
+  const filteredLocal = userId
+    ? localReferrals.filter(
+        (item) => item.referrer_user_id === userId || item.referred_user_id === userId,
+      )
+    : localReferrals;
+
+  const query = useQuery({
+    queryKey: ['referrals', userId ?? 'local'],
+    enabled: useRemote,
+    queryFn: async () => {
+      if (!supabase || !userId) {
+        return filteredLocal;
+      }
+
+      const { data, error } = await supabase
+        .from('referrals')
+        .select('*')
+        .or(`referrer_user_id.eq.${userId},referred_user_id.eq.${userId}`)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      return (data as any[]).map(toReferralRecord);
+    },
+  });
+
+  if (!useRemote) {
+    return { data: filteredLocal, isLoading: false, error: null, isFetching: false };
+  }
+
+  return query;
+}
+
+export function useProfileMutations(userId?: string) {
+  const queryClient = useQueryClient();
+  const updateProfileLocal = useLocalAppStore((state) => state.updateProfile);
+
+  const updateReferralCode = useMutation({
+    mutationFn: async (nextCode: string) => {
+      const normalizedCode = normalizeReferralCode(nextCode);
+
+      if (!normalizedCode) {
+        throw new Error('Referral codes must use letters and numbers only.');
+      }
+
+      if (supabase && userId) {
+        const client = supabase as any;
+        const { data, error } = await client
+          .from('profiles')
+          .update({ referral_code: normalizedCode })
+          .eq('id', userId)
+          .select('*')
+          .single();
+
+        if (error) {
+          throw error;
+        }
+
+        const profile = data as any;
+        const savedProfile: Profile = {
+          id: profile.id,
+          display_name: profile.display_name ?? 'Kurbada Rider',
+          avatar_url: profile.avatar_url,
+          created_at: profile.created_at,
+          subscription_status: profile.subscription_status,
+          subscription_expires_at: profile.subscription_expires_at,
+          access_override: profile.access_override,
+          referral_code: profile.referral_code,
+        };
+
+        updateProfileLocal(savedProfile);
+        return savedProfile;
+      }
+
+      updateProfileLocal({ referral_code: normalizedCode });
+      return { ...useLocalAppStore.getState().profile, referral_code: normalizedCode };
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['profile', userId ?? 'local'] });
+    },
+  });
+
+  return { updateReferralCode };
+}
+
+export function useReferralMutations(userId?: string) {
+  const queryClient = useQueryClient();
+  const upsertReferralLocal = useLocalAppStore((state) => state.upsertReferral);
+  const markReferralNotifiedLocal = useLocalAppStore((state) => state.markReferralNotified);
+
+  const applyReferralCode = useMutation({
+    mutationFn: async ({
+      code,
+      referredDisplayName,
+    }: {
+      code: string;
+      referredDisplayName?: string;
+    }) => {
+      if (!userId) {
+        throw new Error('Sign in to apply a referral code.');
+      }
+
+      const referral = await claimReferralCodeForUser({
+        code,
+        referredUserId: userId,
+        referredDisplayName,
+      });
+      upsertReferralLocal(referral);
+      return referral;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['referrals', userId ?? 'local'] });
+    },
+  });
+
+  const markReferralNotified = useMutation({
+    mutationFn: async (referralId: string) => {
+      const notifiedAt = new Date().toISOString();
+
+      if (supabase && userId) {
+        const client = supabase as any;
+        const { data, error } = await client
+          .from('referrals')
+          .update({ notified_at: notifiedAt })
+          .eq('id', referralId)
+          .select('*')
+          .single();
+
+        if (error) {
+          throw error;
+        }
+
+        const referral = toReferralRecord(data);
+        markReferralNotifiedLocal(referral.id, referral.notified_at ?? notifiedAt);
+        return referral;
+      }
+
+      markReferralNotifiedLocal(referralId, notifiedAt);
+      return useLocalAppStore.getState().referrals.find((item) => item.id === referralId) as ReferralRecord;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['referrals', userId ?? 'local'] });
+    },
+  });
+
+  return { applyReferralCode, markReferralNotified };
 }
 
 export function useBikeMutations(userId?: string) {

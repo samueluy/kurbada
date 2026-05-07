@@ -31,6 +31,7 @@ type AppStore = {
   onboardingStep: OnboardingStep;
   preferredMode: RideMode;
   purchaseCompleted: boolean;
+  pendingReferralCode: string;
   onboardingData: OnboardingData;
   setHasSeenSplash: () => void;
   completeOnboarding: () => void;
@@ -38,6 +39,7 @@ type AppStore = {
   setOnboardingStep: (step: OnboardingStep) => void;
   setPreferredMode: (mode: RideMode) => void;
   setPurchaseCompleted: (value: boolean) => void;
+  setPendingReferralCode: (code: string) => void;
   setOnboardingData: (data: Partial<OnboardingData>) => void;
   resetOnboardingData: () => void;
 };
@@ -51,6 +53,7 @@ export const useAppStore = create<AppStore>()(
       onboardingStep: 1,
       preferredMode: 'weekend',
       purchaseCompleted: false,
+      pendingReferralCode: '',
       onboardingData: defaultOnboardingData,
       setHasSeenSplash: () => set({ hasSeenSplash: true }),
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
@@ -58,6 +61,7 @@ export const useAppStore = create<AppStore>()(
       setOnboardingStep: (onboardingStep) => set({ onboardingStep }),
       setPreferredMode: (mode) => set({ preferredMode: mode }),
       setPurchaseCompleted: (purchaseCompleted) => set({ purchaseCompleted }),
+      setPendingReferralCode: (pendingReferralCode) => set({ pendingReferralCode }),
       setOnboardingData: (data) =>
         set((state) => ({
           onboardingData: { ...state.onboardingData, ...data },
@@ -74,6 +78,7 @@ export const useAppStore = create<AppStore>()(
         onboardingStep: state.onboardingStep,
         preferredMode: state.preferredMode,
         purchaseCompleted: state.purchaseCompleted,
+        pendingReferralCode: state.pendingReferralCode,
         onboardingData: state.onboardingData,
       }),
     },

@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { env } from '@/lib/env';
 
 let configured = false;
+let currentAppUserId: string | null = null;
 
 function getPurchases() {
   if (Platform.OS === 'web') {
@@ -32,6 +33,36 @@ export async function configureRevenueCat() {
   purchases.default.setLogLevel(purchases.LOG_LEVEL.WARN);
   await purchases.default.configure({ apiKey });
   configured = true;
+}
+
+export async function syncRevenueCatIdentity(userId: string | null) {
+  if (!env.revenueCatEnabled || Platform.OS === 'web') {
+    return;
+  }
+
+  await configureRevenueCat();
+
+  const purchases = getPurchases();
+  if (!purchases) {
+    return;
+  }
+
+  if (!userId) {
+    if (currentAppUserId === null) {
+      return;
+    }
+
+    await purchases.default.logOut();
+    currentAppUserId = null;
+    return;
+  }
+
+  if (currentAppUserId === userId) {
+    return;
+  }
+
+  await purchases.default.logIn(userId);
+  currentAppUserId = userId;
 }
 
 export async function getRevenueCatPremiumStatus() {

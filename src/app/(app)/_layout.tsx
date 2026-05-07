@@ -1,7 +1,10 @@
 import { Redirect, Stack } from 'expo-router';
+import { useEffect, useRef } from 'react';
+import { Alert } from 'react-native';
 
 import { env } from '@/lib/env';
 import { useAuth } from '@/hooks/use-auth';
+import { useReferralMutations, useReferrals } from '@/hooks/use-kurbada-data';
 import { useUserAccess } from '@/hooks/use-user-access';
 import { useAppStore } from '@/store/app-store';
 
@@ -9,7 +12,42 @@ export default function AppLayout() {
   const { session, loading } = useAuth();
   const hasCompletedBikeSetup = useAppStore((state) => state.hasCompletedBikeSetup);
   const access = useUserAccess(session?.user.id);
+  const referrals = useReferrals(session?.user.id);
+  const { markReferralNotified } = useReferralMutations(session?.user.id);
   const bypassGate = env.devBypassAppGate;
+  const shownReferralIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!session?.user.id || !referrals.data?.length) {
+      return;
+    }
+
+    const reward = referrals.data.find(
+      (item) =>
+        item.referrer_user_id === session.user.id
+        && item.status === 'rewarded'
+        && !item.notified_at,
+    );
+
+    if (!reward || shownReferralIdRef.current === reward.id) {
+      return;
+    }
+
+    shownReferralIdRef.current = reward.id;
+
+    Alert.alert(
+      'Referral unlocked',
+      `${reward.referred_display_name ?? 'A rider'} just joined! +1 Month of Premium added to your ignition.`,
+      [
+        {
+          text: 'Nice',
+          onPress: () => {
+            void markReferralNotified.mutateAsync(reward.id);
+          },
+        },
+      ],
+    );
+  }, [markReferralNotified, referrals.data, session?.user.id]);
 
   if (loading && !bypassGate) {
     return null;
