@@ -1,4 +1,4 @@
-import { Gauge, Timer } from 'lucide-react-native';
+import { Gauge, Share2, Timer } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
 import { GlassCard } from '@/components/ui/glass-card';
@@ -8,15 +8,28 @@ import { formatDateLabel, formatModeLabel } from '@/lib/format';
 import { palette } from '@/constants/theme';
 import type { RideRecord } from '@/types/domain';
 
-export function RideFeedCard({ ride, onPress }: { ride: RideRecord; onPress?: () => void }) {
+export function RideFeedCard({ ride, onPress, onShare }: { ride: RideRecord; onPress?: () => void; onShare?: () => void }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [{ opacity: pressed ? 0.92 : 1 }]}>
       <GlassCard style={{ padding: 14, gap: 12 }}>
         <RideMapThumbnail ride={ride} />
         <View style={{ gap: 6 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <AppText variant="bodyBold">{formatModeLabel(ride.mode)}</AppText>
-            <AppText variant="meta">{formatDateLabel(ride.started_at)}</AppText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <AppText variant="h3">{formatModeLabel(ride.mode)}</AppText>
+              <AppText variant="meta">{formatDateLabel(ride.started_at)}</AppText>
+            </View>
+            {onShare ? (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  onShare?.();
+                }}
+                hitSlop={8}
+                style={{ padding: 4 }}>
+                <Share2 size={15} color={palette.textTertiary} />
+              </Pressable>
+            ) : null}
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

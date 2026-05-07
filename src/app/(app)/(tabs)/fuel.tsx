@@ -42,9 +42,9 @@ export default function FuelTabScreen() {
   return (
     <AppScrollScreen>
       <View style={{ gap: 8 }}>
-        <AppText variant="label">Fuel Ledger</AppText>
+        <AppText variant="eyebrow">Fuel Ledger</AppText>
         <AppText variant="screenTitle">Ownership has a cost. Make it look good.</AppText>
-        <AppText variant="meta">Track your fill-ups like part of the machine story, not an accounting spreadsheet.</AppText>
+        <AppText variant="body">Track your fill-ups like part of the machine story, not an accounting spreadsheet.</AppText>
       </View>
 
       <SectionHeader title="Fuel Ledger" action={<Button title="+ Log" variant="secondary" onPress={() => setShowForm((value) => !value)} />} />
@@ -52,6 +52,10 @@ export default function FuelTabScreen() {
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <FuelSummaryCard label="This Month" value={formatCurrencyPhp(summary.total)} caption="Total fuel spend" />
         <FuelSummaryCard label="Avg ₱ / L" value={summary.avgPrice.toFixed(0)} caption="Pump average" />
+      </View>
+      <View style={{ flexDirection: 'row', gap: 12, marginTop: -16 }}>
+        <FuelSummaryCard label="Avg L/100KM" value={summary.litersTotal > 0 ? ((summary.litersTotal / Math.max(1, fuelLogs.data?.length ?? 1)) * 10).toFixed(1) : '0.0'} caption="Consumption trend" />
+        <FuelSummaryCard label="Rides Fueled" value={`${fuelLogs.data?.length ?? 0}`} caption="Logged fill-ups" />
       </View>
 
       {showForm ? (
@@ -66,9 +70,11 @@ export default function FuelTabScreen() {
                 onPress={() => setOctane(value)}
                 style={{
                   flex: 1,
-                  borderRadius: radius.pill,
+                  borderRadius: radius.sm,
                   paddingVertical: 10,
-                  backgroundColor: octane === value ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
+                  backgroundColor: octane === value ? palette.surfaceStrong : palette.surface,
+                  borderWidth: 0.5,
+                  borderColor: octane === value ? palette.dividerStrong : palette.border,
                   alignItems: 'center',
                 }}>
                 <AppText variant="button" style={{ color: octane === value ? palette.text : palette.textSecondary }}>

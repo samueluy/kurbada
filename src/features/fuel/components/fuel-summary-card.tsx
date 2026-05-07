@@ -12,10 +12,10 @@ export function FuelSummaryCard({
   caption?: string;
 }) {
   return (
-    <GlassCard style={{ flex: 1, padding: 16, gap: 8 }}>
+    <GlassCard style={{ flex: 1, padding: 14, gap: 6, borderRadius: 14 }}>
       <AppText variant="label">{label}</AppText>
-      <AppText variant="cardMetric">{value}</AppText>
-      {caption ? <AppText variant="meta" style={{ color: palette.textSecondary }}>{caption}</AppText> : null}
+      <AppText variant="cardMetric" style={{ fontSize: 22, lineHeight: 24 }}>{value}</AppText>
+      {caption ? <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 11 }}>{caption}</AppText> : null}
     </GlassCard>
   );
 }

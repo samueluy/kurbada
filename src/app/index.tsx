@@ -10,6 +10,8 @@ export default function IndexScreen() {
   const hasSeenSplash = useAppStore((state) => state.hasSeenSplash);
   const hasCompletedOnboarding = useAppStore((state) => state.hasCompletedOnboarding);
   const hasCompletedBikeSetup = useAppStore((state) => state.hasCompletedBikeSetup);
+  const onboardingStep = useAppStore((state) => state.onboardingStep);
+  const purchaseCompleted = useAppStore((state) => state.purchaseCompleted);
   const access = useUserAccess(session?.user.id);
   const bypassGate = env.devBypassAppGate;
 
@@ -22,7 +24,13 @@ export default function IndexScreen() {
   }
 
   if (!bypassGate && !hasCompletedOnboarding) {
-    return <Redirect href="/(public)/onboarding" />;
+    if (onboardingStep === 1) return <Redirect href="/(public)/onboarding" />;
+    if (onboardingStep === 2) return <Redirect href="/(public)/bike-setup?flow=onboarding" />;
+    if (onboardingStep === 3) return <Redirect href="/(public)/emergency?flow=onboarding" />;
+    if (onboardingStep === 4) return <Redirect href={'/(public)/features' as any} />;
+    if (onboardingStep === 5) return <Redirect href={'/(public)/permissions' as any} />;
+    if (onboardingStep === 6) return <Redirect href="/(public)/paywall" />;
+    if (onboardingStep === 7 && purchaseCompleted) return <Redirect href={'/(public)/success' as any} />;
   }
 
   if (!bypassGate && !session) {

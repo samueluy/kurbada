@@ -2,21 +2,44 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { appStorage } from '@/lib/storage';
-import type { LanguagePreference, RideMode, UnitsPreference } from '@/types/domain';
+import type { RideMode } from '@/types/domain';
+
+export type OnboardingStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export type OnboardingData = {
+  bikeBrand: string;
+  ccClass: string;
+  ridingStyle: RideMode;
+  fullName: string;
+  bloodType: string;
+  emergencyContact: string;
+};
+
+const defaultOnboardingData: OnboardingData = {
+  bikeBrand: '',
+  ccClass: '',
+  ridingStyle: 'weekend',
+  fullName: '',
+  bloodType: 'O+',
+  emergencyContact: '',
+};
 
 type AppStore = {
   hasSeenSplash: boolean;
   hasCompletedOnboarding: boolean;
   hasCompletedBikeSetup: boolean;
+  onboardingStep: OnboardingStep;
   preferredMode: RideMode;
-  language: LanguagePreference;
-  units: UnitsPreference;
+  purchaseCompleted: boolean;
+  onboardingData: OnboardingData;
   setHasSeenSplash: () => void;
   completeOnboarding: () => void;
   completeBikeSetup: () => void;
+  setOnboardingStep: (step: OnboardingStep) => void;
   setPreferredMode: (mode: RideMode) => void;
-  setLanguage: (language: LanguagePreference) => void;
-  setUnits: (units: UnitsPreference) => void;
+  setPurchaseCompleted: (value: boolean) => void;
+  setOnboardingData: (data: Partial<OnboardingData>) => void;
+  resetOnboardingData: () => void;
 };
 
 export const useAppStore = create<AppStore>()(
@@ -25,15 +48,21 @@ export const useAppStore = create<AppStore>()(
       hasSeenSplash: false,
       hasCompletedOnboarding: false,
       hasCompletedBikeSetup: false,
+      onboardingStep: 1,
       preferredMode: 'weekend',
-      language: 'en',
-      units: 'metric',
+      purchaseCompleted: false,
+      onboardingData: defaultOnboardingData,
       setHasSeenSplash: () => set({ hasSeenSplash: true }),
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
       completeBikeSetup: () => set({ hasCompletedBikeSetup: true }),
+      setOnboardingStep: (onboardingStep) => set({ onboardingStep }),
       setPreferredMode: (mode) => set({ preferredMode: mode }),
-      setLanguage: (language) => set({ language }),
-      setUnits: (units) => set({ units }),
+      setPurchaseCompleted: (purchaseCompleted) => set({ purchaseCompleted }),
+      setOnboardingData: (data) =>
+        set((state) => ({
+          onboardingData: { ...state.onboardingData, ...data },
+        })),
+      resetOnboardingData: () => set({ onboardingData: defaultOnboardingData }),
     }),
     {
       name: 'kurbada-app',
@@ -42,9 +71,10 @@ export const useAppStore = create<AppStore>()(
         hasSeenSplash: state.hasSeenSplash,
         hasCompletedOnboarding: state.hasCompletedOnboarding,
         hasCompletedBikeSetup: state.hasCompletedBikeSetup,
+        onboardingStep: state.onboardingStep,
         preferredMode: state.preferredMode,
-        language: state.language,
-        units: state.units,
+        purchaseCompleted: state.purchaseCompleted,
+        onboardingData: state.onboardingData,
       }),
     },
   ),

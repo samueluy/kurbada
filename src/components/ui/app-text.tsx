@@ -1,9 +1,13 @@
 import { Text, type TextProps } from 'react-native';
 
-import { Fonts, palette, typography } from '@/constants/theme';
+import { Fonts, Typography } from '@/constants/theme';
 
 type Variant =
   | 'brand'
+  | 'eyebrow'
+  | 'h1'
+  | 'h2'
+  | 'h3'
   | 'screenTitle'
   | 'sectionTitle'
   | 'heroMetric'
@@ -20,27 +24,25 @@ type Variant =
   | 'mono';
 
 const variantStyles: Record<Variant, TextProps['style']> = {
-  brand: { fontFamily: typography.heading, fontSize: 34, letterSpacing: 2.8, color: palette.text },
-  screenTitle: { fontFamily: typography.heading, fontSize: 34, color: palette.text, lineHeight: 38 },
-  sectionTitle: { fontFamily: typography.heading, fontSize: 24, color: palette.text, lineHeight: 28 },
-  heroMetric: { fontFamily: typography.mono, fontSize: 72, letterSpacing: -2, color: palette.text, lineHeight: 76 },
-  largeMetric: { fontFamily: typography.mono, fontSize: 48, color: palette.text, lineHeight: 52 },
-  cardMetric: { fontFamily: Fonts.mono, fontSize: 34, color: palette.text, lineHeight: 36 },
-  body: { fontFamily: typography.body, fontSize: 17, color: palette.text, lineHeight: 24 },
-  meta: { fontFamily: typography.body, fontSize: 14, color: palette.textSecondary, lineHeight: 20 },
-  button: { fontFamily: typography.bodySemiBold, fontSize: 17, color: palette.text, lineHeight: 20 },
-  label: {
-    fontFamily: typography.bodySemiBold,
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 1.4,
-    color: palette.textSecondary,
-  },
-  caption: { fontFamily: typography.bodySemiBold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.4, color: palette.textSecondary },
-  display: { fontFamily: typography.heading, fontSize: 34, letterSpacing: 2.4, color: palette.text },
-  title: { fontFamily: typography.heading, fontSize: 24, color: palette.text },
-  bodyBold: { fontFamily: typography.bodySemiBold, fontSize: 17, color: palette.text, lineHeight: 24 },
-  mono: { fontFamily: typography.mono, fontSize: 16, color: palette.text },
+  brand: { fontFamily: Fonts.brand, fontSize: 20, letterSpacing: 4, color: Typography.display.color },
+  eyebrow: Typography.eyebrow,
+  h1: Typography.h1,
+  h2: Typography.h2,
+  h3: Typography.h3,
+  screenTitle: Typography.display,
+  sectionTitle: { ...Typography.h1, fontSize: 18, lineHeight: 22 },
+  heroMetric: Typography.monoXL,
+  largeMetric: Typography.monoLG,
+  cardMetric: Typography.monoLG,
+  body: Typography.body,
+  meta: Typography.bodySmall,
+  button: { fontFamily: 'DMSans_700Bold', fontSize: 15, lineHeight: 18, color: Typography.display.color },
+  label: Typography.label,
+  caption: Typography.eyebrow,
+  display: Typography.display,
+  title: Typography.h1,
+  bodyBold: { ...Typography.body, fontFamily: 'DMSans_700Bold', color: Typography.display.color },
+  mono: Typography.monoSM,
 };
 
 export function AppText({ style, children, variant = 'body', ...rest }: TextProps & { variant?: Variant }) {

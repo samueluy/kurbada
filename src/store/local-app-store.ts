@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { sampleBikes, sampleEmergencyInfo, sampleFuelLogs, sampleMaintenanceTasks, sampleProfile, sampleRides } from '@/lib/mock-data';
+import { sampleBikes, sampleEmergencyInfo, sampleFuelLogs, sampleMaintenanceTasks, sampleProfile, sampleRideListings, sampleRides } from '@/lib/mock-data';
 import { appStorage } from '@/lib/storage';
-import type { Bike, EmergencyInfo, FuelLog, MaintenanceTask, Profile, RideRecord } from '@/types/domain';
+import type { Bike, EmergencyInfo, FuelLog, MaintenanceTask, Profile, RideListing, RideRecord } from '@/types/domain';
 
 type LocalAppState = {
   profile: Profile;
@@ -12,12 +12,20 @@ type LocalAppState = {
   rides: RideRecord[];
   fuelLogs: FuelLog[];
   emergencyInfo: EmergencyInfo;
+  rideListings: RideListing[];
   upsertBike: (bike: Bike) => void;
+  deleteBike: (bikeId: string) => void;
   saveRide: (ride: RideRecord) => void;
   saveFuelLog: (fuelLog: FuelLog) => void;
   deleteFuelLog: (fuelLogId: string) => void;
   updateEmergencyInfo: (info: EmergencyInfo) => void;
   addMaintenanceTasks: (tasks: MaintenanceTask[]) => void;
+  addMaintenanceTask: (task: MaintenanceTask) => void;
+  updateMaintenanceTask: (task: MaintenanceTask) => void;
+  deleteMaintenanceTask: (taskId: string) => void;
+  addRideListing: (listing: RideListing) => void;
+  deleteRideListing: (listingId: string) => void;
+  reportRideListing: (listingId: string) => void;
 };
 
 export const useLocalAppStore = create<LocalAppState>()(
@@ -35,6 +43,13 @@ export const useLocalAppStore = create<LocalAppState>()(
             ? state.bikes.map((item) => (item.id === bike.id ? bike : item))
             : [bike, ...state.bikes],
         })),
+      deleteBike: (bikeId) =>
+        set((state) => ({
+          bikes: state.bikes.filter((item) => item.id !== bikeId),
+          maintenanceTasks: state.maintenanceTasks.filter((item) => item.bike_id !== bikeId),
+          rides: state.rides.filter((item) => item.bike_id !== bikeId),
+          fuelLogs: state.fuelLogs.filter((item) => item.bike_id !== bikeId),
+        })),
       saveRide: (ride) => set((state) => ({ rides: [ride, ...state.rides] })),
       saveFuelLog: (fuelLog) =>
         set((state) => ({
@@ -47,9 +62,36 @@ export const useLocalAppStore = create<LocalAppState>()(
           fuelLogs: state.fuelLogs.filter((item) => item.id !== fuelLogId),
         })),
       updateEmergencyInfo: (emergencyInfo) => set({ emergencyInfo }),
+      rideListings: sampleRideListings,
+      addRideListing: (listing) =>
+        set((state) => ({
+          rideListings: [listing, ...state.rideListings],
+        })),
+      deleteRideListing: (listingId) =>
+        set((state) => ({
+          rideListings: state.rideListings.filter((item) => item.id !== listingId),
+        })),
+      reportRideListing: (listingId) =>
+        set((state) => ({
+          rideListings: state.rideListings.map((item) =>
+            item.id === listingId ? { ...item, is_reported: true } : item,
+          ),
+        })),
       addMaintenanceTasks: (tasks: MaintenanceTask[]) =>
         set((state) => ({
           maintenanceTasks: [...tasks, ...state.maintenanceTasks],
+        })),
+      addMaintenanceTask: (task: MaintenanceTask) =>
+        set((state) => ({
+          maintenanceTasks: [task, ...state.maintenanceTasks],
+        })),
+      updateMaintenanceTask: (task: MaintenanceTask) =>
+        set((state) => ({
+          maintenanceTasks: state.maintenanceTasks.map((item) => (item.id === task.id ? task : item)),
+        })),
+      deleteMaintenanceTask: (taskId: string) =>
+        set((state) => ({
+          maintenanceTasks: state.maintenanceTasks.filter((item) => item.id !== taskId),
         })),
     }),
     {

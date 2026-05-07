@@ -10,8 +10,8 @@ export function Button({
   ...rest
 }: PressableProps & { title: string; variant?: 'primary' | 'secondary' | 'ghost' }) {
   const backgroundColor =
-    variant === 'primary' ? palette.text : variant === 'secondary' ? palette.surfaceMuted : 'transparent';
-  const borderWidth = variant === 'secondary' ? 0.5 : 0;
+    variant === 'primary' ? '#FFFFFF' : variant === 'secondary' ? palette.surfaceMuted : 'transparent';
+  const borderWidth = variant === 'ghost' ? 0 : 0.5;
 
   return (
     <Pressable
@@ -26,12 +26,16 @@ export function Button({
           borderColor: palette.border,
           borderWidth,
           opacity: rest.disabled ? 0.5 : 1,
-          transform: [{ scale: state.pressed ? 0.97 : 1 }],
+          transform: [{ scale: state.pressed ? 0.98 : 1 }],
           paddingHorizontal: 18,
         },
         typeof style === 'function' ? style(state) : style,
       ]}>
-      <AppText variant="button" style={{ color: variant === 'primary' ? palette.background : variant === 'ghost' ? palette.textSecondary : palette.text }}>
+      <AppText
+        variant="button"
+        style={{
+          color: variant === 'primary' ? palette.background : variant === 'ghost' ? palette.textSecondary : palette.text,
+        }}>
         {title}
       </AppText>
     </Pressable>

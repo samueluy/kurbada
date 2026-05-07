@@ -16,28 +16,29 @@ export function EmergencyQRCard({
   onPress?: () => void;
 }) {
   return (
-    <GlassCard style={{ padding: 18, gap: 16, backgroundColor: 'rgba(255,255,255,0.08)' }}>
+    <GlassCard style={{ padding: 18, gap: 16, borderColor: palette.danger }}>
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: palette.danger }} />
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
         <View style={{ flex: 1, gap: 8 }}>
-          <View style={{ alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: 'rgba(198,69,55,0.14)' }}>
-            <AppText variant="label" style={{ color: palette.danger }}>Emergency QR</AppText>
+          <View style={{ alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.xs, backgroundColor: 'rgba(192,57,43,0.15)' }}>
+            <AppText variant="label" style={{ color: palette.danger, letterSpacing: 0.8 }}>Emergency QR</AppText>
           </View>
-          <AppText variant="sectionTitle" style={{ fontSize: 22 }}>Serious when you need it.</AppText>
-          <AppText variant="meta">
+          <AppText variant="h1" style={{ fontSize: 18 }}>Serious when you need it.</AppText>
+          <AppText variant="meta" style={{ color: palette.textTertiary }}>
             {emergency?.full_name
               ? 'Keep your rider info ready on your lock screen for emergency response.'
               : 'Set up private rider details so bystanders can help faster after an accident.'}
           </AppText>
         </View>
-        <View style={{ width: 84, height: 84, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ width: 60, height: 60, borderRadius: radius.sm, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}>
           {emergency?.full_name ? (
-            <QRCode value={JSON.stringify(emergency)} size={64} />
+            <QRCode value={JSON.stringify(emergency)} size={46} />
           ) : (
-            <ShieldAlert size={26} color={palette.textSecondary} />
+            <ShieldAlert size={20} color={palette.textSecondary} />
           )}
         </View>
       </View>
-      <Button title="Set Up Emergency Info" variant="secondary" onPress={onPress} />
+      <Button title={emergency?.full_name ? 'Update Emergency Info' : 'Set Up Emergency Info'} variant="secondary" onPress={onPress} />
     </GlassCard>
   );
 }

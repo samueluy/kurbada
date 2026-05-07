@@ -19,12 +19,12 @@ export function EmptyState({
   onAction?: () => void;
 }) {
   return (
-    <View style={{ alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 36 }}>
-      <Ionicons name={icon} size={42} color={palette.textSecondary} />
-      <AppText variant="sectionTitle" style={{ textAlign: 'center' }}>
+    <View style={{ minHeight: 160, alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 24 }}>
+      <Ionicons name={icon} size={32} color={palette.textTertiary} />
+      <AppText variant="title" style={{ textAlign: 'center', fontSize: 18 }}>
         {title}
       </AppText>
-      <AppText variant="meta" style={{ textAlign: 'center', color: palette.textSecondary }}>
+      <AppText variant="meta" style={{ textAlign: 'center', color: palette.textTertiary, maxWidth: 280 }}>
         {body}
       </AppText>
       {actionTitle && onAction ? <Button title={actionTitle} onPress={onAction} style={{ alignSelf: 'stretch', marginTop: 10 }} /> : null}

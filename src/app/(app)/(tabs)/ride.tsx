@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
-import { Sparkles, Waves } from 'lucide-react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useMemo } from 'react';
 import { View } from 'react-native';
 
 import { EmptyState } from '@/components/ui/empty-state';
@@ -12,10 +13,13 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { StatCard } from '@/components/ui/stat-card';
 import { palette } from '@/constants/theme';
 import { RideFeedCard } from '@/features/ride/components/ride-feed-card';
-import { RideHeroCard } from '@/features/ride/components/ride-hero-card';
+import { CustomCalendarHeatmap } from '@/features/ride/components/ride-heatmap';
+import { UpcomingMaintenanceCard } from '@/features/ride/components/upcoming-maintenance-card';
+import { WeatherWidget } from '@/features/ride/components/weather-widget';
 import { getGreeting } from '@/lib/format';
 import { useAuth } from '@/hooks/use-auth';
-import { useBikes, useRides } from '@/hooks/use-kurbada-data';
+import { useBikes, useFuelLogs, useRides } from '@/hooks/use-kurbada-data';
+import { useWeather } from '@/hooks/use-weather';
 import { useAppStore } from '@/store/app-store';
 
 export default function RideTabScreen() {
@@ -24,77 +28,115 @@ export default function RideTabScreen() {
   const setPreferredMode = useAppStore((state) => state.setPreferredMode);
   const bikes = useBikes(session?.user.id);
   const rides = useRides(session?.user.id);
+  const fuelLogs = useFuelLogs(session?.user.id);
+  const weather = useWeather();
   const latestRide = rides.data?.[0];
   const primaryBike = bikes.data?.[0];
 
+  const avgFuelPrice = useMemo(() => {
+    const logs = fuelLogs.data ?? [];
+    if (logs.length === 0) return 65;
+    const latest = logs[0];
+    return latest.price_per_liter || 65;
+  }, [fuelLogs.data]);
+
+  const isWeekend = preferredMode === 'weekend';
+
   return (
-    <AppScrollScreen>
-      <View style={{ gap: 8 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Sparkles size={14} color={palette.lime} />
-          <AppText variant="meta" style={{ color: palette.textSecondary }}>
-            {getGreeting()}, {session?.user.user_metadata.display_name ?? 'Rider'}
-          </AppText>
-        </View>
-        <AppText variant="screenTitle">
-          Ride like it matters.
-        </AppText>
-        <AppText variant="meta" style={{ color: palette.textSecondary }}>
-          Kurbada turns your latest run, lean, and machine story into something worth keeping.
-        </AppText>
+    <AppScrollScreen showWordmark={false}>
+      {/* 1. Top bar */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 }}>
+        <AppText variant="brand">KURBADA</AppText>
+        <WeatherWidget weather={weather.data} isError={weather.isError} />
       </View>
 
+      {/* 2. Greeting + title */}
+      <AppText variant="eyebrow">{getGreeting()}, {session?.user.user_metadata.display_name ?? 'Rider'}</AppText>
+      <AppText variant="screenTitle" style={{ fontSize: 34, lineHeight: 38, letterSpacing: -0.8 }}>
+        {isWeekend ? 'Ready for the next curve.' : 'Traffic efficiency.'}
+      </AppText>
+      <AppText variant="body">
+        {isWeekend
+          ? 'Weekend mode keeps lean, distance, and top-speed telemetry close at hand.'
+          : 'Daily mode prioritizes speed, fuel awareness, and cleaner daily tracking.'}
+      </AppText>
+
+      {/* 3. Mode toggle */}
       <ModeToggle value={preferredMode} onChange={setPreferredMode} />
 
-      {latestRide ? (
-        <RideHeroCard ride={latestRide} />
-      ) : (
-        <GlassCard style={{ padding: 20 }}>
-          <EmptyState icon="speedometer-outline" title="No ride yet" body="Start a ride and the live telemetry story will land here first." />
-        </GlassCard>
-      )}
+      {/* 4. Heatmap hero card */}
+      <GlassCard style={{ paddingTop: 16, paddingBottom: 0, paddingHorizontal: 0, borderRadius: 18 }}>
+        <AppText variant="eyebrow" style={{ paddingHorizontal: 16 }}>RIDE ACTIVITY</AppText>
+        <CustomCalendarHeatmap rides={rides.data ?? []} numDays={90} />
+      </GlassCard>
 
-      <View style={{ flexDirection: 'row', gap: 12 }}>
-        <StatCard label="Distance" value={latestRide?.distance_km.toFixed(1) ?? '0.0'} unit="km" />
-        <StatCard label="Top Speed" value={latestRide?.max_speed_kmh.toFixed(0) ?? '0'} unit="km/h" />
-        <StatCard label="Max Lean" value={latestRide?.max_lean_angle_deg?.toFixed(0) ?? '0'} unit="deg" accent />
-      </View>
-
-      <GlassCard style={{ padding: 18, gap: 14 }}>
+      {/* 5. Start Ride CTA */}
+      <GlassCard style={{ padding: 16, borderRadius: 18 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <View style={{ gap: 6 }}>
-            <AppText variant="label">Ride session</AppText>
-            <AppText variant="sectionTitle" style={{ fontSize: 22 }}>
-              Ready to roll?
-            </AppText>
-          </View>
-          <Waves size={18} color={palette.textSecondary} />
+          <AppText variant="eyebrow">RIDE SESSION · {isWeekend ? 'WEEKEND' : 'DAILY'}</AppText>
+          <MaterialCommunityIcons
+            name={isWeekend ? 'motorbike' : 'flash-outline'}
+            size={18}
+            color={palette.textTertiary}
+          />
         </View>
-        <AppText variant="meta">
-          Weekend keeps the cinematic telemetry front and center. Hustle stays lighter and more utility-driven.
+        <AppText variant="title" style={{ fontSize: 20, marginTop: 6 }}>Ready to roll?</AppText>
+        <AppText variant="body" style={{ color: palette.textTertiary, fontSize: 13, marginTop: 4 }}>
+          {isWeekend
+            ? 'GPS, gyroscope, and accelerometer stay active for full lean telemetry and route tracking.'
+            : 'GPS stays lighter for city mileage, fuel awareness, and efficient day-to-day riding.'}
         </AppText>
         <Button
-          title="Start Ride"
+          title="Start Ride  →"
           onPress={() => {
             if (!primaryBike) {
               router.push('/(public)/bike-setup');
               return;
             }
-
             router.push({
               pathname: '/(app)/ride/active',
-              params: { mode: preferredMode, bikeId: primaryBike.id },
+              params: { mode: preferredMode, bikeId: primaryBike.id, fuelPrice: avgFuelPrice },
             });
+          }}
+          style={{
+            backgroundColor: '#C0392B',
+            borderRadius: 13,
+            minHeight: 50,
+            marginTop: 14,
+            shadowColor: 'rgba(192,57,43,0.35)',
+            shadowOpacity: 1,
+            shadowRadius: 16,
+            shadowOffset: { width: 0, height: 4 },
           }}
         />
       </GlassCard>
 
-      <SectionHeader title="Recent Rides" action={<AppText variant="meta">Latest sessions</AppText>} />
+      {/* 6. Upcoming Maintenance */}
+      <UpcomingMaintenanceCard />
+
+      {/* 7. Weekly stats */}
+      <View style={{ flexDirection: 'row', gap: 12 }}>
+        <StatCard label="Distance" value={latestRide?.distance_km.toFixed(1) ?? '0.0'} unit="km" />
+        <StatCard label="Top Speed" value={latestRide?.max_speed_kmh.toFixed(0) ?? '0'} unit="km/h" />
+        {isWeekend ? (
+          <StatCard label="Max Lean" value={latestRide?.max_lean_angle_deg?.toFixed(0) ?? '0'} unit="deg" accent />
+        ) : (
+          <StatCard label="Est. Fuel" value={latestRide?.fuel_used_liters?.toFixed(1) ?? '0.0'} unit="L" />
+        )}
+      </View>
+
+      {/* 8. Recent Rides */}
+      <SectionHeader title="Recent Rides" action={<AppText variant="meta" style={{ color: palette.textTertiary }}>See all</AppText>} />
       {rides.data?.length ? (
         <View style={{ gap: 14 }}>
-          {rides.data.slice(0, 3).map((ride) => (
-            <RideFeedCard key={ride.id} ride={ride} />
-          ))}
+            {rides.data.slice(0, 3).map((ride) => (
+              <RideFeedCard
+                key={ride.id}
+                ride={ride}
+                onPress={() => router.push({ pathname: '/(app)/ride/summary', params: { rideId: ride.id } })}
+                onShare={() => router.push({ pathname: '/(app)/ride/summary', params: { rideId: ride.id } })}
+              />
+            ))}
         </View>
       ) : (
         <GlassCard style={{ padding: 18 }}>

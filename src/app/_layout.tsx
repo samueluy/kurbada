@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import React from 'react';
 
+import '@/tasks/location-task';
 import { AppProviders } from '@/providers/app-providers';
 
 export default function RootLayout() {

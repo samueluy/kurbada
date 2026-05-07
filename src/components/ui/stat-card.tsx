@@ -2,7 +2,7 @@ import { Text, View } from 'react-native';
 
 import { AppCard } from '@/components/ui/app-card';
 import { AppText } from '@/components/ui/app-text';
-import { palette, typography } from '@/constants/theme';
+import { Colors, palette, Typography } from '@/constants/theme';
 
 export function StatCard({
   label,
@@ -15,26 +15,27 @@ export function StatCard({
   unit?: string;
   accent?: boolean;
 }) {
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  const isEmpty = Number.isFinite(numericValue) ? numericValue <= 0 : false;
+
   return (
-    <AppCard style={{ flex: 1, gap: 8 }}>
-      <AppText variant="label" style={{ color: palette.textSecondary }}>
+    <AppCard style={{ flex: 1, gap: 8, padding: 14, borderRadius: 14 }}>
+      <AppText variant="label">
         {label}
       </AppText>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
+      <View style={{ gap: 3 }}>
         <Text
           adjustsFontSizeToFit
           minimumFontScale={0.55}
           numberOfLines={1}
           style={{
-            flex: 1,
-            fontFamily: typography.mono,
-            fontSize: 34,
-            color: accent ? palette.danger : palette.text,
+            ...Typography.monoMD,
+            color: isEmpty ? Colors.t3 : accent ? palette.danger : palette.text,
           }}>
           {value}
         </Text>
         {unit ? (
-          <AppText variant="meta" style={{ color: palette.textSecondary }}>
+          <AppText variant="meta" style={{ color: palette.textTertiary }}>
             {unit}
           </AppText>
         ) : null}

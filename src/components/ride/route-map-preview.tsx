@@ -3,13 +3,21 @@ import { Platform, View } from 'react-native';
 import { AppText } from '@/components/ui/app-text';
 import { GlassCard } from '@/components/ui/glass-card';
 import { palette } from '@/constants/theme';
-import { env } from '@/lib/env';
 import { getMapboxModule } from '@/lib/mapbox';
+import type { RouteBounds } from '@/types/domain';
 
-export function RouteMapPreview({ routeGeoJson }: { routeGeoJson?: GeoJSON.Feature<GeoJSON.LineString> }) {
+export function RouteMapPreview({
+  routeGeoJson,
+  lineColor = '#E63946',
+  routeBounds,
+}: {
+  routeGeoJson?: GeoJSON.Feature<GeoJSON.LineString>;
+  lineColor?: string;
+  routeBounds?: RouteBounds;
+}) {
   const Mapbox = getMapboxModule();
 
-  if (Platform.OS === 'web' || !env.mapboxToken || !routeGeoJson || !Mapbox) {
+  if (Platform.OS === 'web' || !routeGeoJson || !Mapbox) {
     return (
       <GlassCard style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8, padding: 20 }}>
         <AppText variant="label">Route preview</AppText>
@@ -26,12 +34,21 @@ export function RouteMapPreview({ routeGeoJson }: { routeGeoJson?: GeoJSON.Featu
 
   return (
     <View style={{ flex: 1, overflow: 'hidden', borderRadius: 16 }}>
-      <Mapbox.MapView style={{ flex: 1 }} styleURL="mapbox://styles/mapbox/dark-v11">
-        {firstCoordinate ? (
+      <Mapbox.MapView style={{ flex: 1 }} styleURL="mapbox://styles/mapbox/dark-v11" attributionEnabled={false} logoEnabled={false} compassEnabled={false} scaleBarEnabled={false}>
+        {routeBounds ? (
+          <Mapbox.Camera
+            bounds={{
+              ne: [routeBounds.maxLng, routeBounds.maxLat],
+              sw: [routeBounds.minLng, routeBounds.minLat],
+            }}
+            padding={{ paddingTop: 40, paddingBottom: 40, paddingLeft: 40, paddingRight: 40 }}
+            animationDuration={0}
+          />
+        ) : firstCoordinate ? (
           <Mapbox.Camera zoomLevel={11} centerCoordinate={firstCoordinate} animationMode="none" />
         ) : null}
         <Mapbox.ShapeSource id="ride-route" shape={routeGeoJson}>
-          <Mapbox.LineLayer id="ride-route-line" style={{ lineColor: palette.danger, lineWidth: 3 }} />
+          <Mapbox.LineLayer id="ride-route-line" style={{ lineColor, lineWidth: 3, lineCap: 'round' }} />
         </Mapbox.ShapeSource>
       </Mapbox.MapView>
     </View>

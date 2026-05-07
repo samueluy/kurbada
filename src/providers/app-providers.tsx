@@ -1,8 +1,14 @@
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { BebasNeue_400Regular } from '@expo-google-fonts/bebas-neue';
+import {
+  DMSans_400Regular,
+  DMSans_600SemiBold,
+  DMSans_700Bold,
+  DMSans_900Black,
+} from '@expo-google-fonts/dm-sans';
+import { DMMono_500Medium } from '@expo-google-fonts/dm-mono';
 import { useFonts } from 'expo-font';
-import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
-import { Oswald_500Medium, Oswald_600SemiBold } from '@expo-google-fonts/oswald';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
@@ -30,12 +36,12 @@ Notifications.setNotificationHandler({
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   const [fontsLoaded] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-    Oswald_500Medium,
-    Oswald_600SemiBold,
+    DMSans_400Regular,
+    DMSans_600SemiBold,
+    DMSans_700Bold,
+    DMSans_900Black,
+    DMMono_500Medium,
+    BebasNeue_400Regular,
   });
 
   useEffect(() => {

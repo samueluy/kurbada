@@ -10,16 +10,15 @@ import { useAppStore } from '@/store/app-store';
 
 export default function SplashScreen() {
   const setHasSeenSplash = useAppStore((state) => state.setHasSeenSplash);
-  const hasCompletedOnboarding = useAppStore((state) => state.hasCompletedOnboarding);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
       setHasSeenSplash();
-      router.replace(hasCompletedOnboarding ? '/(public)/auth/sign-in' : '/(public)/onboarding');
+      router.replace('/');
     }, 1800);
 
     return () => clearTimeout(timeout);
-  }, [hasCompletedOnboarding, setHasSeenSplash]);
+  }, [setHasSeenSplash]);
 
   return (
     <AppScreen style={{ justifyContent: 'center', alignItems: 'center' }}>

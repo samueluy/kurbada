@@ -21,7 +21,7 @@ export function ListRow({
     <Pressable
       onPress={onPress}
       style={{
-        minHeight: 72,
+        minHeight: 64,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 14,
@@ -34,14 +34,14 @@ export function ListRow({
           width: 40,
           height: 40,
           borderRadius: radius.sm,
-          backgroundColor: palette.surfaceMuted,
+          backgroundColor: palette.surfaceStrong,
           alignItems: 'center',
           justifyContent: 'center',
         }}>
-        <Ionicons name={icon} size={18} color={palette.textSecondary} />
+        <Ionicons name={icon} size={18} color={palette.text} />
       </View>
       <View style={{ flex: 1 }}>
-        <AppText variant="bodyBold">{title}</AppText>
+        <AppText variant="h3">{title}</AppText>
         {subtitle ? <AppText variant="meta">{subtitle}</AppText> : null}
       </View>
       {value ? <AppText variant="meta" style={{ color: palette.text }}>{value}</AppText> : null}

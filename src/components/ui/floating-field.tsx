@@ -16,8 +16,8 @@ export function FloatingField({
     <View
       style={[
         {
-          backgroundColor: palette.surfaceMuted,
-          borderRadius: radius.md,
+          backgroundColor: palette.surfaceStrong,
+          borderRadius: radius.sm,
           paddingHorizontal: 14,
           paddingVertical: 12,
           gap: 4,
@@ -35,8 +35,8 @@ export function FloatingField({
         style={{
           minHeight: 26,
           color: palette.text,
-          fontFamily: typography.bodyMedium,
-          fontSize: 17,
+          fontFamily: typography.body,
+          fontSize: 15,
           padding: 0,
         }}
         {...rest}

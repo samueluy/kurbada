@@ -1,16 +1,17 @@
 import * as Haptics from 'expo-haptics';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Pressable, View, useWindowDimensions } from 'react-native';
 import { useEffect } from 'react';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { AppText } from '@/components/ui/app-text';
-import { motion, palette, radius, shadows } from '@/constants/theme';
+import { motion, palette, radius } from '@/constants/theme';
 import type { RideMode } from '@/types/domain';
 
 export function ModeToggle({ value, onChange }: { value: RideMode; onChange: (mode: RideMode) => void }) {
   const { width } = useWindowDimensions();
-  const containerWidth = Math.max(width - 40, 0);
-  const pillWidth = Math.max((containerWidth - 7) / 2, 0);
+  const containerWidth = Math.max(width - 48, 0);
+  const pillWidth = Math.max((containerWidth - 8) / 2, 0);
   const translateX = useSharedValue(value === 'weekend' ? 0 : pillWidth);
 
   useEffect(() => {
@@ -28,9 +29,9 @@ export function ModeToggle({ value, onChange }: { value: RideMode; onChange: (mo
     <View
       style={{
         flexDirection: 'row',
-        backgroundColor: 'rgba(255,255,255,0.04)',
+        backgroundColor: palette.surfaceMuted,
         borderRadius: radius.pill,
-        padding: 3,
+        padding: 4,
         position: 'relative',
         borderWidth: 0.5,
         borderColor: palette.border,
@@ -40,37 +41,52 @@ export function ModeToggle({ value, onChange }: { value: RideMode; onChange: (mo
         style={[
           {
             position: 'absolute',
-            top: 3,
-            left: 3,
+            top: 4,
+            left: 4,
             width: pillWidth,
-            bottom: 3,
+            bottom: 4,
             borderRadius: radius.pill,
-            backgroundColor: 'rgba(255,255,255,0.10)',
-            borderWidth: 0.5,
-            borderColor: 'rgba(255,255,255,0.14)',
-            ...shadows.card,
+            backgroundColor: palette.surfaceStrong,
           },
           thumbStyle,
         ]}
       />
-      {(['weekend', 'hustle'] as const).map((mode) => {
-        const active = value === mode;
+      {([
+        { mode: 'weekend', label: 'Weekend', icon: 'motorbike' },
+        { mode: 'hustle', label: 'Daily', icon: 'flash-outline' },
+      ] as const).map((item) => {
+        const active = value === item.mode;
         return (
           <Pressable
-            key={mode}
+            key={item.mode}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
-              onChange(mode);
+              onChange(item.mode);
             }}
             style={{
               flex: 1,
               borderRadius: radius.pill,
-              paddingVertical: 14,
+              paddingVertical: 12,
+              paddingHorizontal: 12,
               alignItems: 'center',
+              justifyContent: 'center',
             }}>
-            <AppText variant="button" style={{ color: active ? palette.text : palette.textSecondary }}>
-              {mode === 'weekend' ? 'Weekend' : 'Hustle'}
-            </AppText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <MaterialCommunityIcons
+                name={item.icon}
+                size={16}
+                color={active ? palette.text : palette.textTertiary}
+              />
+              <AppText
+                variant={active ? 'bodyBold' : 'body'}
+                style={{
+                  fontSize: 14,
+                  color: active ? palette.text : palette.textTertiary,
+                  lineHeight: 18,
+                }}>
+                {item.label}
+              </AppText>
+            </View>
           </Pressable>
         );
       })}

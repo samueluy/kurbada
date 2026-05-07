@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Alert, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScrollScreen } from '@/components/ui/app-screen';
@@ -10,14 +10,13 @@ import { FloatingField } from '@/components/ui/floating-field';
 import { GlassCard } from '@/components/ui/glass-card';
 import { SectionHeader } from '@/components/ui/section-header';
 import { BikeCard } from '@/features/garage/components/bike-card';
-import { palette } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useBikeMutations, useBikes } from '@/hooks/use-kurbada-data';
 
 export default function GarageTabScreen() {
   const { session } = useAuth();
   const bikes = useBikes(session?.user.id);
-  const { saveBike } = useBikeMutations(session?.user.id);
+  const { saveBike, deleteBike } = useBikeMutations(session?.user.id);
   const isSubmittingRef = useRef(false);
   const [showForm, setShowForm] = useState(false);
   const [make, setMake] = useState('');
@@ -28,12 +27,12 @@ export default function GarageTabScreen() {
   return (
     <AppScrollScreen>
       <View style={{ gap: 8 }}>
-        <AppText variant="label">Garage</AppText>
+        <AppText variant="eyebrow">Garage</AppText>
         <AppText variant="screenTitle">Your machines, not just a list.</AppText>
-        <AppText variant="meta">Keep your bike setup feeling like a collection with mileage, category, and service context.</AppText>
+        <AppText variant="body">Keep your bike setup feeling like a collection.</AppText>
       </View>
 
-      <SectionHeader title="My Garage" action={<Button title={showForm ? 'Close' : '+ Add'} variant="secondary" onPress={() => setShowForm((value) => !value)} />} />
+      <SectionHeader title="My Garage" action={<Button title={showForm ? 'Close' : '+ Add'} variant="secondary" onPress={() => setShowForm((value) => !value)} style={{ minHeight: 40, borderRadius: 14 }} />} />
 
       {showForm ? (
         <GlassCard style={{ padding: 18, gap: 10 }}>
@@ -74,7 +73,17 @@ export default function GarageTabScreen() {
 
       {bikes.data?.length ? (
         bikes.data.map((bike) => (
-          <BikeCard key={bike.id} bike={bike} onPress={() => router.push({ pathname: '/(app)/garage/[bikeId]', params: { bikeId: bike.id } })} />
+          <BikeCard
+            key={bike.id}
+            bike={bike}
+            onPress={() => router.push({ pathname: '/(app)/garage/[bikeId]', params: { bikeId: bike.id } })}
+            onLongPress={() => {
+              Alert.alert(`Delete ${bike.make} ${bike.model}?`, 'All maintenance records, rides, and fuel logs for this bike will also be removed.', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Delete', style: 'destructive', onPress: () => deleteBike.mutate(bike.id) },
+              ]);
+            }}
+          />
         ))
       ) : (
         <GlassCard style={{ padding: 18 }}>
@@ -82,12 +91,6 @@ export default function GarageTabScreen() {
         </GlassCard>
       )}
 
-      <GlassCard style={{ padding: 18, gap: 8 }}>
-        <AppText variant="label" style={{ color: palette.textSecondary }}>Rider note</AppText>
-        <AppText variant="meta">
-          This screen stays intentionally calm. The machine should feel like a prized object, not a dense spreadsheet.
-        </AppText>
-      </GlassCard>
     </AppScrollScreen>
   );
 }

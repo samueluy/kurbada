@@ -30,9 +30,10 @@ export default function AppLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="ride/active" options={{ presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="ride/active" options={{ presentation: 'modal', gestureEnabled: true }} />
       <Stack.Screen name="ride/summary" options={{ presentation: 'modal' }} />
       <Stack.Screen name="garage/[bikeId]" />
+      <Stack.Screen name="board/create" options={{ presentation: 'modal' }} />
       <Stack.Screen name="fuel/reports" />
       <Stack.Screen name="profile/emergency" />
     </Stack>

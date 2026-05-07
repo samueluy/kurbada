@@ -1,4 +1,4 @@
-import { Droplets, MapPinned } from 'lucide-react-native';
+import { ChevronRight, Droplets } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
 import { GlassCard } from '@/components/ui/glass-card';
@@ -8,27 +8,34 @@ import { formatCurrencyPhp } from '@/lib/format';
 import type { FuelLog } from '@/types/domain';
 
 export function FuelEntryCard({ entry, onPress }: { entry: FuelLog; onPress?: () => void }) {
+  const octaneStyle =
+    entry.octane_rating >= 100
+      ? { backgroundColor: 'rgba(192,57,43,0.15)', color: palette.danger }
+      : entry.octane_rating === 97
+        ? { backgroundColor: 'rgba(52,152,219,0.15)', color: '#3498DB' }
+        : entry.octane_rating === 95
+          ? { backgroundColor: 'rgba(46,204,113,0.15)', color: palette.success }
+          : { backgroundColor: palette.surfaceStrong, color: palette.textTertiary };
+
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [{ opacity: pressed ? 0.92 : 1 }]}>
-      <GlassCard style={{ padding: 16, gap: 12 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <View style={{ gap: 4 }}>
-            <AppText variant="bodyBold">{entry.station_name ?? 'Fuel stop'}</AppText>
-            <AppText variant="meta">{entry.logged_at}</AppText>
+      <GlassCard style={{ padding: 14 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ width: 36, height: 36, borderRadius: radius.md, backgroundColor: palette.surfaceMuted, alignItems: 'center', justifyContent: 'center' }}>
+            <Droplets size={16} color={palette.text} />
           </View>
-          <AppText variant="cardMetric" style={{ color: palette.text }}>{formatCurrencyPhp(entry.total_cost)}</AppText>
-        </View>
-        <View style={{ flexDirection: 'row', gap: 14, flexWrap: 'wrap' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Droplets size={14} color={palette.textSecondary} />
-            <AppText variant="meta">{entry.liters.toFixed(1)} L</AppText>
+          <View style={{ flex: 1, gap: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <AppText variant="h3">{entry.liters.toFixed(1)}L · Octane {entry.octane_rating}</AppText>
+              <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.xs, backgroundColor: octaneStyle.backgroundColor }}>
+                <AppText variant="label" style={{ color: octaneStyle.color, letterSpacing: 0.8 }}>{entry.octane_rating}</AppText>
+              </View>
+            </View>
+            <AppText variant="meta">{entry.logged_at} · {entry.station_name ?? 'Fuel stop'}</AppText>
           </View>
-          <View style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.06)' }}>
-            <AppText variant="label" style={{ color: palette.text }}>{entry.octane_rating}</AppText>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <MapPinned size={14} color={palette.textSecondary} />
-            <AppText variant="meta">{entry.price_per_liter.toFixed(0)} / L</AppText>
+          <View style={{ alignItems: 'flex-end', gap: 4 }}>
+            <AppText variant="mono">{formatCurrencyPhp(entry.total_cost)}</AppText>
+            <ChevronRight size={14} color={palette.textTertiary} />
           </View>
         </View>
       </GlassCard>

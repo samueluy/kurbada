@@ -3,131 +3,138 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createId } from '@/lib/id';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { useLocalAppStore } from '@/store/local-app-store';
-import type { Bike, EmergencyInfo, FuelLog, MaintenanceTask, RideRecord } from '@/types/domain';
+import type { Bike, EmergencyInfo, FuelLog, MaintenanceTask, RideListing, RideRecord } from '@/types/domain';
+import { useBlockedUsersStore } from '@/store/blocked-users-store';
 
 const defaultMaintenanceTemplates: Omit<MaintenanceTask, 'id' | 'bike_id' | 'last_done_odometer_km' | 'last_done_date'>[] = [
-  { task_name: 'Engine Oil Change', interval_km: 3000 },
-  { task_name: 'Chain Tension & Lube', interval_km: 600 },
-  { task_name: 'Brake Fluid', interval_km: 12000 },
-  { task_name: 'Air Filter', interval_km: 9000 },
-  { task_name: 'Spark Plugs', interval_km: 12000 },
-  { task_name: 'Coolant', interval_km: 18000 },
-  { task_name: 'Tire Pressure reminder', interval_km: 200 },
+  { task_name: 'Engine Oil Change', interval_km: 3000, interval_days: 180 },
+  { task_name: 'Chain Tension & Lube', interval_km: 600, interval_days: 90 },
+  { task_name: 'Brake Fluid', interval_km: 12000, interval_days: 730 },
+  { task_name: 'Air Filter', interval_km: 9000, interval_days: 365 },
+  { task_name: 'Spark Plugs', interval_km: 12000, interval_days: 730 },
+  { task_name: 'Coolant', interval_km: 18000, interval_days: 730 },
+  { task_name: 'Tire Pressure reminder', interval_km: 200, interval_days: 14 },
 ];
 
-export function useBikes(userId?: string) {
-  const bikes = useLocalAppStore((state) => state.bikes);
-  const useRemote = Boolean(userId) && isSupabaseConfigured;
+function useRemoteMode(userId?: string) {
+  return Boolean(userId) && isSupabaseConfigured;
+}
 
-  return useQuery({
+export function useBikes(userId?: string) {
+  const localBikes = useLocalAppStore((state) => state.bikes);
+  const useRemote = useRemoteMode(userId);
+
+  const query = useQuery({
     queryKey: ['bikes', userId ?? 'local'],
     enabled: useRemote,
     queryFn: async () => {
-      if (!supabase || !userId) {
-        return bikes;
-      }
-
+      if (!supabase || !userId) return localBikes;
       const { data, error } = await supabase.from('bikes').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
       return data as Bike[];
     },
-    initialData: useRemote ? undefined : bikes,
   });
+
+  if (!useRemote) {
+    return { data: localBikes, isLoading: false, error: null, isFetching: false };
+  }
+
+  return query;
 }
 
 export function useMaintenanceTasks(bikeId?: string) {
-  const tasks = useLocalAppStore((state) => state.maintenanceTasks);
-  const useRemote = Boolean(bikeId) && isSupabaseConfigured;
+  const localTasks = useLocalAppStore((state) => state.maintenanceTasks);
+  const filteredLocal = bikeId ? localTasks.filter((task) => task.bike_id === bikeId) : [];
+  const useRemote = useRemoteMode(undefined);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ['maintenance', bikeId ?? 'local'],
-    enabled: useRemote,
+    enabled: useRemote && Boolean(bikeId),
     queryFn: async () => {
-      if (!supabase || !bikeId) {
-        return tasks.filter((task) => task.bike_id === bikeId);
-      }
-
+      if (!supabase || !bikeId) return filteredLocal;
       const { data, error } = await supabase.from('maintenance_tasks').select('*').eq('bike_id', bikeId);
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
       return data as MaintenanceTask[];
     },
-    initialData: useRemote ? undefined : tasks.filter((task) => task.bike_id === bikeId),
   });
+
+  if (!useRemote) {
+    return { data: filteredLocal, isLoading: false, error: null, isFetching: false };
+  }
+
+  return query;
 }
 
 export function useRides(userId?: string) {
-  const rides = useLocalAppStore((state) => state.rides);
-  const useRemote = Boolean(userId) && isSupabaseConfigured;
+  const localRides = useLocalAppStore((state) => state.rides);
+  const useRemote = useRemoteMode(userId);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ['rides', userId ?? 'local'],
     enabled: useRemote,
     queryFn: async () => {
-      if (!supabase || !userId) {
-        return rides;
-      }
-
+      if (!supabase || !userId) return localRides;
       const { data, error } = await supabase.from('rides').select('*').eq('user_id', userId).order('started_at', { ascending: false });
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
       return data as unknown as RideRecord[];
     },
-    initialData: useRemote ? undefined : rides,
   });
+
+  if (!useRemote) {
+    return { data: localRides, isLoading: false, error: null, isFetching: false };
+  }
+
+  return query;
 }
 
 export function useFuelLogs(userId?: string) {
-  const fuelLogs = useLocalAppStore((state) => state.fuelLogs);
-  const useRemote = Boolean(userId) && isSupabaseConfigured;
+  const localFuelLogs = useLocalAppStore((state) => state.fuelLogs);
+  const useRemote = useRemoteMode(userId);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ['fuel-logs', userId ?? 'local'],
     enabled: useRemote,
     queryFn: async () => {
-      if (!supabase || !userId) {
-        return fuelLogs;
-      }
-
+      if (!supabase || !userId) return localFuelLogs;
       const { data, error } = await supabase.from('fuel_logs').select('*').eq('user_id', userId).order('logged_at', { ascending: false });
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
       return data as FuelLog[];
     },
-    initialData: useRemote ? undefined : fuelLogs,
   });
+
+  if (!useRemote) {
+    return { data: localFuelLogs, isLoading: false, error: null, isFetching: false };
+  }
+
+  return query;
 }
 
 export function useEmergencyInfo(userId?: string) {
-  const emergencyInfo = useLocalAppStore((state) => state.emergencyInfo);
-  const useRemote = Boolean(userId) && isSupabaseConfigured;
+  const localEmergencyInfo = useLocalAppStore((state) => state.emergencyInfo);
+  const useRemote = useRemoteMode(userId);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ['emergency', userId ?? 'local'],
     enabled: useRemote,
     queryFn: async () => {
-      if (!supabase || !userId) {
-        return emergencyInfo;
-      }
-
+      if (!supabase || !userId) return localEmergencyInfo;
       const { data, error } = await supabase.from('emergency_info').select('*').eq('user_id', userId).maybeSingle();
-      if (error) {
-        throw error;
-      }
-      return (data as EmergencyInfo | null) ?? emergencyInfo;
+      if (error) throw error;
+      return (data as EmergencyInfo | null) ?? localEmergencyInfo;
     },
-    initialData: useRemote ? undefined : emergencyInfo,
   });
+
+  if (!useRemote) {
+    return { data: localEmergencyInfo, isLoading: false, error: null, isFetching: false };
+  }
+
+  return query;
 }
 
 export function useBikeMutations(userId?: string) {
   const queryClient = useQueryClient();
   const upsertBikeLocal = useLocalAppStore((state) => state.upsertBike);
+  const deleteBikeLocal = useLocalAppStore((state) => state.deleteBike);
   const addMaintenanceTasks = useLocalAppStore((state) => state.addMaintenanceTasks);
 
   const saveBike = useMutation({
@@ -149,9 +156,7 @@ export function useBikeMutations(userId?: string) {
           : supabase.from('bikes').insert(payload as any);
 
         const { data, error } = await builder.select().single();
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
 
         const savedBike = data as Bike;
         upsertBikeLocal(savedBike);
@@ -166,14 +171,13 @@ export function useBikeMutations(userId?: string) {
       await queryClient.invalidateQueries({ queryKey: ['bikes', userId ?? 'local'] });
 
       const existingTasks = queryClient.getQueryData<MaintenanceTask[]>(['maintenance', bike.id]) ?? [];
-      if (existingTasks.length) {
-        return;
-      }
+      if (existingTasks.length) return;
 
       const baseTasks = defaultMaintenanceTemplates.map((template) => ({
         bike_id: bike.id,
         task_name: template.task_name,
         interval_km: template.interval_km,
+        interval_days: template.interval_days ?? null,
         last_done_odometer_km: bike.current_odometer_km,
         last_done_date: new Date().toISOString().slice(0, 10),
       }));
@@ -181,11 +185,16 @@ export function useBikeMutations(userId?: string) {
       if (supabase && userId) {
         const { data, error } = await supabase
           .from('maintenance_tasks')
-          .insert(baseTasks as any)
+          .insert(baseTasks.map((t) => ({
+            bike_id: t.bike_id,
+            task_name: t.task_name,
+            interval_km: t.interval_km,
+            interval_days: t.interval_days ?? null,
+            last_done_odometer_km: t.last_done_odometer_km,
+            last_done_date: t.last_done_date,
+          })) as any)
           .select();
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
         addMaintenanceTasks(data as MaintenanceTask[]);
       } else {
         addMaintenanceTasks(
@@ -200,7 +209,25 @@ export function useBikeMutations(userId?: string) {
     },
   });
 
-  return { saveBike };
+  const deleteBike = useMutation({
+    mutationFn: async (bikeId: string) => {
+      if (supabase) {
+        await Promise.all([
+          supabase.from('maintenance_tasks').delete().eq('bike_id', bikeId),
+          supabase.from('fuel_logs').delete().eq('bike_id', bikeId),
+          supabase.from('rides').delete().eq('bike_id', bikeId),
+          supabase.from('bikes').delete().eq('id', bikeId),
+        ]);
+      }
+      deleteBikeLocal(bikeId);
+      return bikeId;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['bikes', userId ?? 'local'] });
+    },
+  });
+
+  return { saveBike, deleteBike };
 }
 
 export function useRideMutations(userId?: string) {
@@ -228,9 +255,7 @@ export function useRideMutations(userId?: string) {
         };
 
         const { data, error } = await supabase.from('rides').insert(payload as any).select().single();
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
 
         const savedRide = data as unknown as RideRecord;
         saveRideLocal(savedRide);
@@ -272,9 +297,7 @@ export function useFuelMutations(userId?: string) {
           : supabase.from('fuel_logs').insert(payload as any);
 
         const { data, error } = await builder.select().single();
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
         const savedFuelLog = data as FuelLog;
         saveFuelLogLocal(savedFuelLog);
         return savedFuelLog;
@@ -305,6 +328,77 @@ export function useFuelMutations(userId?: string) {
   return { saveFuelLog, deleteFuelLog };
 }
 
+export function useMaintenanceMutations(userId?: string) {
+  const queryClient = useQueryClient();
+  const addMaintenanceTaskLocal = useLocalAppStore((state) => state.addMaintenanceTask);
+  const updateMaintenanceTaskLocal = useLocalAppStore((state) => state.updateMaintenanceTask);
+  const deleteMaintenanceTaskLocal = useLocalAppStore((state) => state.deleteMaintenanceTask);
+
+  const addMaintenanceTask = useMutation<MaintenanceTask, Error, Omit<MaintenanceTask, 'id'> & { id?: string }>({
+    mutationFn: async (task: Omit<MaintenanceTask, 'id'> & { id?: string }) => {
+      const newTask = { ...task, id: task.id || createId() } as MaintenanceTask;
+
+      if (supabase && userId) {
+        const { data, error } = await supabase
+          .from('maintenance_tasks')
+            .insert({
+              bike_id: newTask.bike_id,
+              task_name: newTask.task_name,
+              interval_km: newTask.interval_km,
+              interval_days: newTask.interval_days ?? null,
+              last_done_odometer_km: newTask.last_done_odometer_km,
+              last_done_date: newTask.last_done_date,
+            } as any)
+          .select()
+          .single();
+        if (error) throw error;
+        addMaintenanceTaskLocal(data as MaintenanceTask);
+        return data as MaintenanceTask;
+      }
+
+      addMaintenanceTaskLocal(newTask);
+      return newTask;
+    },
+    onSuccess: async (task) => {
+      await queryClient.invalidateQueries({ queryKey: ['maintenance', task.bike_id] });
+    },
+  });
+
+  const updateMaintenanceTask = useMutation({
+    mutationFn: async (task: MaintenanceTask) => {
+      updateMaintenanceTaskLocal(task);
+
+      if (supabase) {
+        const client = supabase as any;
+        await client.from('maintenance_tasks').update({
+          last_done_odometer_km: task.last_done_odometer_km,
+          last_done_date: task.last_done_date,
+        }).eq('id', task.id);
+      }
+
+      return task;
+    },
+    onSuccess: async (task) => {
+      await queryClient.invalidateQueries({ queryKey: ['maintenance', task.bike_id] });
+    },
+  });
+
+  const deleteMaintenanceTask = useMutation({
+    mutationFn: async (taskId: string) => {
+      deleteMaintenanceTaskLocal(taskId);
+      if (supabase) {
+        await supabase.from('maintenance_tasks').delete().eq('id', taskId);
+      }
+      return taskId;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['maintenance', userId ?? 'local'] });
+    },
+  });
+
+  return { addMaintenanceTask, updateMaintenanceTask, deleteMaintenanceTask };
+}
+
 export function useEmergencyMutations(userId?: string) {
   const queryClient = useQueryClient();
   const updateEmergencyInfoLocal = useLocalAppStore((state) => state.updateEmergencyInfo);
@@ -329,9 +423,7 @@ export function useEmergencyMutations(userId?: string) {
           : supabase.from('emergency_info').insert(payload as any);
 
         const { data, error } = await builder.select().single();
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
         const savedInfo = data as EmergencyInfo;
         updateEmergencyInfoLocal(savedInfo);
         return savedInfo;
@@ -347,4 +439,110 @@ export function useEmergencyMutations(userId?: string) {
   });
 
   return { saveEmergencyInfo };
+}
+
+export function useRideListings(userId?: string) {
+  const localListings = useLocalAppStore((state) => state.rideListings);
+  const blockedIds = useBlockedUsersStore((state) => state.blockedUserIds);
+  const useRemote = Boolean(userId) && isSupabaseConfigured;
+
+  const visibleLocal = localListings
+    .filter((listing) => !listing.is_reported && !blockedIds.includes(listing.host_user_id))
+    .sort((a, b) => new Date(a.ride_date).getTime() - new Date(b.ride_date).getTime());
+
+  const query = useQuery({
+    queryKey: ['ride-listings', userId ?? 'local'],
+    enabled: useRemote,
+    queryFn: async () => {
+      if (!supabase || !userId) return visibleLocal;
+      const { data, error } = await supabase
+        .from('ride_listings')
+        .select('*')
+        .eq('is_reported', false)
+        .order('ride_date', { ascending: true });
+      if (error) throw error;
+      const remote = data as RideListing[];
+      return remote.filter((listing) => !blockedIds.includes(listing.host_user_id));
+    },
+  });
+
+  if (!useRemote) {
+    return { data: visibleLocal, isLoading: false, error: null, isFetching: false };
+  }
+
+  return query;
+}
+
+export function useBoardMutations(userId?: string) {
+  const queryClient = useQueryClient();
+  const addRideListingLocal = useLocalAppStore((state) => state.addRideListing);
+  const deleteRideListingLocal = useLocalAppStore((state) => state.deleteRideListing);
+  const reportRideListingLocal = useLocalAppStore((state) => state.reportRideListing);
+
+  const createRideListing = useMutation({
+    mutationFn: async (listing: Omit<RideListing, 'id' | 'created_at' | 'is_reported' | 'display_name'> & { display_name: string }) => {
+      if (supabase && userId) {
+        const { data, error } = await supabase
+          .from('ride_listings')
+          .insert({
+            host_user_id: userId,
+            meetup_point: listing.meetup_point,
+            meetup_coordinates: listing.meetup_coordinates ?? null,
+            destination: listing.destination,
+            ride_date: listing.ride_date,
+            pace: listing.pace,
+            lobby_link: listing.lobby_link,
+            display_name: listing.display_name,
+          } as any)
+          .select()
+          .single();
+        if (error) throw error;
+        const savedListing = data as RideListing;
+        addRideListingLocal(savedListing);
+        return savedListing;
+      }
+
+      const localListing: RideListing = {
+        ...listing,
+        id: createId(),
+        host_user_id: userId ?? 'local',
+        is_reported: false,
+        created_at: new Date().toISOString(),
+      };
+      addRideListingLocal(localListing);
+      return localListing;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['ride-listings', userId ?? 'local'] });
+    },
+  });
+
+  const deleteRideListing = useMutation({
+    mutationFn: async (listingId: string) => {
+      deleteRideListingLocal(listingId);
+      if (supabase) {
+        await supabase.from('ride_listings').delete().eq('id', listingId);
+      }
+      return listingId;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['ride-listings', userId ?? 'local'] });
+    },
+  });
+
+  const reportRideListing = useMutation({
+    mutationFn: async (listingId: string) => {
+      reportRideListingLocal(listingId);
+      if (supabase) {
+        const client = supabase as any;
+        await client.rpc('report_ride_listing', { listing_id: listingId });
+      }
+      return listingId;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['ride-listings', userId ?? 'local'] });
+    },
+  });
+
+  return { createRideListing, deleteRideListing, reportRideListing };
 }

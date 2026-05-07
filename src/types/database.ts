@@ -51,6 +51,7 @@ export type Database = {
           bike_id: string;
           task_name: string;
           interval_km: number;
+          interval_days: number | null;
           last_done_odometer_km: number;
           last_done_date: string;
         };
@@ -108,6 +109,27 @@ export type Database = {
         };
         Insert: Omit<Database['public']['Tables']['emergency_info']['Row'], 'id'> & { id?: string };
         Update: Partial<Database['public']['Tables']['emergency_info']['Insert']>;
+      };
+      ride_listings: {
+        Row: {
+          id: string;
+          host_user_id: string;
+          meetup_point: string;
+          meetup_coordinates: Json | null;
+          destination: string;
+          ride_date: string;
+          pace: 'chill' | 'moderate' | 'sporty';
+          lobby_link: string;
+          is_reported: boolean;
+          display_name: string;
+          created_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['ride_listings']['Row'], 'id' | 'created_at' | 'is_reported'> & {
+          id?: string;
+          created_at?: string;
+          is_reported?: boolean;
+        };
+        Update: Partial<Database['public']['Tables']['ride_listings']['Insert']>;
       };
     };
   };

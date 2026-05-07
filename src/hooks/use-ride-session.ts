@@ -11,16 +11,20 @@ import { sleep } from '@/lib/time';
 import { useAuth } from '@/hooks/use-auth';
 import { useRideMutations } from '@/hooks/use-kurbada-data';
 import { useRideStore } from '@/store/ride-store';
+import { clearStoredCoords, getStoredCoords, LOCATION_TASK_NAME } from '@/tasks/location-task';
 import type { LeanCalibration, RideMode, RidePoint } from '@/types/domain';
 
 Accelerometer.setUpdateInterval(16);
 Gyroscope.setUpdateInterval(16);
 
+function fuelRateForMode(mode: RideMode) {
+  return mode === 'hustle' ? 28 : 22;
+}
+
 export function useRideSession() {
   const { session } = useAuth();
   const { saveRide } = useRideMutations(session?.user.id);
   const store = useRideStore();
-  const routePointsRef = useRef<RidePoint[]>([]);
   const latestAccelRef = useRef({ x: 0, y: 0, z: 1 });
   const filteredAccelRef = useRef({ x: 0, y: 0, z: 1 });
   const rollRef = useRef(0);
@@ -30,6 +34,8 @@ export function useRideSession() {
   const gyroSubscriptionRef = useRef<{ remove: () => void } | null>(null);
   const crashThresholdSinceRef = useRef<number | null>(null);
   const calibrationRef = useRef<LeanCalibration | undefined>(store.calibration);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const foregroundPointsRef = useRef<RidePoint[]>([]);
 
   useEffect(() => {
     calibrationRef.current = store.calibration;
@@ -53,7 +59,6 @@ export function useRideSession() {
     }, 1000);
 
     return () => clearInterval(interval);
-    // We intentionally bind to the store snapshot here because the ride timer is store-driven state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store]);
 
@@ -106,30 +111,47 @@ export function useRideSession() {
     startLocationWatch().catch(() => undefined);
 
     return cleanupSubscriptions;
-    // The sensor/session lifecycle is keyed only by ride state and mode.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.state, store.mode]);
 
-  const simplifiedPreviewPoints = simplifyRoute(routePointsRef.current);
-  const routePreview = simplifiedPreviewPoints.length ? buildRouteGeoJson(simplifiedPreviewPoints) : undefined;
+  const latestPosition = foregroundPointsRef.current[foregroundPointsRef.current.length - 1];
 
-  const startRide = async (mode: RideMode, bikeId: string) => {
-    const permission = await Location.requestForegroundPermissionsAsync();
-    if (!permission.granted) {
+  const startRide = async (mode: RideMode, bikeId: string, fuelPricePerLiter: number) => {
+    const fgPerm = await Location.requestForegroundPermissionsAsync();
+    if (!fgPerm.granted) {
       throw new Error('Location permission is required to start a ride.');
     }
 
+    await Location.requestBackgroundPermissionsAsync().catch(() => undefined);
+
     store.resetRide();
-    routePointsRef.current = [];
+    foregroundPointsRef.current = [];
     rollRef.current = 0;
     lastGyroTimestampRef.current = null;
     calibrationRef.current = undefined;
     crashThresholdSinceRef.current = null;
     store.setMode(mode);
     store.setBikeId(bikeId);
+    store.setFuelPricePerLiter(fuelPricePerLiter);
+    store.setDashboardView(mode === 'weekend' ? 'speed' : 'economy');
     store.setStartedAt(Date.now());
+
+    await clearStoredCoords();
+
+    await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
+      accuracy: Location.Accuracy.BestForNavigation,
+      timeInterval: 5000,
+      distanceInterval: 8,
+      showsBackgroundLocationIndicator: true,
+      foregroundService: {
+        notificationTitle: 'Kurbada — Ride in progress',
+        notificationBody: 'Tracking your route in the background',
+        notificationColor: '#E63946',
+      },
+    }).catch(() => undefined);
+
     store.setState('starting');
-    await sleep(180);
+    await sleep(500);
     store.setState(mode === 'weekend' ? 'calibrating' : 'active');
   };
 
@@ -139,52 +161,113 @@ export function useRideSession() {
       return;
     }
 
-    await sleep(2500);
-    const calibration = {
-      zeroRollDeg: rollRef.current,
-      capturedAt: new Date().toISOString(),
-      mountProfileId: 'ride-start',
-    };
-    calibrationRef.current = calibration;
-    store.setCalibration(calibration);
-    store.setState('active');
+    let countdown = 3;
+    store.setCalibrationCountdown(countdown);
+
+    countdownIntervalRef.current = setInterval(() => {
+      countdown--;
+      store.setCalibrationCountdown(countdown);
+
+      if (countdown <= 0) {
+        if (countdownIntervalRef.current) {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+        }
+
+        const calibration = {
+          zeroRollDeg: rollRef.current,
+          capturedAt: new Date().toISOString(),
+          mountProfileId: 'ride-start',
+        };
+        calibrationRef.current = calibration;
+        store.setCalibration(calibration);
+        store.setCalibrationCountdown(null);
+        store.setState('active');
+      }
+    }, 1000);
   };
 
   const stopRide = async () => {
-    if (!store.bikeId || !store.startedAt) {
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+
+    if (!calibrationRef.current && store.mode === 'weekend' && rollRef.current !== undefined) {
+      const calibration = {
+        zeroRollDeg: rollRef.current,
+        capturedAt: new Date().toISOString(),
+        mountProfileId: 'ride-stop',
+      };
+      calibrationRef.current = calibration;
+      store.setCalibration(calibration);
+      store.setCalibrationCountdown(null);
+    }
+
+    if (!store.startedAt) {
+      store.setStartedAt(Date.now() - store.telemetry.durationSeconds * 1000);
+    }
+
+    const startedAt = store.startedAt!;
+
+    if (!store.bikeId) {
       store.resetRide();
-      return;
+      return null;
     }
 
     store.setState('stopping');
     cleanupSubscriptions();
 
-    const simplified = simplifyRoute(routePointsRef.current);
+    try {
+      await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => undefined);
+    } catch {
+      // ignore
+    }
+
+    const bgPoints = await getStoredCoords();
+    const fgPoints = [...foregroundPointsRef.current];
+    const allPoints = [...bgPoints, ...fgPoints].sort((a, b) => a.timestamp - b.timestamp);
+
+    const simplified = simplifyRoute(allPoints);
     const routeGeoJson = buildRouteGeoJson(simplified);
+    const bounds = computeRouteBounds(simplified.length ? simplified : allPoints);
+
+    const totalDistance = simplified.reduce((sum, p, i) => {
+      if (i === 0) return 0;
+      return sum + haversineDistanceKm(simplified[i - 1], p);
+    }, 0);
+
+    const maxSpeed = simplified.reduce((m, p) => Math.max(m, p.speedKmh), 0);
     const ride = {
       id: createId(),
       bike_id: store.bikeId,
       user_id: session?.user.id,
       mode: store.mode,
-      started_at: new Date(store.startedAt).toISOString(),
+      started_at: new Date(startedAt).toISOString(),
       ended_at: new Date().toISOString(),
-      distance_km: Number(store.telemetry.distanceKm.toFixed(1)),
-      max_speed_kmh: Number(store.telemetry.maxSpeedKmh.toFixed(1)),
+      distance_km: Number(totalDistance.toFixed(1)),
+      max_speed_kmh: Number(maxSpeed.toFixed(1)),
       avg_speed_kmh:
         store.telemetry.durationSeconds > 0
-          ? Number((store.telemetry.distanceKm / (store.telemetry.durationSeconds / 3600)).toFixed(1))
+          ? Number((totalDistance / (store.telemetry.durationSeconds / 3600)).toFixed(1))
           : 0,
       max_lean_angle_deg: store.mode === 'weekend' ? Number(store.telemetry.maxLeanAngleDeg.toFixed(1)) : null,
       fuel_used_liters: Number(store.telemetry.estimatedFuelLiters.toFixed(2)),
       route_geojson: routeGeoJson,
-      route_point_count_raw: routePointsRef.current.length,
+      route_point_count_raw: allPoints.length,
       route_point_count_simplified: simplified.length,
-      route_bounds: computeRouteBounds(simplified.length ? simplified : routePointsRef.current),
+      route_bounds: bounds,
     };
 
     store.setState('saving');
-    await saveRide.mutateAsync(ride);
-    return ride;
+    try {
+      await saveRide.mutateAsync(ride);
+      await clearStoredCoords();
+      return ride;
+    } catch {
+      store.setState('active');
+      throw new Error('Failed to save ride. Please try again.');
+    }
   };
 
   const dismissCrashAlert = () => {
@@ -211,9 +294,7 @@ export function useRideSession() {
   }
 
   async function startLocationWatch() {
-    if (locationSubscriptionRef.current) {
-      return;
-    }
+    if (locationSubscriptionRef.current) return;
 
     locationSubscriptionRef.current = await Location.watchPositionAsync(
       {
@@ -227,25 +308,40 @@ export function useRideSession() {
           longitude: location.coords.longitude,
           timestamp: location.timestamp,
           speedKmh: Math.max(0, (location.coords.speed ?? 0) * 3.6),
-          altitude: location.coords.altitude,
+          altitude: location.coords.altitude ?? 0,
         };
 
-        const previous = routePointsRef.current[routePointsRef.current.length - 1];
+        const previous = foregroundPointsRef.current[foregroundPointsRef.current.length - 1];
         const distanceDelta = previous ? haversineDistanceKm(previous, point) : 0;
-        routePointsRef.current = [...routePointsRef.current, point];
-        store.appendPoint(point);
+        foregroundPointsRef.current = [...foregroundPointsRef.current, point];
+        store.appendForegroundPoint(point);
+
+        const newDistance = store.telemetry.distanceKm + distanceDelta;
+        const fuelRate = fuelRateForMode(store.mode);
+        const fuelLiters = newDistance / fuelRate;
+        const fuelCost = fuelLiters * store.fuelPricePerLiter;
+
+        const heading = location.coords.heading ?? store.telemetry.heading;
+
         store.updateTelemetry({
           speedKmh: point.speedKmh,
           altitudeMeters: point.altitude ?? 0,
-          distanceKm: store.telemetry.distanceKm + distanceDelta,
+          distanceKm: newDistance,
           maxSpeedKmh: Math.max(store.telemetry.maxSpeedKmh, point.speedKmh),
-          estimatedFuelLiters: store.mode === 'hustle' ? (store.telemetry.distanceKm + distanceDelta) / 28 : (store.telemetry.distanceKm + distanceDelta) / 22,
+          estimatedFuelLiters: fuelLiters,
+          estimatedFuelCost: fuelCost,
+          heading: heading || store.telemetry.heading,
         });
       },
     );
   }
 
   function cleanupSubscriptions() {
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+
     accelSubscriptionRef.current?.remove();
     gyroSubscriptionRef.current?.remove();
     locationSubscriptionRef.current?.remove();
@@ -256,9 +352,13 @@ export function useRideSession() {
 
   useEffect(() => cleanupSubscriptions, []);
 
+  const previewPoints = simplifyRoute(foregroundPointsRef.current);
+  const routePreview = previewPoints.length ? buildRouteGeoJson(previewPoints) : undefined;
+
   return {
     ...store,
     routePreview,
+    latestPosition,
     startRide,
     completeCalibration,
     stopRide,

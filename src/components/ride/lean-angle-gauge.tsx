@@ -9,7 +9,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Defs, Line, Path, RadialGradient, Stop, Text as SvgText } from 'react-native-svg';
 
 import { AppText } from '@/components/ui/app-text';
 import { palette, radius } from '@/constants/theme';
@@ -84,18 +84,18 @@ export function LeanAngleGauge({
     <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center', minHeight: 380 }}>
       <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
         <Defs>
-          <LinearGradient id="leanArc" x1="0%" y1="0%" x2="100%" y2="0%">
-            <Stop offset="0%" stopColor="rgba(198,69,55,0.65)" />
-            <Stop offset="50%" stopColor="rgba(255,255,255,0.12)" />
-            <Stop offset="100%" stopColor="rgba(198,69,55,0.65)" />
-          </LinearGradient>
+          <RadialGradient id="gaugeGlow" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor="rgba(192,57,43,0.12)" />
+            <Stop offset="100%" stopColor="rgba(192,57,43,0)" />
+          </RadialGradient>
         </Defs>
 
-        <Circle cx={CENTER} cy={CENTER} r={116} fill="rgba(255,255,255,0.02)" />
-        <Circle cx={CENTER} cy={CENTER} r={116} stroke="rgba(255,255,255,0.05)" strokeWidth={1} />
+        <Circle cx={CENTER} cy={CENTER} r={116} fill="url(#gaugeGlow)" />
 
-        <Path d={arcPath(205, 335)} stroke="rgba(255,255,255,0.06)" strokeWidth={8} fill="none" strokeLinecap="round" />
-        <Path d={arcPath(205, 335)} stroke="url(#leanArc)" strokeWidth={8} fill="none" strokeLinecap="round" />
+        <Path d={arcPath(210, 330)} stroke="rgba(255,255,255,0.06)" strokeWidth={12} fill="none" strokeLinecap="round" />
+        <Path d={arcPath(210, 230)} stroke="rgba(192,57,43,0.25)" strokeWidth={12} fill="none" strokeLinecap="round" />
+        <Path d={arcPath(310, 330)} stroke="rgba(192,57,43,0.25)" strokeWidth={12} fill="none" strokeLinecap="round" />
+        <Path d={arcPath(270, 270 + Math.max(-60, Math.min(60, leanAngle)))} stroke={palette.danger} strokeWidth={12} fill="none" strokeLinecap="round" />
 
         {[-60, -40, -20, 0, 20, 40, 60].map((tick) => {
           const angle = 270 + tick;
@@ -111,7 +111,7 @@ export function LeanAngleGauge({
           0
         </SvgText>
         <SvgText x={226} y={232} fill="rgba(255,255,255,0.42)" fontSize={10}>
-          R 60
+          R 60°
         </SvgText>
       </Svg>
 
@@ -129,12 +129,12 @@ export function LeanAngleGauge({
           style={[
             {
               position: 'absolute',
-              width: 240,
+              width: 220,
               height: 2,
-              backgroundColor: 'rgba(255,255,255,0.8)',
-              shadowColor: '#FFFFFF',
+              backgroundColor: '#FFFFFF',
+              shadowColor: palette.danger,
               shadowOpacity: 0.2,
-              shadowRadius: 8,
+              shadowRadius: 10,
               shadowOffset: { width: 0, height: 0 },
             },
             horizonStyle,
@@ -144,18 +144,40 @@ export function LeanAngleGauge({
           style={[
             {
               position: 'absolute',
-              width: 96,
-              height: 96,
+              width: 80,
+              height: 80,
               borderRadius: radius.round,
-              backgroundColor: 'rgba(217,255,63,0.08)',
+              backgroundColor: 'rgba(192,57,43,0.08)',
             },
             pulseStyle,
           ]}
         />
+        <View
+          style={{
+            position: 'absolute',
+            width: 10,
+            height: 10,
+            borderRadius: 5,
+            backgroundColor: '#000000',
+            borderWidth: 1.5,
+            borderColor: '#FFFFFF',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: palette.danger }} />
+        </View>
         <View style={{ alignItems: 'center', gap: 6 }}>
-          <AppText variant="heroMetric" style={{ fontSize: 68, color: danger ? palette.danger : palette.text }}>
-            {value}deg
-          </AppText>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {value < -2 ? (
+              <AppText variant="label" style={{ color: palette.textTertiary, fontSize: 16 }}>◄ L</AppText>
+            ) : null}
+            <AppText variant="largeMetric" style={{ color: danger ? palette.danger : palette.text }}>
+              {value}°
+            </AppText>
+            {value > 2 ? (
+              <AppText variant="label" style={{ color: palette.textTertiary, fontSize: 16 }}>R ►</AppText>
+            ) : null}
+          </View>
           <AppText variant="meta">
             {speed !== undefined ? `${Math.round(speed)} km/h live` : 'lean telemetry live'}
           </AppText>

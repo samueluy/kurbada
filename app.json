@@ -9,7 +9,14 @@
     "userInterfaceStyle": "light",
     "ios": {
       "icon": "./assets/expo.icon",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "location",
+          "location"
+        ]
+      },
+      "bundleIdentifier": "com.sajedph.kurbada"
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +29,17 @@
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "POST_NOTIFICATIONS"
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "POST_NOTIFICATIONS",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
     "web": {
@@ -44,7 +61,8 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Kurbada uses your location to record rides, calculate distance, and show your route."
+          "locationAlwaysAndWhenInUsePermission": "Kurbada tracks your location during rides to record your route, even when the app is in the background.",
+          "isAndroidBackgroundLocationEnabled": true
         }
       ],
       [
@@ -65,7 +83,8 @@
       [
         "@rnmapbox/maps",
         {}
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

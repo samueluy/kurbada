@@ -40,6 +40,7 @@ export type MaintenanceTask = {
   bike_id: string;
   task_name: string;
   interval_km: number;
+  interval_days: number | null;
   last_done_odometer_km: number;
   last_done_date: string;
 };
@@ -63,6 +64,22 @@ export type RouteBounds = {
   maxLng: number;
 };
 
+export type RidePace = 'chill' | 'moderate' | 'sporty';
+
+export type RideListing = {
+  id: string;
+  host_user_id: string;
+  meetup_point: string;
+  meetup_coordinates?: { lat: number; lng: number } | null;
+  destination: string;
+  ride_date: string;
+  pace: RidePace;
+  lobby_link: string;
+  is_reported: boolean;
+  display_name: string;
+  created_at: string;
+};
+
 export type RideRecord = {
   id: string;
   user_id?: string;
@@ -81,11 +98,13 @@ export type RideRecord = {
   route_bounds: RouteBounds;
 };
 
+export type EmergencyBloodType = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
+
 export type EmergencyInfo = {
   id: string;
   user_id?: string;
   full_name: string;
-  blood_type: 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
+  blood_type: EmergencyBloodType;
   allergies: string;
   conditions: string;
   contact1_name: string;
@@ -111,4 +130,18 @@ export type RidePoint = {
   timestamp: number;
   speedKmh: number;
   altitude?: number | null;
+};
+
+export type WeatherData = {
+  temperature: number;
+  weatherCode: number;
+  weatherLabel: string;
+  weatherIcon: string;
+  windSpeed: number;
+  sunrise: string;
+  sunset: string;
+  tempMax: number;
+  tempMin: number;
+  precipProb: number;
+  locationName: string;
 };

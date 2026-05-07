@@ -41,5 +41,20 @@ export function getGreeting(date = new Date()) {
 }
 
 export function formatModeLabel(mode: RideMode) {
-  return mode === 'weekend' ? 'Weekend' : 'Hustle';
+  return mode === 'weekend' ? 'Weekend' : 'Daily';
+}
+
+export function weatherFromCode(code: number): { label: string; icon: string } {
+  if (code === 0) return { label: 'Clear sky', icon: 'sunny-outline' };
+  if (code === 1) return { label: 'Mainly clear', icon: 'partly-sunny-outline' };
+  if (code === 2) return { label: 'Partly cloudy', icon: 'cloudy-outline' };
+  if (code === 3) return { label: 'Overcast', icon: 'cloud-outline' };
+  if (code >= 45 && code <= 48) return { label: 'Fog', icon: 'cloudy-outline' };
+  if (code >= 51 && code <= 55) return { label: 'Drizzle', icon: 'rainy-outline' };
+  if (code >= 61 && code <= 65) return { label: 'Rain', icon: 'rainy-outline' };
+  if (code >= 71 && code <= 77) return { label: 'Snow', icon: 'snow-outline' };
+  if (code >= 80 && code <= 82) return { label: 'Showers', icon: 'rainy-outline' };
+  if (code >= 85 && code <= 86) return { label: 'Snow showers', icon: 'snow-outline' };
+  if (code >= 95 && code <= 99) return { label: 'Thunderstorm', icon: 'thunderstorm-outline' };
+  return { label: 'Partly cloudy', icon: 'cloudy-outline' };
 }

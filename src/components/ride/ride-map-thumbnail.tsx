@@ -9,7 +9,6 @@ import type { RideRecord } from '@/types/domain';
 export function RideMapThumbnail({ ride }: { ride: RideRecord }) {
   const Mapbox = getMapboxModule();
   const coordinates = ride.route_geojson?.geometry.coordinates as [number, number][] | undefined;
-  const center = coordinates?.[0];
 
   return (
     <View
@@ -17,11 +16,11 @@ export function RideMapThumbnail({ ride }: { ride: RideRecord }) {
         height: 110,
         borderRadius: radius.md,
         overflow: 'hidden',
-        backgroundColor: '#0B1012',
+        backgroundColor: '#0D1B2A',
       }}>
-      {Mapbox && coordinates?.length && center ? (
-        <Mapbox.MapView style={{ flex: 1 }} styleURL="mapbox://styles/mapbox/light-v11" logoEnabled={false} compassEnabled={false} scaleBarEnabled={false}>
-          <Mapbox.Camera zoomLevel={11} centerCoordinate={center} animationMode="none" />
+      {Mapbox && coordinates?.length ? (
+        <Mapbox.MapView style={{ flex: 1 }} styleURL="mapbox://styles/mapbox/dark-v11" attributionEnabled={false} logoEnabled={false} compassEnabled={false} scaleBarEnabled={false}>
+          <Mapbox.Camera zoomLevel={11} centerCoordinate={coordinates[0]} animationMode="none" />
           <Mapbox.ShapeSource id={`ride-thumb-${ride.id}`} shape={ride.route_geojson}>
             <Mapbox.LineLayer
               id={`ride-thumb-line-${ride.id}`}
@@ -31,8 +30,8 @@ export function RideMapThumbnail({ ride }: { ride: RideRecord }) {
         </Mapbox.MapView>
       ) : (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }}>
-          <AppText variant="meta" style={{ color: '#FFFFFF' }}>
-            Native Mapbox preview appears in a development build.
+          <AppText variant="meta" style={{ color: '#FFFFFF', textAlign: 'center' }}>
+            Native Mapbox preview appears in dev build
           </AppText>
         </View>
       )}
@@ -42,12 +41,12 @@ export function RideMapThumbnail({ ride }: { ride: RideRecord }) {
           position: 'absolute',
           left: 10,
           bottom: 10,
-          backgroundColor: 'rgba(10,10,10,0.72)',
-          borderRadius: radius.pill,
-          paddingHorizontal: 10,
-          paddingVertical: 4,
+          backgroundColor: palette.surfaceMuted,
+          borderRadius: radius.xs,
+          paddingHorizontal: 8,
+          paddingVertical: 3,
         }}>
-        <AppText variant="label" style={{ color: '#FFFFFF' }}>
+        <AppText variant="label" style={{ color: palette.textSecondary, letterSpacing: 1 }}>
           {formatModeLabel(ride.mode)}
         </AppText>
       </View>

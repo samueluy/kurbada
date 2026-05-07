@@ -1,4 +1,4 @@
-import type { Bike, EmergencyInfo, FuelLog, MaintenanceTask, Profile, RideRecord } from '@/types/domain';
+import type { Bike, EmergencyInfo, FuelLog, MaintenanceTask, Profile, RideListing, RideRecord } from '@/types/domain';
 import { buildRouteGeoJson, computeRouteBounds } from '@/lib/route';
 
 const samplePoints = [
@@ -40,6 +40,7 @@ export const sampleMaintenanceTasks: MaintenanceTask[] = [
     bike_id: SAMPLE_BIKE_ID,
     task_name: 'Engine Oil Change',
     interval_km: 3000,
+    interval_days: 180,
     last_done_odometer_km: 10840,
     last_done_date: '2026-03-15',
   },
@@ -48,6 +49,7 @@ export const sampleMaintenanceTasks: MaintenanceTask[] = [
     bike_id: SAMPLE_BIKE_ID,
     task_name: 'Chain Tension & Lube',
     interval_km: 600,
+    interval_days: 90,
     last_done_odometer_km: 12480,
     last_done_date: '2026-04-25',
   },
@@ -96,3 +98,32 @@ export const sampleEmergencyInfo: EmergencyInfo = {
   contact2_name: 'Secondary Contact',
   contact2_phone: '+639189998877',
 };
+
+export const sampleRideListings: RideListing[] = [
+  {
+    id: 'bb4a8f7e-3d56-4bbc-9e1a-94c87d6bc123',
+    host_user_id: '9cf2d582-9504-4e0a-a564-5c68fa237f71',
+    meetup_point: 'Shell Marcos Highway',
+    meetup_coordinates: { lat: 14.612, lng: 121.119 },
+    destination: 'Marilaque to Infanta',
+    ride_date: new Date(Date.now() + 86_400_000 * 3).toISOString(),
+    pace: 'moderate',
+    lobby_link: 'https://m.me/join/kurbadaride',
+    is_reported: false,
+    display_name: 'Samuel Rider',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'cc5b9g8f-4e67-5ccd-0f2b-a5d98e7cd234',
+    host_user_id: 'aabbcc-1111-2222-3333-444455556666',
+    meetup_point: 'Petron SLEX',
+    meetup_coordinates: { lat: 14.279, lng: 121.037 },
+    destination: 'Tagaytay Weekend Run',
+    ride_date: new Date(Date.now() + 86_400_000 * 5).toISOString(),
+    pace: 'chill',
+    lobby_link: 'https://t.me/kurbadatagaytay',
+    is_reported: false,
+    display_name: 'Maria Rider',
+    created_at: new Date().toISOString(),
+  },
+];

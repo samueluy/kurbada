@@ -1,87 +1,136 @@
 import '@/global.css';
 
-export const LightColors = {
-  bg: '#F4F4F1',
-  elevated: '#FFFFFF',
-  softSurface: '#ECECE7',
-  textPrimary: '#171717',
-  textSecondary: '#6F6F68',
-  textMuted: '#9A9A92',
-  hairline: 'rgba(255,255,255,0.18)',
-  darkBorder: 'rgba(0,0,0,0.08)',
-  action: '#171717',
+export const Colors = {
+  bg: '#0D0D0D',
+  s1: '#161616',
+  s2: '#1E1E1E',
+  s3: '#272727',
+  s4: '#303030',
+  t1: '#FFFFFF',
+  t2: '#A0A0A0',
+  t3: '#555555',
+  t4: '#333333',
+  red: '#C0392B',
+  redLight: '#E05444',
+  redDim: 'rgba(192,57,43,0.15)',
+  redBorder: 'rgba(192,57,43,0.30)',
+  redGlow: 'rgba(192,57,43,0.45)',
+  green: '#2ECC71',
+  greenDim: 'rgba(46,204,113,0.15)',
+  amber: '#F39C12',
+  amberDim: 'rgba(243,156,18,0.15)',
+  border: 'rgba(255,255,255,0.07)',
+  borderMid: 'rgba(255,255,255,0.12)',
 } as const;
 
-export const Colors = {
-  bg: '#050505',
-  surface: 'rgba(255,255,255,0.06)',
-  surfaceSoft: 'rgba(255,255,255,0.04)',
-  surfaceStrong: 'rgba(255,255,255,0.10)',
-  textPrimary: '#F5F5F2',
-  textSecondary: 'rgba(255,255,255,0.72)',
-  textMuted: 'rgba(255,255,255,0.45)',
-  inverse: '#FFFFFF',
-  borderHairline: 'rgba(255,255,255,0.18)',
-  borderSoft: 'rgba(255,255,255,0.08)',
-  darkBorder: 'rgba(0,0,0,0.08)',
-  accentDanger: '#C64537',
-  accentSuccess: '#2F6B4F',
-  accentLime: '#D9FF3F',
-  glowWhite: 'rgba(255,255,255,0.18)',
-  glowLime: 'rgba(217,255,63,0.12)',
-  glowRed: 'rgba(198,69,55,0.18)',
-  lightBg: LightColors.bg,
-  lightSurface: LightColors.elevated,
-  lightSoft: LightColors.softSurface,
-  lightText: LightColors.textPrimary,
-  dark: '#171717',
-  mid: LightColors.textSecondary,
-  faint: LightColors.softSurface,
-  red: '#C64537',
-  green: '#2F6B4F',
-  border: 'rgba(255,255,255,0.18)',
-  borderMid: 'rgba(255,255,255,0.08)',
-  hudBg: '#050505',
-  hudSurface: 'rgba(255,255,255,0.06)',
-  hudBorder: 'rgba(255,255,255,0.08)',
-  hudText: '#F5F5F2',
-  hudMuted: 'rgba(255,255,255,0.45)',
+export const Typography = {
+  display: {
+    fontFamily: 'DMSans_900Black',
+    fontSize: 30,
+    lineHeight: 32,
+    letterSpacing: -0.8,
+    color: Colors.t1,
+  },
+  h1: {
+    fontFamily: 'DMSans_700Bold',
+    fontSize: 20,
+    lineHeight: 24,
+    letterSpacing: -0.4,
+    color: Colors.t1,
+  },
+  h2: {
+    fontFamily: 'DMSans_700Bold',
+    fontSize: 16,
+    lineHeight: 20,
+    letterSpacing: -0.2,
+    color: Colors.t1,
+  },
+  h3: {
+    fontFamily: 'DMSans_600SemiBold',
+    fontSize: 14,
+    lineHeight: 18,
+    color: Colors.t1,
+  },
+  eyebrow: {
+    fontFamily: 'DMSans_600SemiBold',
+    fontSize: 11,
+    lineHeight: 14,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase' as const,
+    color: Colors.t3,
+  },
+  body: {
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 14,
+    lineHeight: 20,
+    color: Colors.t2,
+  },
+  bodySmall: {
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 12,
+    lineHeight: 17,
+    color: Colors.t2,
+  },
+  monoXL: {
+    fontFamily: 'DMMono_500Medium',
+    fontSize: 48,
+    lineHeight: 50,
+    letterSpacing: -1,
+    color: Colors.t1,
+  },
+  monoLG: {
+    fontFamily: 'DMMono_500Medium',
+    fontSize: 32,
+    lineHeight: 34,
+    letterSpacing: -0.5,
+    color: Colors.t1,
+  },
+  monoMD: {
+    fontFamily: 'DMMono_500Medium',
+    fontSize: 22,
+    lineHeight: 24,
+    letterSpacing: -0.3,
+    color: Colors.t1,
+  },
+  monoSM: {
+    fontFamily: 'DMMono_500Medium',
+    fontSize: 15,
+    lineHeight: 18,
+    color: Colors.t1,
+  },
+  label: {
+    fontFamily: 'DMSans_600SemiBold',
+    fontSize: 10,
+    lineHeight: 12,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase' as const,
+    color: Colors.t3,
+  },
+} as const;
+
+export const Radius = { xs: 6, sm: 10, md: 14, lg: 18, xl: 24, pill: 100, round: 999 } as const;
+
+export const CardStyle = {
+  backgroundColor: Colors.s1,
+  borderRadius: Radius.lg,
+  borderWidth: 0.5,
+  borderColor: Colors.border,
 } as const;
 
 export const Fonts = {
-  display: 'Inter_700Bold',
-  heading: 'Inter_700Bold',
-  body: 'Inter_400Regular',
-  bodyMedium: 'Inter_500Medium',
-  bodySemiBold: 'Inter_600SemiBold',
-  mono: 'Oswald_500Medium',
-  monoStrong: 'Oswald_600SemiBold',
-} as const;
-
-export const Radius = {
-  sm: 16,
-  md: 18,
-  lg: 24,
-  xl: 30,
-  pill: 28,
-  round: 999,
+  display: 'DMSans_900Black',
+  heading: 'DMSans_700Bold',
+  body: 'DMSans_400Regular',
+  bodyMedium: 'DMSans_600SemiBold',
+  bodySemiBold: 'DMSans_700Bold',
+  mono: 'DMMono_500Medium',
+  monoStrong: 'DMMono_500Medium',
+  brand: 'BebasNeue_400Regular',
 } as const;
 
 export const Shadow = {
-  card: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 22,
-    elevation: 3,
-  },
-  floating: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.14,
-    shadowRadius: 24,
-    elevation: 5,
-  },
+  card: {},
+  floating: {},
 } as const;
 
 export const spacing = {
@@ -99,7 +148,7 @@ export const spacing = {
 
 export const layout = {
   screenPadding: 20,
-  tabBarHeight: 72,
+  tabBarHeight: 60,
   maxContentWidth: 920,
 } as const;
 
@@ -110,33 +159,33 @@ export const motion = {
   slow: 220,
 } as const;
 
-export const chartColors = ['#F5F5F2', 'rgba(255,255,255,0.72)', 'rgba(255,255,255,0.55)', 'rgba(255,255,255,0.35)'];
+export const chartColors = [Colors.t1, Colors.t2, Colors.t3, Colors.t4];
 
 export const palette = {
   background: Colors.bg,
-  surface: Colors.surface,
-  surfaceMuted: Colors.surfaceSoft,
-  surfaceStrong: Colors.surfaceStrong,
-  heroFrom: 'rgba(255,255,255,0.10)',
-  heroTo: 'rgba(255,255,255,0.02)',
-  text: Colors.textPrimary,
-  textSecondary: Colors.textSecondary,
-  textTertiary: Colors.textMuted,
-  textInverse: Colors.inverse,
-  border: Colors.borderSoft,
-  divider: Colors.borderSoft,
-  dividerStrong: Colors.borderHairline,
-  danger: Colors.accentDanger,
-  success: Colors.accentSuccess,
-  lime: Colors.accentLime,
-  weekend: Colors.surfaceStrong,
-  hustle: Colors.surfaceSoft,
-  blue: '#4D7CFE',
-  lightBackground: LightColors.bg,
-  lightSurface: LightColors.elevated,
-  lightSurfaceSoft: LightColors.softSurface,
-  lightText: LightColors.textPrimary,
-  lightTextSecondary: LightColors.textSecondary,
+  surface: Colors.s1,
+  surfaceMuted: Colors.s2,
+  surfaceStrong: Colors.s3,
+  heroFrom: Colors.s2,
+  heroTo: Colors.s1,
+  text: Colors.t1,
+  textSecondary: Colors.t2,
+  textTertiary: Colors.t3,
+  textInverse: Colors.t1,
+  border: Colors.border,
+  divider: Colors.border,
+  dividerStrong: Colors.borderMid,
+  danger: Colors.red,
+  success: Colors.green,
+  lime: Colors.redLight,
+  weekend: Colors.s3,
+  hustle: Colors.s2,
+  blue: '#3498DB',
+  lightBackground: Colors.bg,
+  lightSurface: Colors.s1,
+  lightSurfaceSoft: Colors.s2,
+  lightText: Colors.t1,
+  lightTextSecondary: Colors.t2,
 } as const;
 
 export const typography = {
@@ -145,10 +194,11 @@ export const typography = {
   body: Fonts.body,
   bodyMedium: Fonts.bodyMedium,
   bodySemiBold: Fonts.bodySemiBold,
-  mono: Fonts.monoStrong,
+  mono: Fonts.mono,
 } as const;
 
 export const radius = {
+  xs: Radius.xs,
   sm: Radius.sm,
   md: Radius.md,
   lg: Radius.lg,
