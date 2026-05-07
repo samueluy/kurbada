@@ -91,9 +91,9 @@ export function CustomCalendarHeatmap({ rides, numDays = 90 }: { rides: RideReco
       {/* Grid row: day labels + cells */}
       <View style={{ flexDirection: 'row' }}>
         <View style={{ width: 16, paddingLeft: 12, justifyContent: 'space-between', paddingVertical: 1 }}>
-          {DAY_LABELS.map((day) => (
+          {DAY_LABELS.map((day, i) => (
             <AppText
-              key={day}
+              key={`${day}-${i}`}
               variant="meta"
               style={{
                 color: palette.textTertiary,
