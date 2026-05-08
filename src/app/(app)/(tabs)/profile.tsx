@@ -26,6 +26,7 @@ export default function ProfileTabScreen() {
   const emergency = useEmergencyInfo(session?.user.id);
   const customFuelPrice = useAppStore((state) => state.customFuelPricePerLiter);
   const setCustomFuelPrice = useAppStore((state) => state.setCustomFuelPricePerLiter);
+  const resetForSignOut = useAppStore((state) => state.resetForSignOut);
 
   const [showFuelPrice, setShowFuelPrice] = useState(false);
   const [fuelPriceInput, setFuelPriceInput] = useState('');
@@ -108,7 +109,7 @@ export default function ProfileTabScreen() {
         />
       </GlassCard>
 
-      <Button title="Sign Out" variant="secondary" onPress={async () => { await signOut(); router.replace('/(public)/auth/sign-in'); }} />
+      <Button title="Sign Out" variant="secondary" onPress={async () => { await signOut(); resetForSignOut(); router.replace('/'); }} />
 
       <View style={{ paddingVertical: 24 }}>
         <AppText variant="meta" style={{ fontSize: 11, opacity: 0.25, textAlign: 'center' }}>

@@ -11,7 +11,7 @@ export function Button({
   ...rest
 }: PressableProps & { title: string; variant?: 'primary' | 'secondary' | 'ghost' }) {
   const backgroundColor =
-    variant === 'primary' ? '#FFFFFF' : variant === 'secondary' ? palette.surfaceMuted : 'transparent';
+    variant === 'primary' ? '#C0392B' : variant === 'secondary' ? palette.surfaceMuted : 'transparent';
   const borderWidth = variant === 'ghost' ? 0 : 0.5;
   const scale = useRef(new Animated.Value(1)).current;
 
@@ -53,7 +53,7 @@ export function Button({
         <AppText
           variant="button"
           style={{
-            color: variant === 'primary' ? palette.background : variant === 'ghost' ? palette.textSecondary : palette.text,
+            color: variant === 'primary' ? '#FFFFFF' : variant === 'ghost' ? palette.textSecondary : palette.text,
           }}>
           {title}
         </AppText>

@@ -59,6 +59,7 @@ type AppStore = {
   maintenanceRemindersEnabled: boolean;
   maintenanceReminderThresholds: number[];
   maintenanceReminderLastNotified: Record<string, number>;
+  didSignOut: boolean;
   setHasSeenSplash: () => void;
   completeOnboarding: () => void;
   completeBikeSetup: () => void;
@@ -72,6 +73,8 @@ type AppStore = {
   setMaintenanceRemindersEnabled: (value: boolean) => void;
   setMaintenanceReminderThresholds: (thresholds: number[]) => void;
   setMaintenanceReminderLastNotified: (taskId: string, threshold: number) => void;
+  setDidSignOut: (value: boolean) => void;
+  resetForSignOut: () => void;
   markOnboardingSyncing: () => void;
   markOnboardingSyncComplete: (payload: { userId: string; bikeId?: string | null; emergencyId?: string | null }) => void;
   markOnboardingSyncFailed: () => void;
@@ -98,6 +101,7 @@ export const useAppStore = create<AppStore>()(
       maintenanceRemindersEnabled: true,
       maintenanceReminderThresholds: [50, 80, 90, 95, 100],
       maintenanceReminderLastNotified: {},
+      didSignOut: false,
       setHasSeenSplash: () => set({ hasSeenSplash: true }),
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
       completeBikeSetup: () => set({ hasCompletedBikeSetup: true }),
@@ -118,6 +122,8 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({
           maintenanceReminderLastNotified: { ...state.maintenanceReminderLastNotified, [taskId]: threshold },
         })),
+      setDidSignOut: (didSignOut) => set({ didSignOut }),
+      resetForSignOut: () => set({ hasCompletedOnboarding: false, hasCompletedBikeSetup: false, didSignOut: true }),
       markOnboardingSyncing: () => set({ onboardingSyncStatus: 'syncing' }),
       markOnboardingSyncComplete: ({ userId, bikeId = null, emergencyId = null }) =>
         set({

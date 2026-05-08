@@ -109,12 +109,10 @@ export default function RideTabScreen() {
             });
           }}
           style={{
-            backgroundColor: '#FFFFFF',
-            borderColor: '#FFFFFF',
             borderRadius: 13,
             minHeight: 50,
             marginTop: 14,
-            shadowColor: 'rgba(255,255,255,0.18)',
+            shadowColor: 'rgba(192,57,43,0.35)',
             shadowOpacity: 1,
             shadowRadius: 16,
             shadowOffset: { width: 0, height: 4 },
