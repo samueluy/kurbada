@@ -42,7 +42,7 @@ export function ListRow({
       </View>
       <View style={{ flex: 1 }}>
         <AppText variant="h3">{title}</AppText>
-        {subtitle ? <AppText variant="meta">{subtitle}</AppText> : null}
+        {subtitle ? <AppText variant="meta" numberOfLines={1}>{subtitle}</AppText> : null}
       </View>
       {value ? <AppText variant="meta" style={{ color: palette.text }}>{value}</AppText> : null}
       <Ionicons name="chevron-forward" size={16} color={palette.textTertiary} />

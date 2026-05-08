@@ -19,7 +19,17 @@ export function RideMapThumbnail({ ride }: { ride: RideRecord }) {
         backgroundColor: '#0B1012',
       }}>
       {Mapbox && coordinates?.length ? (
-        <Mapbox.MapView style={{ flex: 1 }} styleURL="mapbox://styles/mapbox/dark-v11" attributionEnabled={false} logoEnabled={false} compassEnabled={false} scaleBarEnabled={false}>
+        <Mapbox.MapView
+          style={{ flex: 1 }}
+          styleURL="mapbox://styles/mapbox/dark-v11"
+          attributionEnabled={false}
+          logoEnabled={false}
+          compassEnabled={false}
+          scaleBarEnabled={false}
+          scrollEnabled={false}
+          zoomEnabled={false}
+          pitchEnabled={false}
+          rotateEnabled={false}>
           <Mapbox.Camera zoomLevel={11} centerCoordinate={coordinates[0]} animationMode="none" />
           <Mapbox.ShapeSource id={`ride-thumb-${ride.id}`} shape={ride.route_geojson}>
             <Mapbox.LineLayer
@@ -31,7 +41,7 @@ export function RideMapThumbnail({ ride }: { ride: RideRecord }) {
       ) : (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }}>
           <AppText variant="meta" style={{ color: '#FFFFFF', textAlign: 'center' }}>
-            Route preview opens in ride summary
+            No route data
           </AppText>
         </View>
       )}

@@ -15,8 +15,8 @@ const paceColors: Record<RideListing['pace'], { bg: string; fg: string }> = {
 
 const paceLabels: Record<RideListing['pace'], string> = {
   chill: 'Chill',
-  moderate: 'Moderate',
-  sporty: 'Sporty',
+  moderate: 'Sakto lang',
+  sporty: 'Kamote',
 };
 
 export function RideListingCard({

@@ -20,17 +20,17 @@ export function LeanAngleGauge({
       <AppText variant="label" style={{ color: palette.textTertiary, fontSize: 10, letterSpacing: 3 }}>
         LEAN
       </AppText>
-      <AppText
-        variant="heroMetric"
-        adjustsFontSizeToFit
-        numberOfLines={1}
-        style={{
-          color: isMuted ? palette.textTertiary : palette.text,
-          fontSize: 96,
-          lineHeight: 104,
-          maxWidth: '100%',
-        }}>
-        {value}°
+          <AppText
+            variant="heroMetric"
+            adjustsFontSizeToFit
+            numberOfLines={1}
+            style={{
+              color: isMuted ? palette.textTertiary : palette.text,
+              fontSize: 88,
+              lineHeight: 92,
+              maxWidth: '100%',
+            }}>
+            {value}°
       </AppText>
       <AppText variant="meta" style={{ color: palette.textSecondary }}>
         {speed !== undefined ? `${Math.round(speed)} km/h live` : 'lean telemetry live'}

@@ -16,7 +16,7 @@ const iconMap = {
   ),
   board: (focused: boolean) => <Ionicons name="radio-outline" size={22} color={focused ? Colors.t1 : Colors.t3} />,
   fuel: (focused: boolean) => <MaterialCommunityIcons name="gas-station-outline" size={22} color={focused ? Colors.t1 : Colors.t3} />,
-  profile: (focused: boolean) => <Ionicons name="shield-outline" size={22} color={focused ? Colors.t1 : Colors.t3} />,
+  profile: (focused: boolean) => <Ionicons name="person-outline" size={22} color={focused ? Colors.t1 : Colors.t3} />,
 };
 
 const labelMap = {

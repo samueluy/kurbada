@@ -141,13 +141,13 @@ export default function ActiveRideScreen() {
           </View>
         ) : (
           <View style={{ flexDirection: 'row', gap: 16 }}>
-            <View style={{ alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: radius.lg, paddingHorizontal: 24, paddingVertical: 16 }}>
+            <View style={{ alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: radius.lg, paddingHorizontal: 24, paddingVertical: 16, minWidth: 80 }}>
               <AppText variant="bodyBold" style={{ color: palette.lime, fontSize: 32 }}>
                 {ride.telemetry.estimatedFuelLiters.toFixed(1)}
               </AppText>
               <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 12 }}>LITERS</AppText>
             </View>
-            <View style={{ alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: radius.lg, paddingHorizontal: 24, paddingVertical: 16 }}>
+            <View style={{ alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: radius.lg, paddingHorizontal: 24, paddingVertical: 16, minWidth: 80 }}>
               <AppText variant="bodyBold" style={{ color: palette.text, fontSize: 32 }}>
                 {ride.telemetry.distanceKm > 0
                   ? (ride.telemetry.distanceKm / Math.max(ride.telemetry.estimatedFuelLiters, 0.01)).toFixed(1)
@@ -181,11 +181,8 @@ export default function ActiveRideScreen() {
           <AppText variant="screenTitle" style={{ textAlign: 'center' }}>
             Hold phone upright{'\n'}and still
           </AppText>
-          <AppText variant="heroMetric" style={{ fontSize: 80, color: ride.calibrationCountdown <= 1 ? palette.success : palette.text }}>
+          <AppText variant="heroMetric" style={{ fontSize: 80, color: ride.calibrationCountdown <= 1 ? palette.success : palette.text, textAlign: 'center' }}>
             {ride.calibrationCountdown}
-          </AppText>
-          <AppText variant="meta" style={{ color: palette.textSecondary }}>
-            Capture in {ride.calibrationCountdown}s
           </AppText>
         </View>
       ) : ride.state === 'calibrating' ? (

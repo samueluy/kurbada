@@ -77,6 +77,7 @@ export default function BikeProfileScreen() {
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [customTaskName, setCustomTaskName] = useState('');
   const [customInterval, setCustomInterval] = useState('');
+  const [customIntervalMonths, setCustomIntervalMonths] = useState('');
   const autoSeededRef = useRef(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [confirmTask, setConfirmTask] = useState<MaintenanceTask | null>(null);
@@ -246,26 +247,29 @@ export default function BikeProfileScreen() {
           <GlassCard style={{ padding: 18, gap: 10 }}>
             <FloatingField label="Task Name" value={customTaskName} onChangeText={setCustomTaskName} placeholder="Brake Pads" />
             <FloatingField label="Interval (km)" value={customInterval} onChangeText={setCustomInterval} placeholder="8000" keyboardType="number-pad" />
+            <FloatingField label="Interval (months)" value={customIntervalMonths} onChangeText={setCustomIntervalMonths} placeholder="6" keyboardType="number-pad" />
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <View style={{ flex: 1 }}>
-                <Button title="Cancel" variant="ghost" onPress={() => { setShowCustomForm(false); setCustomTaskName(''); setCustomInterval(''); }} />
+                <Button title="Cancel" variant="ghost" onPress={() => { setShowCustomForm(false); setCustomTaskName(''); setCustomInterval(''); setCustomIntervalMonths(''); }} />
               </View>
               <View style={{ flex: 1 }}>
                 <Button
                   title="Save Task"
                   onPress={() => {
                     if (!customTaskName || !customInterval || !bike) return;
+                    const months = Number(customIntervalMonths);
                     addMaintenanceTask.mutate({
                       bike_id: bike.id,
                       task_name: customTaskName,
                       interval_km: Number(customInterval),
-                      interval_days: null,
+                      interval_days: customIntervalMonths.trim() ? months * 30 : null,
                       last_done_odometer_km: bike.current_odometer_km,
                       last_done_date: new Date().toISOString().slice(0, 10),
                     });
                     setShowCustomForm(false);
                     setCustomTaskName('');
                     setCustomInterval('');
+                    setCustomIntervalMonths('');
                   }}
                 />
               </View>

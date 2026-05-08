@@ -15,9 +15,9 @@ import { getMapboxModule } from '@/lib/mapbox';
 import type { RidePace } from '@/types/domain';
 
 const paceOptions: { value: RidePace; label: string }[] = [
-  { value: 'chill', label: 'Chill / Scenic' },
-  { value: 'moderate', label: 'Moderate' },
-  { value: 'sporty', label: 'Sporty / Fast' },
+  { value: 'chill', label: 'Chill' },
+  { value: 'moderate', label: 'Sakto lang' },
+  { value: 'sporty', label: 'Kamote' },
 ];
 
 function isValidLobbyUrl(url: string) {

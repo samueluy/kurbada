@@ -42,10 +42,11 @@ export function RouteMapPreview({
               sw: [routeBounds.minLng, routeBounds.minLat],
             }}
             padding={{ paddingTop: 40, paddingBottom: 40, paddingLeft: 40, paddingRight: 40 }}
-            animationDuration={0}
+            animationDuration={1000}
+            animationMode="flyTo"
           />
         ) : firstCoordinate ? (
-          <Mapbox.Camera zoomLevel={11} centerCoordinate={firstCoordinate} animationMode="none" />
+          <Mapbox.Camera zoomLevel={11} centerCoordinate={firstCoordinate} animationMode="flyTo" animationDuration={800} />
         ) : null}
         <Mapbox.ShapeSource id="ride-route" shape={routeGeoJson}>
           <Mapbox.LineLayer id="ride-route-line" style={{ lineColor, lineWidth: 3, lineCap: 'round' }} />

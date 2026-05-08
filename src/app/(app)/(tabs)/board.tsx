@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { useState } from 'react';
-import { Alert, FlatList, View } from 'react-native';
+import { Alert, FlatList, Pressable, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScreen } from '@/components/ui/app-screen';
@@ -57,13 +57,10 @@ export default function BoardTabScreen() {
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 96, gap: 12 }}
         ListHeaderComponent={
           <View style={{ paddingTop: 8, gap: 8 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View style={{ gap: 4, flex: 1 }}>
-                <AppText variant="eyebrow">Public Rides</AppText>
-                <AppText variant="screenTitle">The lobby is open.</AppText>
-                <AppText variant="body">Join group rides and coordinate via Messenger or Telegram.</AppText>
-              </View>
-              <Button title="+ Post" variant="secondary" onPress={() => router.push('/(app)/board/create')} />
+            <View style={{ gap: 4 }}>
+              <AppText variant="eyebrow">Public Rides</AppText>
+              <AppText variant="screenTitle">The lobby is open.</AppText>
+              <AppText variant="body">Join group rides and coordinate via Messenger or Telegram.</AppText>
             </View>
             <SectionHeader title="Upcoming" />
           </View>
@@ -92,6 +89,27 @@ export default function BoardTabScreen() {
           <JoinLobbySheet listing={selectedListing} onClose={() => setSelectedListing(null)} />
         </View>
       ) : null}
+
+      <Pressable
+        onPress={() => router.push('/(app)/board/create')}
+        style={{
+          position: 'absolute',
+          bottom: 100,
+          right: 16,
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          backgroundColor: '#C0392B',
+          alignItems: 'center',
+          justifyContent: 'center',
+          shadowColor: '#C0392B',
+          shadowOpacity: 0.4,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 6,
+        }}>
+        <AppText variant="bodyBold" style={{ color: '#FFFFFF', fontSize: 24, lineHeight: 28 }}>+</AppText>
+      </Pressable>
     </AppScreen>
   );
 }
