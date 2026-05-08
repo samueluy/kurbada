@@ -1,59 +1,106 @@
 import { Platform } from 'react-native';
+import Purchases, {
+  type CustomerInfo,
+  type CustomerInfoUpdateListener,
+  type PurchasesOffering,
+  type PurchasesOfferings,
+  type PurchasesPackage,
+} from 'react-native-purchases';
 
 import { env } from '@/lib/env';
 
 let configured = false;
+let customerInfoListenerRegistered = false;
 let currentAppUserId: string | null = null;
+let cachedCustomerInfo: CustomerInfo | null = null;
+let cachedOffering: PurchasesOffering | null = null;
+const customerInfoSubscribers = new Set<(customerInfo: CustomerInfo) => void>();
 
-function getPurchases() {
-  if (Platform.OS === 'web') {
-    return null;
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  return require('react-native-purchases') as typeof import('react-native-purchases');
+function isRevenueCatSupported() {
+  return env.revenueCatEnabled && Platform.OS !== 'web';
 }
 
-export async function configureRevenueCat() {
-  if (!env.revenueCatEnabled || Platform.OS === 'web' || configured) {
+function getRevenueCatApiKey() {
+  if (Platform.OS === 'ios') {
+    return env.revenueCatIosKey;
+  }
+
+  if (Platform.OS === 'android') {
+    return env.revenueCatAndroidKey;
+  }
+
+  return '';
+}
+
+function handleCustomerInfoUpdate(customerInfo: CustomerInfo) {
+  cachedCustomerInfo = customerInfo;
+
+  for (const subscriber of customerInfoSubscribers) {
+    subscriber(customerInfo);
+  }
+}
+
+function ensureCustomerInfoListener() {
+  if (customerInfoListenerRegistered) {
     return;
   }
 
-  const apiKey = Platform.OS === 'ios' ? env.revenueCatIosKey : env.revenueCatAndroidKey;
+  const listener: CustomerInfoUpdateListener = (customerInfo) => {
+    handleCustomerInfoUpdate(customerInfo);
+  };
 
+  Purchases.addCustomerInfoUpdateListener(listener);
+  customerInfoListenerRegistered = true;
+}
+
+function normalizeOffering(offerings: PurchasesOfferings) {
+  cachedOffering = offerings.current ?? null;
+  return cachedOffering;
+}
+
+function selectDefaultPackage(offering: PurchasesOffering | null) {
+  if (!offering) {
+    return null;
+  }
+
+  const monthlyPackage = offering.availablePackages.find(
+    (pkg) => pkg.packageType === Purchases.PACKAGE_TYPE.MONTHLY,
+  );
+
+  return monthlyPackage ?? offering.availablePackages[0] ?? null;
+}
+
+export async function configureRevenueCat() {
+  if (!isRevenueCatSupported() || configured) {
+    return;
+  }
+
+  const apiKey = getRevenueCatApiKey();
   if (!apiKey) {
     return;
   }
 
-  const purchases = getPurchases();
-  if (!purchases) {
-    return;
-  }
-
-  purchases.default.setLogLevel(purchases.LOG_LEVEL.WARN);
-  await purchases.default.configure({ apiKey });
+  Purchases.setLogLevel(__DEV__ ? Purchases.LOG_LEVEL.DEBUG : Purchases.LOG_LEVEL.WARN);
+  Purchases.configure({ apiKey });
+  ensureCustomerInfoListener();
   configured = true;
 }
 
 export async function syncRevenueCatIdentity(userId: string | null) {
-  if (!env.revenueCatEnabled || Platform.OS === 'web') {
+  if (!isRevenueCatSupported()) {
     return;
   }
 
   await configureRevenueCat();
-
-  const purchases = getPurchases();
-  if (!purchases) {
-    return;
-  }
 
   if (!userId) {
     if (currentAppUserId === null) {
       return;
     }
 
-    await purchases.default.logOut();
+    const customerInfo = await Purchases.logOut();
     currentAppUserId = null;
+    handleCustomerInfoUpdate(customerInfo);
     return;
   }
 
@@ -61,55 +108,111 @@ export async function syncRevenueCatIdentity(userId: string | null) {
     return;
   }
 
-  await purchases.default.logIn(userId);
+  const { customerInfo } = await Purchases.logIn(userId);
   currentAppUserId = userId;
+  handleCustomerInfoUpdate(customerInfo);
 }
 
-export async function getRevenueCatPremiumStatus() {
-  if (!env.revenueCatEnabled || Platform.OS === 'web') {
-    return false;
+export function subscribeToCustomerInfo(listener: (customerInfo: CustomerInfo) => void) {
+  customerInfoSubscribers.add(listener);
+
+  if (cachedCustomerInfo) {
+    listener(cachedCustomerInfo);
   }
 
-  const purchases = getPurchases();
-  if (!purchases) {
-    return false;
+  return () => {
+    customerInfoSubscribers.delete(listener);
+  };
+}
+
+export async function getCustomerInfo(forceRefresh = false) {
+  if (!isRevenueCatSupported()) {
+    return null;
   }
 
-  const info = await purchases.default.getCustomerInfo();
-  return Boolean(info.entitlements.active.premium);
+  await configureRevenueCat();
+
+  if (cachedCustomerInfo && !forceRefresh) {
+    return cachedCustomerInfo;
+  }
+
+  const customerInfo = await Purchases.getCustomerInfo();
+  handleCustomerInfoUpdate(customerInfo);
+  return customerInfo;
+}
+
+export async function getCurrentOffering(forceRefresh = false) {
+  if (!isRevenueCatSupported()) {
+    return null;
+  }
+
+  await configureRevenueCat();
+
+  if (cachedOffering && !forceRefresh) {
+    return cachedOffering;
+  }
+
+  const offerings = await Purchases.getOfferings();
+  return normalizeOffering(offerings);
+}
+
+export async function getCurrentOfferingPackage(forceRefresh = false) {
+  const offering = await getCurrentOffering(forceRefresh);
+  return selectDefaultPackage(offering);
+}
+
+export async function getPremiumAccessState() {
+  const customerInfo = await getCustomerInfo();
+  return Boolean(customerInfo?.entitlements.active.premium);
 }
 
 export async function purchasePremium() {
-  if (!env.revenueCatEnabled || Platform.OS === 'web') {
-    return { success: false, reason: 'RevenueCat disabled for this build.' };
+  if (!isRevenueCatSupported()) {
+    return { success: false as const, reason: 'RevenueCat disabled for this build.' };
   }
 
-  const purchases = getPurchases();
-  if (!purchases) {
-    return { success: false, reason: 'RevenueCat is not available on this platform.' };
+  const selectedPackage = await getCurrentOfferingPackage(true);
+  if (!selectedPackage) {
+    return { success: false as const, reason: 'No monthly purchase package is currently available.' };
   }
 
-  const offerings = await purchases.default.getOfferings();
-  const pkg = offerings.current?.availablePackages[0];
+  try {
+    const result = await Purchases.purchasePackage(selectedPackage);
+    handleCustomerInfoUpdate(result.customerInfo);
+    return { success: true as const, customerInfo: result.customerInfo, packageId: selectedPackage.identifier };
+  } catch (error: any) {
+    if (error?.userCancelled) {
+      return { success: false as const, cancelled: true as const, reason: 'Purchase was cancelled.' };
+    }
 
-  if (!pkg) {
-    return { success: false, reason: 'No purchase package is currently available.' };
+    return {
+      success: false as const,
+      reason: error instanceof Error ? error.message : 'Purchase failed.',
+    };
   }
-
-  await purchases.default.purchasePackage(pkg);
-  return { success: true };
 }
 
 export async function restorePremiumPurchases() {
-  if (!env.revenueCatEnabled || Platform.OS === 'web') {
-    return false;
+  if (!isRevenueCatSupported()) {
+    return { success: false as const, hasPremium: false, reason: 'RevenueCat disabled for this build.' };
   }
 
-  const purchases = getPurchases();
-  if (!purchases) {
-    return false;
+  try {
+    const customerInfo = await Purchases.restorePurchases();
+    handleCustomerInfoUpdate(customerInfo);
+    return {
+      success: true as const,
+      hasPremium: Boolean(customerInfo.entitlements.active.premium),
+      customerInfo,
+    };
+  } catch (error) {
+    return {
+      success: false as const,
+      hasPremium: false,
+      reason: error instanceof Error ? error.message : 'Restore failed.',
+    };
   }
-
-  const info = await purchases.default.restorePurchases();
-  return Boolean(info.entitlements.active.premium);
 }
+
+export type RevenueCatOffering = PurchasesOffering;
+export type RevenueCatPackage = PurchasesPackage;

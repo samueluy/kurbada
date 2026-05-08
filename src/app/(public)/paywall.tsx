@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScrollScreen } from '@/components/ui/app-screen';
@@ -10,7 +10,7 @@ import { GlassCard } from '@/components/ui/glass-card';
 import { palette, radius } from '@/constants/theme';
 import { env } from '@/lib/env';
 import { normalizeReferralCode, validateReferralCode } from '@/lib/referrals';
-import { purchasePremium } from '@/services/revenuecat';
+import { getCurrentOffering, getCurrentOfferingPackage, purchasePremium, restorePremiumPurchases, type RevenueCatPackage } from '@/services/revenuecat';
 import { useAuth } from '@/hooks/use-auth';
 import { useReferralMutations } from '@/hooks/use-kurbada-data';
 import { useUserProfile } from '@/hooks/use-user-access';
@@ -22,16 +22,6 @@ const features = [
   ['Shareable Ride Cards', 'Export polished ride summaries for social sharing.'],
   ['Maintenance Tracker', 'Keep service intervals and reminders in one place.'],
 ];
-
-function getPurchases() {
-  if (Platform.OS === 'web') return null;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('react-native-purchases') as typeof import('react-native-purchases');
-  } catch {
-    return null;
-  }
-}
 
 export default function PaywallScreen() {
   const { session } = useAuth();
@@ -46,6 +36,9 @@ export default function PaywallScreen() {
   const [referralError, setReferralError] = useState('');
   const [referralSuccess, setReferralSuccess] = useState('');
   const [isValidatingReferral, setIsValidatingReferral] = useState(false);
+  const [offeringPackage, setOfferingPackage] = useState<RevenueCatPackage | null>(null);
+  const [isLoadingOffering, setIsLoadingOffering] = useState(env.revenueCatEnabled);
+  const [purchaseError, setPurchaseError] = useState('');
 
   useEffect(() => {
     if (pendingReferralCode) {
@@ -55,32 +48,52 @@ export default function PaywallScreen() {
     }
   }, [pendingReferralCode]);
 
-  const handleRevenuCatPaywall = async () => {
-    const purchases = getPurchases();
-    if (!purchases || !env.revenueCatEnabled) {
-      // Fallback: show custom UI below
-      return false;
+  useEffect(() => {
+    if (!env.revenueCatEnabled) {
+      setIsLoadingOffering(false);
+      return;
     }
 
-    try {
-      const rc = purchases.default as any;
-      const result = await rc.presentPaywallIfNeeded({
-        requiredEntitlementIdentifier: 'premium',
-      });
+    let cancelled = false;
 
-      if (result === rc.PURCHASE_RESULT?.PURCHASED) {
-        setPurchaseCompleted(true);
-        setOnboardingStep(8);
-        router.replace('/(public)/success' as any);
-        return true;
+    const loadOffering = async () => {
+      setIsLoadingOffering(true);
+      setPurchaseError('');
+
+      try {
+        const [offering, selectedPackage] = await Promise.all([
+          getCurrentOffering(true),
+          getCurrentOfferingPackage(true),
+        ]);
+        if (cancelled) {
+          return;
+        }
+
+        setOfferingPackage(selectedPackage);
+        if (!offering || !selectedPackage) {
+          setPurchaseError('No monthly Premium package is currently available in RevenueCat.');
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setPurchaseError(error instanceof Error ? error.message : 'Unable to load Premium offering.');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingOffering(false);
+        }
       }
-      return false;
-    } catch {
-      return false;
-    }
-  };
+    };
+
+    void loadOffering();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleStartTrial = async () => {
+    setPurchaseError('');
+
     if (!session?.user.id && env.revenueCatEnabled) {
       if (referralCode.trim()) {
         setPendingReferralCode(normalizeReferralCode(referralCode));
@@ -96,19 +109,16 @@ export default function PaywallScreen() {
       return;
     }
 
-    const purchases = getPurchases();
-    if (!purchases) return;
-
-    // Try RevenueCat native paywall first
-    const usedNativePaywall = await handleRevenuCatPaywall();
-    if (usedNativePaywall) return;
-
-    // Fallback: use direct purchasePremium (works with test store)
     const result = await purchasePremium();
     if (result.success) {
       setPurchaseCompleted(true);
       setOnboardingStep(8);
       router.replace('/(public)/success' as any);
+      return;
+    }
+
+    if (!result.cancelled) {
+      setPurchaseError(result.reason);
     }
   };
 
@@ -160,14 +170,18 @@ export default function PaywallScreen() {
 
             <View style={{ alignSelf: 'flex-start', backgroundColor: palette.danger, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 10, gap: 2 }}>
               <AppText variant="bodyBold" style={{ color: palette.background, fontSize: 24 }}>
-                ₱59
+                {offeringPackage?.product.priceString ?? '₱59'}
               </AppText>
               <AppText variant="meta" style={{ color: palette.background }}>
-                /month
+                /{offeringPackage?.packageType === 'MONTHLY' ? 'month' : 'plan'}
               </AppText>
             </View>
             <AppText variant="meta">
-              7-day free trial · Cancel anytime
+              {isLoadingOffering
+                ? 'Loading current Premium plan...'
+                : offeringPackage?.product.introPrice
+                  ? 'Includes intro pricing or free trial · Cancel anytime'
+                  : 'Cancel anytime'}
             </AppText>
 
             <Pressable onPress={() => setShowReferralField((value) => !value)}>
@@ -249,22 +263,34 @@ export default function PaywallScreen() {
                 : 'Create Account to Start Trial →'
               : 'Continue (Dev Build)'
           }
+          disabled={env.revenueCatEnabled && Boolean(session?.user.id) && (isLoadingOffering || !offeringPackage)}
           onPress={handleStartTrial}
           style={{ backgroundColor: palette.danger, borderRadius: radius.pill, minHeight: 56, shadowColor: '#C64537', shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 4 } }}
         />
+        {isLoadingOffering ? (
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator size="small" color={palette.textSecondary} />
+            <AppText variant="meta" style={{ color: palette.textSecondary }}>
+              Loading RevenueCat offering…
+            </AppText>
+          </View>
+        ) : null}
+        {purchaseError ? (
+          <AppText variant="meta" style={{ color: palette.danger, textAlign: 'center' }}>
+            {purchaseError}
+          </AppText>
+        ) : null}
         <Button
           title="Restore Purchase"
           variant="ghost"
           onPress={async () => {
-            const purchases = getPurchases();
-            if (!purchases) return;
-            try {
-              await purchases.default.restorePurchases();
+            const result = await restorePremiumPurchases();
+            if (result.success && result.hasPremium) {
               setPurchaseCompleted(true);
               setOnboardingStep(8);
               router.replace('/(public)/success' as any);
-            } catch {
-              // ignore
+            } else if (!result.success) {
+              setPurchaseError(result.reason);
             }
           }}
         />

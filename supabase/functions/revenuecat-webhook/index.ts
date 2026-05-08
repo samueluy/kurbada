@@ -3,14 +3,10 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? Deno.env.get('KURBADA_SUPABASE_URL') ?? '';
 const serviceRoleKey = Deno.env.get('KURBADA_SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY') ?? '';
-const revenueCatSecretApiKey = Deno.env.get('RC_SECRET_PROMO_KEY') ?? Deno.env.get('REVENUECAT_SECRET_API_KEY') ?? '';
-const revenueCatSecretApiKeySource = Deno.env.get('RC_SECRET_PROMO_KEY')
-  ? 'RC_SECRET_PROMO_KEY'
-  : Deno.env.get('REVENUECAT_SECRET_API_KEY')
-    ? 'REVENUECAT_SECRET_API_KEY'
-    : 'missing';
-const webhookAuthorization = Deno.env.get('REVENUECAT_WEBHOOK_AUTHORIZATION') ?? '';
-const premiumEntitlementId = Deno.env.get('REVENUECAT_PREMIUM_ENTITLEMENT_ID') ?? 'premium';
+const revenueCatSecretApiKey = (Deno.env.get('REVENUECAT_SECRET_API_KEY') ?? '').trim();
+const revenueCatSecretApiKeySource = revenueCatSecretApiKey ? 'REVENUECAT_SECRET_API_KEY' : 'missing';
+const webhookAuthorization = (Deno.env.get('REVENUECAT_WEBHOOK_AUTHORIZATION') ?? '').trim();
+const premiumEntitlementId = (Deno.env.get('REVENUECAT_PREMIUM_ENTITLEMENT_ID') ?? 'premium').trim();
 
 const client = createClient(supabaseUrl, serviceRoleKey, {
   auth: {
@@ -83,13 +79,26 @@ async function grantPromotionalEntitlement(appUserId: string) {
   }
 }
 
+async function persistWebhookEvent(eventId: string, eventType: string, appUserId: string, payload: Record<string, unknown>) {
+  const { error } = await client.from('revenuecat_webhook_events').insert({
+    event_id: eventId,
+    event_type: eventType,
+    app_user_id: appUserId,
+    payload,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
 Deno.serve(async (request) => {
   if (!supabaseUrl || !serviceRoleKey || !revenueCatSecretApiKey) {
     return json(500, { error: 'Missing Supabase or RevenueCat server configuration.' });
   }
 
   if (webhookAuthorization) {
-    const authorization = request.headers.get('Authorization') ?? '';
+    const authorization = (request.headers.get('Authorization') ?? '').trim();
     if (authorization !== webhookAuthorization) {
       return json(401, { error: 'Unauthorized webhook request.' });
     }
@@ -124,12 +133,12 @@ Deno.serve(async (request) => {
   }
 
   if (event.type !== 'INITIAL_PURCHASE' || !event.entitlement_ids?.includes(premiumEntitlementId)) {
-    await client.from('revenuecat_webhook_events').insert({
-      event_id: event.id,
-      event_type: event.type,
-      app_user_id: event.app_user_id ?? 'unknown',
-      payload: payload as Record<string, unknown>,
-    });
+    await persistWebhookEvent(
+      event.id,
+      event.type,
+      event.app_user_id ?? 'unknown',
+      payload as Record<string, unknown>,
+    );
     return json(200, { ok: true, ignored: true });
   }
 
@@ -169,12 +178,12 @@ Deno.serve(async (request) => {
   }
 
   if (!referral) {
-    await client.from('revenuecat_webhook_events').insert({
-      event_id: event.id,
-      event_type: event.type,
-      app_user_id: event.app_user_id ?? candidateUserIds[0],
-      payload: payload as Record<string, unknown>,
-    });
+    await persistWebhookEvent(
+      event.id,
+      event.type,
+      event.app_user_id ?? candidateUserIds[0],
+      payload as Record<string, unknown>,
+    );
     return json(200, { ok: true, referral: 'missing' });
   }
 
@@ -186,12 +195,12 @@ Deno.serve(async (request) => {
       })
       .eq('id', referral.id);
 
-    await client.from('revenuecat_webhook_events').insert({
-      event_id: event.id,
-      event_type: event.type,
-      app_user_id: event.app_user_id ?? candidateUserIds[0],
-      payload: payload as Record<string, unknown>,
-    });
+    await persistWebhookEvent(
+      event.id,
+      event.type,
+      event.app_user_id ?? candidateUserIds[0],
+      payload as Record<string, unknown>,
+    );
 
     return json(200, { ok: true, referral: 'rejected-self-referral' });
   }
@@ -217,15 +226,15 @@ Deno.serve(async (request) => {
     return json(500, { error: referralUpdateError.message });
   }
 
-  const { error: eventInsertError } = await client.from('revenuecat_webhook_events').insert({
-    event_id: event.id,
-    event_type: event.type,
-    app_user_id: event.app_user_id ?? candidateUserIds[0],
-    payload: payload as Record<string, unknown>,
-  });
-
-  if (eventInsertError) {
-    return json(500, { error: eventInsertError.message });
+  try {
+    await persistWebhookEvent(
+      event.id,
+      event.type,
+      event.app_user_id ?? candidateUserIds[0],
+      payload as Record<string, unknown>,
+    );
+  } catch (eventInsertError) {
+    return json(500, { error: eventInsertError instanceof Error ? eventInsertError.message : 'Failed to persist webhook event.' });
   }
 
   return json(200, { ok: true, rewarded: true });

@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "prebuild": "expo prebuild",
     "bootstrap:special-users": "node ./scripts/bootstrap-special-users.mjs",
-    "tester:access": "node ./scripts/set-closed-testing-access.mjs"
+    "tester:access": "node ./scripts/set-closed-testing-access.mjs",
+    "tester:premium": "node ./scripts/grant-premium-promo.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/bebas-neue": "^0.4.1",

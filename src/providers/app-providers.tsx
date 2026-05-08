@@ -22,7 +22,7 @@ import { env } from '@/lib/env';
 import { getMapboxModule } from '@/lib/mapbox';
 import { queryClient } from '@/lib/query-client';
 import { supabase } from '@/lib/supabase';
-import { configureRevenueCat, syncRevenueCatIdentity } from '@/services/revenuecat';
+import { configureRevenueCat, subscribeToCustomerInfo, syncRevenueCatIdentity } from '@/services/revenuecat';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
@@ -48,6 +48,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(palette.background).catch(() => undefined);
     configureRevenueCat().catch(() => undefined);
+    const unsubscribeCustomerInfo = subscribeToCustomerInfo(() => {
+      void queryClient.invalidateQueries({ queryKey: ['access'] });
+    });
 
     if (env.mapboxToken) {
       if (Platform.OS !== 'web') {
@@ -57,7 +60,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     }
 
     if (!supabase) {
-      return undefined;
+      return () => {
+        unsubscribeCustomerInfo();
+      };
     }
 
     supabase.auth.getSession().then(({ data }) => {
@@ -69,6 +74,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
+      unsubscribeCustomerInfo();
       data.subscription.unsubscribe();
     };
   }, []);

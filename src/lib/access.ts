@@ -1,5 +1,5 @@
 import { env } from '@/lib/env';
-import { getRevenueCatPremiumStatus } from '@/services/revenuecat';
+import { getPremiumAccessState } from '@/services/revenuecat';
 import type { AccessOverride, Profile } from '@/types/domain';
 
 export type UserAccess = {
@@ -19,7 +19,7 @@ export async function getUserAccess(profile?: Profile | null): Promise<UserAcces
     return { hasAccess: true, reason: 'override', accessOverride };
   }
 
-  const hasPremium = await getRevenueCatPremiumStatus();
+  const hasPremium = await getPremiumAccessState();
 
   return {
     hasAccess: hasPremium,

@@ -39,7 +39,6 @@ Bootstrap / server-side:
 
 - `KURBADA_SUPABASE_URL`
 - `KURBADA_SUPABASE_SERVICE_ROLE_KEY`
-- `RC_SECRET_PROMO_KEY`
 - `REVENUECAT_SECRET_API_KEY`
 - `REVENUECAT_WEBHOOK_AUTHORIZATION`
 - `REVENUECAT_PREMIUM_ENTITLEMENT_ID`
@@ -68,7 +67,7 @@ Kurbada now supports referral codes at the paywall and rewards the referrer with
 Apply the new migration, then deploy the RevenueCat webhook Edge Function and configure RevenueCat to send webhooks to it with an authorization header:
 
 ```bash
-supabase functions deploy revenuecat-webhook
+supabase functions deploy revenuecat-webhook --no-verify-jwt
 ```
 
 For closed testing, grant or revoke manual access by email:
@@ -76,6 +75,13 @@ For closed testing, grant or revoke manual access by email:
 ```bash
 npm run tester:access -- grant rider@example.com
 npm run tester:access -- revoke rider@example.com
+```
+
+To grant a tester a promotional RevenueCat entitlement without charging them:
+
+```bash
+npm run tester:premium -- rider@example.com
+npm run tester:premium -- rider@example.com 6
 ```
 
 The app review notes template lives in [docs/apple-review-notes.md](/Users/samueluy/Documents/GitHub/kurbada/docs/apple-review-notes.md).
