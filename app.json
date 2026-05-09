@@ -4,13 +4,15 @@
     "slug": "kurbada",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/logo.png",
     "scheme": "kurbada",
     "userInterfaceStyle": "dark",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/logo.png",
       "supportsTablet": false,
       "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Kurbada needs photo access so riders can pick a photo and share ride overlays to Instagram.",
+        "NSPhotoLibraryAddUsageDescription": "Kurbada saves your exported ride overlays locally before sharing them to Instagram.",
         "UIBackgroundModes": [
           "location",
           "location"
@@ -20,8 +22,9 @@
     },
     "android": {
       "package": "com.sajedph.kurbada",
+      "edgeToEdgeEnabled": true,
       "adaptiveIcon": {
-        "backgroundColor": "#F4F4F2",
+        "backgroundColor": "#000000",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -50,11 +53,10 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0D0D0D",
-          "android": {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
-          }
+          "backgroundColor": "#000000",
+          "image": "./assets/images/splash-screen-square.png",
+          "imageWidth": 200,
+          "resizeMode": "contain"
         }
       ],
       [
@@ -70,6 +72,17 @@
           "sounds": []
         }
       ],
+      [
+        "react-native-share",
+        {
+          "ios": [
+            "instagram"
+          ],
+          "android": [
+            "com.instagram.android"
+          ]
+        }
+      ],
       "expo-sharing",
       "expo-secure-store",
       "expo-sqlite",
@@ -78,11 +91,18 @@
         {}
       ],
       "@react-native-community/datetimepicker",
-      "expo-asset"
+      "expo-asset",
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b2da3e1e-40b8-492f-bf47-8f7af19b8e8c"
+      }
     }
   }
 }

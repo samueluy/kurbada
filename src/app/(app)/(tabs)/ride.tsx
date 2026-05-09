@@ -16,7 +16,7 @@ import { RideFeedCard } from '@/features/ride/components/ride-feed-card';
 import { CustomCalendarHeatmap } from '@/features/ride/components/ride-heatmap';
 import { UpcomingMaintenanceCard } from '@/features/ride/components/upcoming-maintenance-card';
 import { WeatherWidget } from '@/features/ride/components/weather-widget';
-import { getGreeting } from '@/lib/format';
+import { formatCurrencyPhp, getGreeting } from '@/lib/format';
 import { useAuth } from '@/hooks/use-auth';
 import { useBikes, useFuelLogs, useRides } from '@/hooks/use-kurbada-data';
 import { useWeather } from '@/hooks/use-weather';
@@ -49,6 +49,7 @@ export default function RideTabScreen() {
       preferredMode,
     );
   }, [primaryBike?.engine_cc, primaryBike?.category, preferredMode]);
+  const latestFuelCost = latestRide?.fuel_used_liters ? latestRide.fuel_used_liters * fuelPrice : 0;
 
   const isWeekend = preferredMode === 'weekend';
 
@@ -74,63 +75,105 @@ export default function RideTabScreen() {
       {/* 3. Mode toggle */}
       <ModeToggle value={preferredMode} onChange={setPreferredMode} />
 
-      {/* 4. Heatmap hero card */}
-      <GlassCard style={{ paddingTop: 16, paddingBottom: 0, paddingHorizontal: 0, borderRadius: 18 }}>
-        <AppText variant="eyebrow" style={{ paddingHorizontal: 16 }}>RIDE ACTIVITY</AppText>
+      <GlassCard style={{ paddingTop: 8, paddingBottom: 6, paddingHorizontal: 10, borderRadius: 18 }}>
         <CustomCalendarHeatmap rides={rides.data ?? []} numDays={90} />
       </GlassCard>
 
-      {/* 5. Start Ride CTA */}
-      <GlassCard style={{ padding: 16, borderRadius: 18 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <AppText variant="eyebrow">RIDE SESSION · {isWeekend ? 'WEEKEND' : 'DAILY'}</AppText>
-          <MaterialCommunityIcons
-            name={isWeekend ? 'motorbike' : 'flash-outline'}
-            size={18}
-            color={palette.textTertiary}
+      {isWeekend ? (
+        <GlassCard style={{ padding: 18, borderRadius: 18, gap: 12 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <AppText variant="eyebrow">WEEKEND TELEMETRY</AppText>
+            <MaterialCommunityIcons name="motorbike" size={18} color={palette.danger} />
+          </View>
+          <AppText variant="title" style={{ fontSize: 20 }}>Ready to hunt the next apex?</AppText>
+          <AppText variant="body" style={{ color: palette.textTertiary, fontSize: 13 }}>
+            Lean tracking, top speed, elevation, and route energy stay front and center for every spirited run.
+          </AppText>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <StatCard label="Top Speed" value={latestRide?.max_speed_kmh.toFixed(0) ?? '0'} unit="km/h" />
+            <StatCard label="Max Lean" value={latestRide?.max_lean_angle_deg?.toFixed(0) ?? '0'} unit="deg" accent />
+          </View>
+          <Button
+            title="Start Weekend Ride  →"
+            onPress={() => {
+              if (!primaryBike) {
+                router.push('/(public)/bike-setup');
+                return;
+              }
+              router.push({
+                pathname: '/(app)/ride/active',
+                params: { mode: preferredMode, bikeId: primaryBike.id, fuelPrice: fuelPrice, fuelRate: fuelRate },
+              });
+            }}
+            style={{
+              borderRadius: 13,
+              minHeight: 52,
+              shadowColor: 'rgba(192,57,43,0.35)',
+              shadowOpacity: 1,
+              shadowRadius: 16,
+              shadowOffset: { width: 0, height: 4 },
+            }}
           />
-        </View>
-        <AppText variant="title" style={{ fontSize: 20, marginTop: 6 }}>Ready to roll?</AppText>
-        <AppText variant="body" style={{ color: palette.textTertiary, fontSize: 13, marginTop: 4 }}>
-          {isWeekend
-            ? 'GPS, gyroscope, and accelerometer stay active for full lean telemetry and route tracking.'
-            : 'GPS stays lighter for city mileage, fuel awareness, and efficient day-to-day riding.'}
-        </AppText>
-        <Button
-          title="Start Ride  →"
-          onPress={() => {
-            if (!primaryBike) {
-              router.push('/(public)/bike-setup');
-              return;
-            }
-            router.push({
-              pathname: '/(app)/ride/active',
-              params: { mode: preferredMode, bikeId: primaryBike.id, fuelPrice: fuelPrice, fuelRate: fuelRate },
-            });
-          }}
-          style={{
-            borderRadius: 13,
-            minHeight: 50,
-            marginTop: 14,
-            shadowColor: 'rgba(192,57,43,0.35)',
-            shadowOpacity: 1,
-            shadowRadius: 16,
-            shadowOffset: { width: 0, height: 4 },
-          }}
-        />
-      </GlassCard>
+        </GlassCard>
+      ) : (
+        <GlassCard style={{ padding: 18, borderRadius: 18, gap: 14 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <AppText variant="eyebrow">DAILY EFFICIENCY</AppText>
+            <MaterialCommunityIcons name="flash-outline" size={18} color={palette.lime} />
+          </View>
+          <View style={{ gap: 6 }}>
+            <AppText variant="title" style={{ fontSize: 20 }}>Keep the run efficient.</AppText>
+            <AppText variant="heroMetric" style={{ fontSize: 44, lineHeight: 50, color: palette.lime }}>
+              {formatCurrencyPhp(latestFuelCost)}
+            </AppText>
+            <AppText variant="meta" style={{ color: palette.textSecondary }}>
+              Estimated cost from your latest tracked ride
+            </AppText>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <StatCard label="Fuel Burn" value={latestRide?.fuel_used_liters?.toFixed(1) ?? '0.0'} unit="L" />
+            <StatCard label="Fuel Rate" value={fuelRate.toFixed(1)} unit="km/L" />
+          </View>
+          <Button
+            title="Start Daily Ride  →"
+            onPress={() => {
+              if (!primaryBike) {
+                router.push('/(public)/bike-setup');
+                return;
+              }
+              router.push({
+                pathname: '/(app)/ride/active',
+                params: { mode: preferredMode, bikeId: primaryBike.id, fuelPrice: fuelPrice, fuelRate: fuelRate },
+              });
+            }}
+            style={{
+              backgroundColor: palette.lime,
+              borderRadius: 13,
+              minHeight: 52,
+              shadowColor: 'rgba(224,84,68,0.22)',
+              shadowOpacity: 1,
+              shadowRadius: 14,
+              shadowOffset: { width: 0, height: 4 },
+            }}
+          />
+        </GlassCard>
+      )}
 
       {/* 6. Upcoming Maintenance */}
       <UpcomingMaintenanceCard />
 
-      {/* 7. Weekly stats */}
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <StatCard label="Distance" value={latestRide?.distance_km.toFixed(1) ?? '0.0'} unit="km" />
-        <StatCard label="Top Speed" value={latestRide?.max_speed_kmh.toFixed(0) ?? '0'} unit="km/h" />
         {isWeekend ? (
-          <StatCard label="Max Lean" value={latestRide?.max_lean_angle_deg?.toFixed(0) ?? '0'} unit="deg" accent />
+          <>
+            <StatCard label="Avg Speed" value={latestRide?.avg_speed_kmh.toFixed(0) ?? '0'} unit="km/h" />
+            <StatCard label="Route Pts" value={String(latestRide?.route_point_count_simplified ?? 0)} unit="pts" />
+          </>
         ) : (
-          <StatCard label="Est. Fuel" value={latestRide?.fuel_used_liters?.toFixed(1) ?? '0.0'} unit="L" />
+          <>
+            <StatCard label="Top Speed" value={latestRide?.max_speed_kmh.toFixed(0) ?? '0'} unit="km/h" />
+            <StatCard label="Est. Fuel" value={latestRide?.fuel_used_liters?.toFixed(1) ?? '0.0'} unit="L" />
+          </>
         )}
       </View>
 

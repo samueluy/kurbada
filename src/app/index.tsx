@@ -1,8 +1,13 @@
 import { Redirect } from 'expo-router';
+import { ActivityIndicator, View } from 'react-native';
 
+import { AppText } from '@/components/ui/app-text';
+import { AppScreen } from '@/components/ui/app-screen';
 import { env } from '@/lib/env';
 import { useAuth } from '@/hooks/use-auth';
 import { useUserAccess } from '@/hooks/use-user-access';
+import { palette } from '@/constants/theme';
+import { getOnboardingRoute } from '@/lib/onboarding-flow';
 import { useAppStore } from '@/store/app-store';
 
 export default function IndexScreen() {
@@ -20,7 +25,16 @@ export default function IndexScreen() {
       return <Redirect href="/(public)/splash" />;
     }
 
-    return null;
+    return (
+      <AppScreen style={{ justifyContent: 'center', alignItems: 'center' }} showWordmark={false}>
+        <View style={{ alignItems: 'center', gap: 12 }}>
+          <ActivityIndicator size="small" color={palette.textSecondary} />
+          <AppText variant="meta" style={{ color: palette.textSecondary }}>
+            Loading your rider profile…
+          </AppText>
+        </View>
+      </AppScreen>
+    );
   }
 
   if (!hasSeenSplash) {
@@ -28,14 +42,8 @@ export default function IndexScreen() {
   }
 
   if (!bypassGate && !hasCompletedOnboarding) {
-    if (onboardingStep === 1) return <Redirect href="/(public)/onboarding" />;
-    if (onboardingStep === 2) return <Redirect href="/(public)/bike-setup?flow=onboarding" />;
-    if (onboardingStep === 3) return <Redirect href="/(public)/maintenance" />;
-    if (onboardingStep === 4) return <Redirect href="/(public)/emergency?flow=onboarding" />;
-    if (onboardingStep === 5) return <Redirect href={'/(public)/features' as any} />;
-    if (onboardingStep === 6) return <Redirect href={'/(public)/permissions' as any} />;
-    if (onboardingStep === 7) return <Redirect href="/(public)/paywall" />;
     if (onboardingStep === 8 && purchaseCompleted) return <Redirect href={'/(public)/success' as any} />;
+    return <Redirect href={getOnboardingRoute(onboardingStep) as any} />;
   }
 
   if (!bypassGate && !session) {

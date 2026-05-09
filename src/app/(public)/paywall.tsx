@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 
@@ -7,8 +7,9 @@ import { AppText } from '@/components/ui/app-text';
 import { AppScrollScreen } from '@/components/ui/app-screen';
 import { Button } from '@/components/ui/button';
 import { GlassCard } from '@/components/ui/glass-card';
-import { palette, radius } from '@/constants/theme';
+import { palette, radius, typography } from '@/constants/theme';
 import { env } from '@/lib/env';
+import { getOnboardingRoute, ONBOARDING_TOTAL_STEPS } from '@/lib/onboarding-flow';
 import { normalizeReferralCode, validateReferralCode } from '@/lib/referrals';
 import { getCurrentOffering, getCurrentOfferingPackage, purchasePremium, restorePremiumPurchases, type RevenueCatPackage } from '@/services/revenuecat';
 import { useAuth } from '@/hooks/use-auth';
@@ -24,6 +25,7 @@ const features = [
 ];
 
 export default function PaywallScreen() {
+  const params = useLocalSearchParams<{ context?: string }>();
   const { session } = useAuth();
   const profile = useUserProfile(session?.user.id);
   const { applyReferralCode } = useReferralMutations(session?.user.id);
@@ -39,6 +41,7 @@ export default function PaywallScreen() {
   const [offeringPackage, setOfferingPackage] = useState<RevenueCatPackage | null>(null);
   const [isLoadingOffering, setIsLoadingOffering] = useState(env.revenueCatEnabled);
   const [purchaseError, setPurchaseError] = useState('');
+  const isOnboardingPaywall = params.context === 'onboarding';
 
   useEffect(() => {
     if (pendingReferralCode) {
@@ -156,20 +159,29 @@ export default function PaywallScreen() {
   return (
     <AppScrollScreen contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
       <View style={{ gap: 18 }}>
-        <AppText variant="label" style={{ color: palette.textSecondary, textAlign: 'center' }}>
-          Step 7 of 8
-        </AppText>
+        {isOnboardingPaywall ? (
+          <>
+            <AppText variant="label" style={{ color: palette.textSecondary, textAlign: 'center' }}>
+              Step 7 of {ONBOARDING_TOTAL_STEPS}
+            </AppText>
+            <Pressable
+              onPress={() => { setOnboardingStep(6); router.replace(getOnboardingRoute(6) as any); }}
+              style={{ alignSelf: 'center', padding: 4 }}>
+              <Ionicons name="arrow-back" size={20} color={palette.textSecondary} />
+            </Pressable>
+          </>
+        ) : null}
         <View style={{ gap: 0 }}>
           <View style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: 20, gap: 12 }}>
             <AppText variant="label" style={{ color: palette.textSecondary }}>
               Kurbada Premium
             </AppText>
-            <AppText variant="screenTitle" style={{ fontSize: 36, lineHeight: 38 }}>
+            <AppText variant="screenTitle" style={{ fontSize: 34, lineHeight: 36 }}>
               UNLOCK THE{'\n'}FULL RIDE
             </AppText>
 
             <View style={{ alignSelf: 'flex-start', backgroundColor: palette.danger, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 10, gap: 2 }}>
-              <AppText variant="bodyBold" style={{ color: palette.background, fontSize: 24 }}>
+              <AppText variant="bodyBold" style={{ color: palette.background, fontSize: 22, lineHeight: 26 }}>
                 {offeringPackage?.product.priceString ?? '₱59'}
               </AppText>
               <AppText variant="meta" style={{ color: palette.background }}>
@@ -203,6 +215,7 @@ export default function PaywallScreen() {
                   placeholderTextColor={palette.textSecondary}
                   autoCapitalize="characters"
                   autoCorrect={false}
+                  selectionColor={palette.danger}
                   style={{
                     minHeight: 50,
                     borderRadius: radius.md,
@@ -211,6 +224,8 @@ export default function PaywallScreen() {
                     borderColor: referralError ? palette.danger : palette.border,
                     backgroundColor: 'rgba(255,255,255,0.06)',
                     color: palette.text,
+                    fontFamily: typography.body,
+                    fontSize: 15,
                   }}
                 />
                 <Button

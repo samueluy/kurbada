@@ -42,8 +42,8 @@ function buildDateGrid(rides: RideRecord[], numDays: number) {
 
 export function CustomCalendarHeatmap({ rides, numDays = 90 }: { rides: RideRecord[]; numDays?: number }) {
   const dates = useMemo(() => buildDateGrid(rides, numDays), [rides, numDays]);
-  const cellSize = 6;
-  const cellGap = 1;
+  const cellSize = 11;
+  const cellGap = 2;
 
   const totalWeeks = Math.ceil(dates.length / 7);
   const weeks = useMemo(() => {
@@ -70,20 +70,18 @@ export function CustomCalendarHeatmap({ rides, numDays = 90 }: { rides: RideReco
     return positions;
   }, [weeks]);
 
-  const totalRides = rides.length;
-  const totalDistance = rides.reduce((sum, r) => sum + r.distance_km, 0);
   const gridWidth = totalWeeks * cellSize + Math.max(totalWeeks - 1, 0) * cellGap;
   const monthCellWidth = cellSize + cellGap;
 
   return (
-    <View style={{ paddingTop: 8, paddingBottom: 10, alignItems: 'center', maxHeight: 110 }}>
+    <View style={{ paddingTop: 10, paddingBottom: 8, alignItems: 'center' }}>
       {/* Month labels row */}
       <View
         style={{
           flexDirection: 'row',
           width: gridWidth + 18,
           paddingLeft: 18,
-          marginBottom: 3,
+          marginBottom: 6,
         }}>
         {Array.from({ length: totalWeeks }).map((_, col) => {
           const pos = monthPositions.find((p) => p.col === col);
@@ -94,7 +92,7 @@ export function CustomCalendarHeatmap({ rides, numDays = 90 }: { rides: RideReco
                   numberOfLines={1}
                   ellipsizeMode="clip"
                   variant="meta"
-                  style={{ color: palette.textTertiary, fontSize: 7, lineHeight: 8, width: monthCellWidth * 2.8 }}>
+                  style={{ color: palette.textTertiary, fontSize: 10, lineHeight: 11, width: monthCellWidth * 3.2 }}>
                   {pos.label}
                 </AppText>
               ) : null}
@@ -110,12 +108,7 @@ export function CustomCalendarHeatmap({ rides, numDays = 90 }: { rides: RideReco
             <AppText
               key={`${day}-${i}`}
               variant="meta"
-              style={{
-                color: palette.textTertiary,
-                fontSize: 7,
-                textAlign: 'center',
-                lineHeight: 8,
-              }}>
+              style={{ color: palette.textTertiary, fontSize: 9, textAlign: 'center', lineHeight: 11 }}>
               {day}
             </AppText>
           ))}
@@ -137,7 +130,7 @@ export function CustomCalendarHeatmap({ rides, numDays = 90 }: { rides: RideReco
                       style={{
                         width: cellSize,
                         height: cellSize,
-                        borderRadius: 1.5,
+                        borderRadius: 2.5,
                         backgroundColor: cell ? getColor(cell.distance) : '#1E1E1E',
                         borderWidth: isRidden ? 0 : 0.5,
                         borderColor: isRidden ? 'transparent' : 'rgba(255,255,255,0.04)',
@@ -150,18 +143,6 @@ export function CustomCalendarHeatmap({ rides, numDays = 90 }: { rides: RideReco
           </View>
         </View>
       </View>
-
-      {/* Summary */}
-      <AppText
-        variant="meta"
-        style={{
-          color: palette.textTertiary,
-          fontSize: 10,
-          textAlign: 'center',
-          marginTop: 8,
-        }}>
-        {totalRides} ride{totalRides !== 1 ? 's' : ''} · {totalDistance.toFixed(0)} km · last {numDays} days
-      </AppText>
 
     </View>
   );

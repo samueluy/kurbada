@@ -74,7 +74,7 @@ export function useRideSession() {
         z: 0.8 * filteredAccelRef.current.z + 0.2 * reading.z,
       };
 
-      const accelRoll = (Math.atan2(filteredAccelRef.current.y, filteredAccelRef.current.z) * 180) / Math.PI;
+      const accelRoll = (Math.atan2(filteredAccelRef.current.x, filteredAccelRef.current.z) * 180) / Math.PI;
       rollRef.current = 0.92 * rollRef.current + 0.08 * accelRoll;
 
       const gForce = Math.sqrt(reading.x ** 2 + reading.y ** 2 + reading.z ** 2);
@@ -99,8 +99,8 @@ export function useRideSession() {
         if (lastGyroTimestampRef.current) {
           const dt = (now - lastGyroTimestampRef.current) / 1000;
           rollRef.current =
-            0.92 * (rollRef.current + (reading.x * dt * 180) / Math.PI) +
-            0.08 * ((Math.atan2(filteredAccelRef.current.y, filteredAccelRef.current.z) * 180) / Math.PI);
+            0.92 * (rollRef.current + (reading.y * dt * 180) / Math.PI) +
+            0.08 * ((Math.atan2(filteredAccelRef.current.x, filteredAccelRef.current.z) * 180) / Math.PI);
         }
         lastGyroTimestampRef.current = now;
       });
@@ -184,6 +184,28 @@ export function useRideSession() {
         store.setState('active');
       }
     }, 1000);
+  };
+
+  const recalibrateLean = async () => {
+    if (store.mode !== 'weekend') {
+      return;
+    }
+
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+
+    calibrationRef.current = undefined;
+    store.setCalibration(undefined);
+    store.setCalibrationCountdown(null);
+    store.updateTelemetry({
+      leanAngleDeg: 0,
+      maxLeanAngleDeg: 0,
+    });
+    lastGyroTimestampRef.current = null;
+    rollRef.current = 0;
+    store.setState('calibrating');
   };
 
   const stopRide = async () => {
@@ -362,6 +384,7 @@ export function useRideSession() {
     latestPosition,
     startRide,
     completeCalibration,
+    recalibrateLean,
     stopRide,
     dismissCrashAlert,
     requestHelp,

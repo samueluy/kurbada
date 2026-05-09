@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { useState } from 'react';
 import { Alert, FlatList, Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScreen } from '@/components/ui/app-screen';
@@ -11,8 +12,10 @@ import { GlassCard } from '@/components/ui/glass-card';
 import { SectionHeader } from '@/components/ui/section-header';
 import { palette } from '@/constants/theme';
 import { RideListingCard } from '@/features/board/components/ride-listing-card';
+import { LeaderboardSection } from '@/features/board/components/leaderboard-section';
 import { useAuth } from '@/hooks/use-auth';
 import { useBoardMutations, useRideListings } from '@/hooks/use-kurbada-data';
+import { useLeaderboard } from '@/hooks/use-leaderboard';
 import type { RideListing } from '@/types/domain';
 
 function JoinLobbySheet({ listing, onClose }: { listing: RideListing; onClose: () => void }) {
@@ -45,7 +48,9 @@ function JoinLobbySheet({ listing, onClose }: { listing: RideListing; onClose: (
 
 export default function BoardTabScreen() {
   const { session } = useAuth();
+  const insets = useSafeAreaInsets();
   const listings = useRideListings(session?.user.id);
+  const leaderboard = useLeaderboard();
   const { reportRideListing } = useBoardMutations(session?.user.id);
   const [selectedListing, setSelectedListing] = useState<RideListing | null>(null);
 
@@ -57,11 +62,7 @@ export default function BoardTabScreen() {
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 96, gap: 12 }}
         ListHeaderComponent={
           <View style={{ paddingTop: 8, gap: 8 }}>
-            <View style={{ gap: 4 }}>
-              <AppText variant="eyebrow">Public Rides</AppText>
-              <AppText variant="screenTitle">The lobby is open.</AppText>
-              <AppText variant="body">Join group rides and coordinate via Messenger or Telegram.</AppText>
-            </View>
+            <LeaderboardSection entries={leaderboard} currentUserId={session?.user.id} />
             <SectionHeader title="Upcoming" />
           </View>
         }
@@ -94,7 +95,7 @@ export default function BoardTabScreen() {
         onPress={() => router.push('/(app)/board/create')}
         style={{
           position: 'absolute',
-          bottom: 100,
+          bottom: insets.bottom + 22,
           right: 16,
           width: 56,
           height: 56,

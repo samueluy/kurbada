@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { GlassCard } from '@/components/ui/glass-card';
 import { ProgressDots } from '@/components/ui/progress-dots';
 import { palette, radius } from '@/constants/theme';
+import { getOnboardingRoute, ONBOARDING_TOTAL_STEPS } from '@/lib/onboarding-flow';
 import {
   getDefaultMaintenancePresets,
   getVisibleMaintenancePresets,
@@ -41,12 +42,17 @@ export default function OnboardingMaintenanceScreen() {
   };
 
   return (
-    <AppScrollScreen contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
+    <AppScrollScreen contentContainerStyle={{ flexGrow: 1 }}>
       <GlassCard style={{ gap: 18, padding: 22 }}>
-        <ProgressDots total={8} current={3} />
-        <AppText variant="label" style={{ color: palette.textSecondary }}>
-          Step 3 of 8
-        </AppText>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <Pressable onPress={() => { setOnboardingStep(2); router.replace(getOnboardingRoute(2) as any); }}>
+            <Ionicons name="arrow-back" size={20} color={palette.textSecondary} />
+          </Pressable>
+          <AppText variant="label" style={{ color: palette.textSecondary }}>
+            Step 3 of {ONBOARDING_TOTAL_STEPS}
+          </AppText>
+        </View>
+        <ProgressDots total={ONBOARDING_TOTAL_STEPS} current={3} />
 
         <View style={{ gap: 8 }}>
           <AppText variant="screenTitle" style={{ fontSize: 30 }}>
@@ -72,8 +78,8 @@ export default function OnboardingMaintenanceScreen() {
                   gap: 14,
                   borderRadius: radius.md,
                   borderWidth: 0.5,
-                  borderColor: active ? palette.text : palette.border,
-                  backgroundColor: active ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
+                  borderColor: active ? palette.danger : palette.border,
+                  backgroundColor: active ? 'rgba(192,57,43,0.18)' : 'rgba(255,255,255,0.04)',
                   paddingHorizontal: 16,
                   paddingVertical: 14,
                 }}>
@@ -83,14 +89,14 @@ export default function OnboardingMaintenanceScreen() {
                     height: 22,
                     borderRadius: 11,
                     borderWidth: 1,
-                    borderColor: active ? palette.text : palette.border,
-                    backgroundColor: active ? palette.text : 'transparent',
+                    borderColor: active ? palette.danger : palette.border,
+                    backgroundColor: active ? palette.danger : 'transparent',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}>
-                  {active ? <Ionicons name="checkmark" size={14} color={palette.background} /> : null}
+                  {active ? <Ionicons name="checkmark" size={14} color="#FFFFFF" /> : null}
                 </View>
-                <AppText variant="bodyBold" style={{ flex: 1, color: active ? palette.text : palette.textSecondary }}>
+                <AppText variant="bodyBold" style={{ flex: 1, color: active ? '#FFFFFF' : palette.textSecondary }}>
                   {preset.label}
                 </AppText>
               </Pressable>
@@ -102,7 +108,7 @@ export default function OnboardingMaintenanceScreen() {
           title="Next →"
           onPress={() => {
             setOnboardingStep(4);
-            router.replace('/(public)/emergency?flow=onboarding');
+            router.push(getOnboardingRoute(4) as any);
           }}
         />
       </GlassCard>

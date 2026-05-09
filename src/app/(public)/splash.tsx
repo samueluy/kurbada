@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
-import { View } from 'react-native';
+import { Image, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScreen } from '@/components/ui/app-screen';
@@ -23,12 +23,18 @@ export default function SplashScreen() {
   return (
     <AppScreen style={{ justifyContent: 'center', alignItems: 'center' }}>
       <LinearGradient colors={['#0A0A0A', '#050505', '#101010']} style={{ position: 'absolute', inset: 0 }} />
-      <View style={{ alignItems: 'center', gap: 16 }}>
+      <View style={{ alignItems: 'center', gap: 24 }}>
+        <Image
+          source={require('@/assets/images/logo.png')}
+          style={{ width: 120, height: 120, resizeMode: 'contain' }}
+        />
+        <View style={{ alignItems: 'center', gap: 16 }}>
         <AppText variant="brand" style={{ fontSize: 44, letterSpacing: 7, color: '#F5F5F2' }}>
           KURBADA
         </AppText>
         <View style={{ width: 48, height: 2, backgroundColor: palette.danger }} />
         <AppText variant="meta" style={{ color: palette.textSecondary }}>Built for Filipino Riders</AppText>
+        </View>
       </View>
     </AppScreen>
   );

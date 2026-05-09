@@ -3,13 +3,14 @@ import { router } from 'expo-router';
 import * as Location from 'expo-location';
 import { Accelerometer } from 'expo-sensors';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScreen } from '@/components/ui/app-screen';
 import { Button } from '@/components/ui/button';
 import { GlassCard } from '@/components/ui/glass-card';
 import { palette } from '@/constants/theme';
+import { getOnboardingRoute, ONBOARDING_TOTAL_STEPS } from '@/lib/onboarding-flow';
 import { useAppStore } from '@/store/app-store';
 
 const loadingTexts = [
@@ -42,7 +43,7 @@ export default function PermissionsScreen() {
               clearInterval(interval);
               setTimeout(() => {
             setOnboardingStep(7);
-            router.replace('/(public)/paywall');
+            router.replace(getOnboardingRoute(7) as any);
           }, 500);
         }
         return next;
@@ -57,13 +58,18 @@ export default function PermissionsScreen() {
     return (
       <AppScreen style={{ justifyContent: 'center' }}>
         <GlassCard style={{ minHeight: '78%', justifyContent: 'space-between', paddingVertical: 40, paddingHorizontal: 24 }}>
+          <View style={{ alignSelf: 'flex-start' }}>
+            <Pressable onPress={() => { setOnboardingStep(5); router.replace(getOnboardingRoute(5) as any); }}>
+              <Ionicons name="arrow-back" size={20} color={palette.textSecondary} />
+            </Pressable>
+          </View>
           <View style={{ alignItems: 'center', gap: 32 }}>
             <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: 'rgba(217,255,63,0.08)', alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name="hardware-chip-outline" size={52} color={palette.lime} />
             </View>
             <View style={{ alignItems: 'center', gap: 14 }}>
               <AppText variant="label" style={{ color: palette.textSecondary }}>
-                Step 6 of 8
+                Step 6 of {ONBOARDING_TOTAL_STEPS}
               </AppText>
               <AppText variant="screenTitle" style={{ textAlign: 'center', fontSize: 32, lineHeight: 38 }}>
                 We need to connect{'\n'}to your sensors.

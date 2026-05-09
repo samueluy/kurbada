@@ -71,15 +71,20 @@ export default function ActiveRideScreen() {
   const ride = useRideSession();
   const insets = useSafeAreaInsets();
   const isWeekend = ride.mode === 'weekend';
+  const requestedMode = Array.isArray(params.mode) ? params.mode[0] : params.mode;
+  const requestedBikeId = Array.isArray(params.bikeId) ? params.bikeId[0] : params.bikeId;
+  const requestedFuelPrice = Array.isArray(params.fuelPrice) ? params.fuelPrice[0] : params.fuelPrice;
+  const requestedFuelRate = Array.isArray(params.fuelRate) ? params.fuelRate[0] : params.fuelRate;
 
   useEffect(() => {
-    if (ride.state === 'idle' && params.bikeId) {
-      const fuelPrice = Number(params.fuelPrice) || 65;
-      const fuelRate = Number(params.fuelRate) || 28;
-      ride.startRide((params.mode as RideMode) ?? 'weekend', params.bikeId, fuelPrice, fuelRate).catch(() => undefined);
+    if (ride.state === 'idle' && requestedBikeId) {
+      const fuelPrice = Number(requestedFuelPrice) || 65;
+      const fuelRate = Number(requestedFuelRate) || 28;
+      const normalizedMode: RideMode = requestedMode === 'hustle' ? 'hustle' : 'weekend';
+      ride.startRide(normalizedMode, requestedBikeId, fuelPrice, fuelRate).catch(() => undefined);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.bikeId, params.mode, params.fuelPrice, params.fuelRate]);
+  }, [requestedBikeId, requestedMode, requestedFuelPrice, requestedFuelRate]);
 
   const handleStop = async () => {
     try {
@@ -110,6 +115,24 @@ export default function ActiveRideScreen() {
         <AppText variant="label" style={{ color: palette.textTertiary, fontSize: 14, letterSpacing: 5 }}>
           KURBADA
         </AppText>
+        {isWeekend && ride.state === 'active' ? (
+          <Pressable
+            onPress={() => ride.recalibrateLean().catch(() => undefined)}
+            style={{
+              borderRadius: radius.pill,
+              borderWidth: 0.5,
+              borderColor: palette.border,
+              backgroundColor: 'rgba(255,255,255,0.04)',
+              paddingHorizontal: 14,
+              paddingVertical: 8,
+            }}>
+            <AppText variant="label" style={{ color: palette.textSecondary, fontSize: 11 }}>
+              RE-CALIBRATE
+            </AppText>
+          </Pressable>
+        ) : (
+          <View style={{ width: 108 }} />
+        )}
       </View>
 
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20, gap: 24 }}>
@@ -177,19 +200,19 @@ export default function ActiveRideScreen() {
 
       {/* Calibration overlay */}
       {ride.state === 'calibrating' && ride.calibrationCountdown !== null ? (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', alignItems: 'center', justifyContent: 'center', zIndex: 15, gap: 24 }}>
-          <AppText variant="screenTitle" style={{ textAlign: 'center' }}>
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', alignItems: 'center', justifyContent: 'center', zIndex: 15, gap: 24, paddingHorizontal: 24 }}>
+          <AppText variant="screenTitle" style={{ textAlign: 'center', lineHeight: 40, paddingTop: 6 }}>
             Hold phone upright{'\n'}and still
           </AppText>
-          <AppText variant="heroMetric" style={{ fontSize: 80, color: ride.calibrationCountdown <= 1 ? palette.success : palette.text, textAlign: 'center' }}>
+          <AppText variant="heroMetric" style={{ fontSize: 80, lineHeight: 92, color: ride.calibrationCountdown <= 1 ? palette.success : palette.text, textAlign: 'center', paddingTop: 4 }}>
             {ride.calibrationCountdown}
           </AppText>
         </View>
       ) : ride.state === 'calibrating' ? (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', alignItems: 'center', justifyContent: 'center', zIndex: 15, gap: 16 }}>
-          <AppText variant="screenTitle">Calibrate zero reference</AppText>
-          <AppText variant="meta" style={{ textAlign: 'center', color: palette.textSecondary }}>
-            Mount the phone, hold the bike upright and still,{'\n'}then capture the neutral horizon.
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', alignItems: 'center', justifyContent: 'center', zIndex: 15, gap: 16, paddingHorizontal: 24 }}>
+          <AppText variant="screenTitle" style={{ textAlign: 'center', lineHeight: 40, paddingTop: 6 }}>Calibrate zero reference</AppText>
+          <AppText variant="meta" style={{ textAlign: 'center', color: palette.textSecondary, lineHeight: 22 }}>
+            Mount the phone vertically, hold the bike upright and still,{'\n'}then capture the neutral lean position.
           </AppText>
           <Button title="Capture Zero Reference" onPress={() => ride.completeCalibration()} />
         </View>

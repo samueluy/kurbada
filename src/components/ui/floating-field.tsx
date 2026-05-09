@@ -32,6 +32,7 @@ export function FloatingField({
       <TextInput
         value={value}
         placeholderTextColor={palette.textTertiary}
+        selectionColor={palette.danger}
         style={{
           minHeight: 26,
           color: palette.text,

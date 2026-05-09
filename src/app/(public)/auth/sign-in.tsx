@@ -1,4 +1,4 @@
-import { Link, Redirect, router } from 'expo-router';
+import { Link, Redirect } from 'expo-router';
 import { useState } from 'react';
 import { Alert, TextInput, View } from 'react-native';
 
@@ -6,11 +6,11 @@ import { AppText } from '@/components/ui/app-text';
 import { AppScrollScreen } from '@/components/ui/app-screen';
 import { Button } from '@/components/ui/button';
 import { GlassCard } from '@/components/ui/glass-card';
-import { palette, radius } from '@/constants/theme';
-import { env, isSupabaseConfigured } from '@/lib/env';
+import { palette, radius, typography } from '@/constants/theme';
+import { isSupabaseConfigured } from '@/lib/env';
 import { useAuth } from '@/hooks/use-auth';
 
-function Field({ value, onChangeText, placeholder, secureTextEntry = false }: { value: string; onChangeText: (value: string) => void; placeholder: string; secureTextEntry?: boolean }) {
+function Field({ value, onChangeText, placeholder, secureTextEntry = false, keyboardType = 'default', autoCapitalize = 'sentences' }: { value: string; onChangeText: (value: string) => void; placeholder: string; secureTextEntry?: boolean; keyboardType?: TextInput['props']['keyboardType']; autoCapitalize?: TextInput['props']['autoCapitalize'] }) {
   return (
     <TextInput
       value={value}
@@ -18,6 +18,11 @@ function Field({ value, onChangeText, placeholder, secureTextEntry = false }: { 
       placeholder={placeholder}
       placeholderTextColor={palette.textTertiary}
       secureTextEntry={secureTextEntry}
+      keyboardType={keyboardType}
+      autoCapitalize={autoCapitalize}
+      autoCorrect={false}
+      textContentType={secureTextEntry ? 'password' : keyboardType === 'email-address' ? 'emailAddress' : undefined}
+      selectionColor={palette.danger}
       style={{
         minHeight: 52,
         borderRadius: radius.md,
@@ -25,6 +30,9 @@ function Field({ value, onChangeText, placeholder, secureTextEntry = false }: { 
         borderColor: palette.border,
         paddingHorizontal: 16,
         backgroundColor: palette.surface,
+        color: palette.text,
+        fontFamily: typography.body,
+        fontSize: 15,
       }}
     />
   );
@@ -35,10 +43,6 @@ export default function SignInScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
-
-  if (env.devBypassAppGate) {
-    return <Redirect href="/(app)/(tabs)/ride" />;
-  }
 
   if (session) {
     return <Redirect href="/" />;
@@ -63,7 +67,7 @@ export default function SignInScreen() {
           </AppText>
         ) : null}
 
-        <Field value={email} onChangeText={setEmail} placeholder="Email" />
+        <Field value={email} onChangeText={setEmail} placeholder="Email" keyboardType="email-address" autoCapitalize="none" />
         <Field value={password} onChangeText={setPassword} placeholder="Password" secureTextEntry />
         <Button
           title={busy ? 'Signing in...' : 'Sign In'}
@@ -72,7 +76,6 @@ export default function SignInScreen() {
             try {
               setBusy(true);
               await signIn(email.trim(), password);
-              router.replace('/');
             } catch (error) {
               Alert.alert('Sign in failed', error instanceof Error ? error.message : 'Please try again.');
             } finally {

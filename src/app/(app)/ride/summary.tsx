@@ -1,13 +1,14 @@
+import Constants from 'expo-constants';
+import Share from 'react-native-share';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import { useLocalSearchParams, router } from 'expo-router';
-import { useRef, useState } from 'react';
-import { Alert, Platform, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { Alert, Platform, ScrollView, View } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 
 import { RouteMapPreview } from '@/components/ride/route-map-preview';
-import { ShareCard } from '@/components/ride/share-card';
 import { IgStoryCanvas } from '@/components/ride/ig-story-canvas';
 import { AppText } from '@/components/ui/app-text';
 import { AppScrollScreen } from '@/components/ui/app-screen';
@@ -17,23 +18,29 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { StatCard } from '@/components/ui/stat-card';
 import { formatDuration } from '@/lib/format';
 import { useAuth } from '@/hooks/use-auth';
-import { useRides } from '@/hooks/use-kurbada-data';
-import { palette } from '@/constants/theme';
+import { useFuelLogs, useRides } from '@/hooks/use-kurbada-data';
+import { palette, radius } from '@/constants/theme';
+import { rideStoryTemplates, type RideStoryTemplateId } from '@/lib/ride-story';
 
 export default function RideSummaryScreen() {
   const params = useLocalSearchParams<{ rideId?: string }>();
   const { session } = useAuth();
   const rides = useRides(session?.user.id);
+  const fuelLogs = useFuelLogs(session?.user.id);
   const ride = rides.data?.find((item) => item.id === params.rideId) ?? rides.data?.[0];
-  const shotRef = useRef<any>(null);
   const storyShotRef = useRef<any>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<RideStoryTemplateId>('distance_hero');
   const [storyPhoto, setStoryPhoto] = useState<string | undefined>();
+  const latestFuelPrice = useMemo(() => {
+    const logs = fuelLogs.data ?? [];
+    return logs.length ? logs[0].price_per_liter : undefined;
+  }, [fuelLogs.data]);
 
   if (!ride) {
     return null;
   }
 
-  const handleShareToStories = async () => {
+  const pickStoryPhoto = async () => {
     try {
       const pickerResult = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
@@ -45,6 +52,22 @@ export default function RideSummaryScreen() {
       }
 
       setStoryPhoto(pickerResult.assets[0].uri);
+    } catch (error) {
+      Alert.alert('Photo picker failed', error instanceof Error ? error.message : 'Could not open photo library.');
+    }
+  };
+
+  const handleShareToStories = async () => {
+    try {
+      if (!storyPhoto) {
+        await pickStoryPhoto();
+        return;
+      }
+
+      const permission = await MediaLibrary.requestPermissionsAsync();
+      if (!permission.granted) {
+        throw new Error('Media library permission is required to export the story.');
+      }
 
       setTimeout(async () => {
         try {
@@ -53,18 +76,39 @@ export default function RideSummaryScreen() {
             throw new Error('Could not capture the story card.');
           }
 
-          await MediaLibrary.saveToLibraryAsync(uri);
-          if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(uri);
+          try {
+            await Share.shareSingle({
+              social: Share.Social.INSTAGRAM_STORIES as any,
+              backgroundImage: uri,
+              appId:
+                Constants.expoConfig?.android?.package
+                ?? Constants.expoConfig?.ios?.bundleIdentifier
+                ?? 'com.sajedph.kurbada',
+              forceDialog: Platform.OS === 'android',
+              useInternalStorage: Platform.OS === 'android',
+            });
+          } catch {
+            try {
+              await Share.shareSingle({
+                social: Share.Social.INSTAGRAM as any,
+                url: uri,
+                type: 'image/png',
+                forceDialog: Platform.OS === 'android',
+                useInternalStorage: Platform.OS === 'android',
+              });
+            } catch {
+              await MediaLibrary.saveToLibraryAsync(uri);
+              if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(uri);
+              }
+            }
           }
         } catch (error) {
           Alert.alert('Export failed', error instanceof Error ? error.message : 'Please try again.');
-        } finally {
-          setStoryPhoto(undefined);
         }
       }, 500);
     } catch (error) {
-      Alert.alert('Photo picker failed', error instanceof Error ? error.message : 'Could not open photo library.');
+      Alert.alert('Export failed', error instanceof Error ? error.message : 'Please try again.');
     }
   };
 
@@ -76,7 +120,7 @@ export default function RideSummaryScreen() {
     <AppScrollScreen>
       <GlassCard style={{ gap: 12, padding: 20 }}>
         <AppText variant="label">Ride saved</AppText>
-        <AppText variant="heroMetric" style={{ fontSize: 48, fontFamily: Platform.OS === 'ios' ? 'DMMono_500Medium' : 'monospace', color: palette.text }}>{ride.distance_km.toFixed(1)} km</AppText>
+        <AppText variant="heroMetric" style={{ fontSize: 48, color: palette.text }}>{ride.distance_km.toFixed(1)} km</AppText>
       </GlassCard>
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
@@ -96,43 +140,74 @@ export default function RideSummaryScreen() {
 
       <SectionHeader title="Share" />
 
-      <Button
-        title="Share to Social"
-        onPress={handleShareToStories}
-        style={{ backgroundColor: palette.danger }}
-      />
+      <GlassCard style={{ gap: 16, padding: 16 }}>
+        <View style={{ gap: 6 }}>
+          <AppText variant="sectionTitle">Instagram Story Overlays</AppText>
+          <AppText variant="meta" style={{ color: palette.textSecondary }}>
+            Pick a gallery photo, switch between five templates, then export straight from your phone. Nothing gets uploaded.
+          </AppText>
+        </View>
 
-      <SectionHeader title="Create Share Card" />
-      <ViewShot ref={shotRef} options={{ result: 'tmpfile', quality: 1, width: 1080, height: 1080, format: 'png' }}>
-        <ShareCard ride={ride} />
-      </ViewShot>
-      <Button
-        title="Export Share Card"
-        onPress={async () => {
-          try {
-            const permission = await MediaLibrary.requestPermissionsAsync();
-            if (!permission.granted) {
-              throw new Error('Media library permission is required to export the card.');
-            }
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+          {rideStoryTemplates.map((template) => {
+            const active = selectedTemplate === template.id;
+            return (
+              <Button
+                key={template.id}
+                title={template.label}
+                variant={active ? 'primary' : 'secondary'}
+                onPress={() => setSelectedTemplate(template.id)}
+                style={{
+                  minHeight: 40,
+                  paddingHorizontal: 14,
+                  borderRadius: radius.pill,
+                  backgroundColor: active ? palette.danger : palette.surfaceStrong,
+                }}
+              />
+            );
+          })}
+        </ScrollView>
 
-            const uri = await shotRef.current?.capture?.();
-            if (!uri) {
-              throw new Error('Could not capture the share card.');
-            }
+        <View style={{ alignItems: 'center' }}>
+          <IgStoryCanvas
+            ride={ride}
+            photoUri={storyPhoto}
+            templateId={selectedTemplate}
+            fuelPricePerLiter={latestFuelPrice}
+            width={240}
+          />
+        </View>
 
-            await MediaLibrary.saveToLibraryAsync(uri);
-            if (await Sharing.isAvailableAsync()) {
-              await Sharing.shareAsync(uri);
-            }
-          } catch (error) {
-            Alert.alert('Export failed', error instanceof Error ? error.message : 'Please try again.');
-          }
-        }}
-      />
+        <View style={{ gap: 10 }}>
+          <Button
+            title={storyPhoto ? 'Change Photo' : 'Pick Album Photo'}
+            variant="secondary"
+            onPress={pickStoryPhoto}
+          />
+          {storyPhoto ? (
+            <Button
+              title="Use Route Background Instead"
+              variant="ghost"
+              onPress={() => setStoryPhoto(undefined)}
+            />
+          ) : null}
+          <Button
+            title="Share to Instagram"
+            onPress={handleShareToStories}
+            style={{ backgroundColor: palette.danger }}
+          />
+        </View>
+      </GlassCard>
       <Button title="Done" variant="secondary" onPress={() => router.replace('/(app)/(tabs)/ride')} />
 
       <ViewShot ref={storyShotRef} options={{ result: 'tmpfile', quality: 1, width: 1080, height: 1920, format: 'png' }}>
-        <IgStoryCanvas ride={ride} photoUri={storyPhoto} />
+        <IgStoryCanvas
+          ride={ride}
+          photoUri={storyPhoto}
+          templateId={selectedTemplate}
+          fuelPricePerLiter={latestFuelPrice}
+          hidden
+        />
       </ViewShot>
     </AppScrollScreen>
   );

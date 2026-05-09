@@ -1,3 +1,4 @@
+import * as Linking from 'expo-linking';
 import { Link, Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, TextInput, View } from 'react-native';
@@ -6,13 +7,12 @@ import { AppText } from '@/components/ui/app-text';
 import { AppScrollScreen } from '@/components/ui/app-screen';
 import { Button } from '@/components/ui/button';
 import { GlassCard } from '@/components/ui/glass-card';
-import { palette, radius } from '@/constants/theme';
-import { env } from '@/lib/env';
+import { palette, radius, typography } from '@/constants/theme';
 import { getRideModeLabel } from '@/lib/onboarding';
 import { useAuth } from '@/hooks/use-auth';
 import { useAppStore } from '@/store/app-store';
 
-function Field({ value, onChangeText, placeholder, secureTextEntry = false }: { value: string; onChangeText: (value: string) => void; placeholder: string; secureTextEntry?: boolean }) {
+function Field({ value, onChangeText, placeholder, secureTextEntry = false, keyboardType = 'default', autoCapitalize = 'sentences' }: { value: string; onChangeText: (value: string) => void; placeholder: string; secureTextEntry?: boolean; keyboardType?: TextInput['props']['keyboardType']; autoCapitalize?: TextInput['props']['autoCapitalize'] }) {
   return (
     <TextInput
       value={value}
@@ -20,6 +20,11 @@ function Field({ value, onChangeText, placeholder, secureTextEntry = false }: { 
       placeholder={placeholder}
       placeholderTextColor={palette.textTertiary}
       secureTextEntry={secureTextEntry}
+      keyboardType={keyboardType}
+      autoCapitalize={autoCapitalize}
+      autoCorrect={false}
+      textContentType={secureTextEntry ? 'password' : keyboardType === 'email-address' ? 'emailAddress' : undefined}
+      selectionColor={palette.danger}
       style={{
         minHeight: 52,
         borderRadius: radius.md,
@@ -28,6 +33,8 @@ function Field({ value, onChangeText, placeholder, secureTextEntry = false }: { 
         paddingHorizontal: 16,
         backgroundColor: palette.surface,
         color: palette.text,
+        fontFamily: typography.body,
+        fontSize: 15,
       }}
     />
   );
@@ -36,14 +43,10 @@ function Field({ value, onChangeText, placeholder, secureTextEntry = false }: { 
 export default function SignUpScreen() {
   const { session, signUp } = useAuth();
   const onboardingData = useAppStore((state) => state.onboardingData);
-  const [displayName, setDisplayName] = useState(onboardingData.fullName || '');
+  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
-
-  if (env.devBypassAppGate) {
-    return <Redirect href="/(app)/(tabs)/ride" />;
-  }
 
   if (session) {
     return <Redirect href="/" />;
@@ -55,7 +58,7 @@ export default function SignUpScreen() {
         <View style={{ gap: 6 }}>
           <AppText variant="screenTitle" style={{ fontSize: 30 }}>Create account</AppText>
           <AppText variant="meta" style={{ color: palette.textSecondary }}>
-            Your onboarding data is saved. Create your account to drop straight into Kurbada.
+            Your onboarding data is saved. Create your account and verify your email to finish setup cleanly.
           </AppText>
         </View>
 
@@ -71,8 +74,25 @@ export default function SignUpScreen() {
         ) : null}
 
         <Field value={displayName} onChangeText={setDisplayName} placeholder="Display name" />
-        <Field value={email} onChangeText={setEmail} placeholder="Email" />
+        <Field value={email} onChangeText={setEmail} placeholder="Email" keyboardType="email-address" autoCapitalize="none" />
         <Field value={password} onChangeText={setPassword} placeholder="Password" secureTextEntry />
+        <AppText variant="meta" style={{ color: palette.textSecondary, lineHeight: 19 }}>
+          By registering, you agree to the{' '}
+          <AppText
+            variant="meta"
+            onPress={() => Linking.openURL('https://asenso.samueluy.com/terms').catch(() => undefined)}
+            style={{ color: palette.text, textDecorationLine: 'underline' }}>
+            Terms & Conditions
+          </AppText>
+          {' '}and{' '}
+          <AppText
+            variant="meta"
+            onPress={() => Linking.openURL('https://asenso.samueluy.com/privacy').catch(() => undefined)}
+            style={{ color: palette.text, textDecorationLine: 'underline' }}>
+            Privacy Policy
+          </AppText>
+          .
+        </AppText>
 
         <Button
           title={busy ? 'Creating...' : 'Create Account'}

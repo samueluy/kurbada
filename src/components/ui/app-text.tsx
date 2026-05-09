@@ -24,7 +24,7 @@ type Variant =
   | 'mono';
 
 const variantStyles: Record<Variant, TextProps['style']> = {
-  brand: { fontFamily: Fonts.brand, fontSize: 20, letterSpacing: 4, color: Typography.display.color },
+  brand: { fontFamily: Fonts.brand, fontSize: 20, lineHeight: 24, letterSpacing: 4, color: Typography.display.color },
   eyebrow: Typography.eyebrow,
   h1: Typography.h1,
   h2: Typography.h2,

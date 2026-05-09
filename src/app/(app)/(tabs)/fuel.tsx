@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Pressable, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScrollScreen } from '@/components/ui/app-screen';
@@ -26,6 +26,7 @@ export default function FuelTabScreen() {
   const [price, setPrice] = useState('66');
   const [station, setStation] = useState('Shell Katipunan');
   const [octane, setOctane] = useState<'91' | '95' | '97' | '100'>('95');
+  const formProgress = useRef(new Animated.Value(0)).current;
   const currentBike = bikes.data?.[0];
 
   const summary = useMemo(() => {
@@ -38,6 +39,26 @@ export default function FuelTabScreen() {
       avgPrice: litersTotal ? total / litersTotal : 0,
     };
   }, [fuelLogs.data]);
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(formProgress, {
+        toValue: showForm ? 1 : 0,
+        duration: showForm ? 220 : 180,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [formProgress, showForm]);
+
+  const formTranslateY = formProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [18, 0],
+  });
+
+  const formHeight = formProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
 
   return (
     <AppScrollScreen>
@@ -58,7 +79,17 @@ export default function FuelTabScreen() {
         <FuelSummaryCard label="Rides Fueled" value={`${fuelLogs.data?.length ?? 0}`} caption="Logged fill-ups" />
       </View>
 
-      {showForm ? (
+      <Animated.View
+        pointerEvents={showForm ? 'auto' : 'none'}
+        style={{
+          opacity: formProgress,
+          transform: [{ translateY: formTranslateY }],
+          maxHeight: formHeight.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, 420],
+          }),
+          overflow: 'hidden',
+        }}>
         <GlassCard style={{ padding: 18, gap: 10 }}>
           <FloatingField label="Liters" value={liters} onChangeText={setLiters} placeholder="7.0" keyboardType="decimal-pad" />
           <FloatingField label="Price per Liter" value={price} onChangeText={setPrice} placeholder="66" keyboardType="decimal-pad" />
@@ -105,7 +136,7 @@ export default function FuelTabScreen() {
             }}
           />
         </GlassCard>
-      ) : null}
+      </Animated.View>
 
       <SectionHeader
         title="Entries"

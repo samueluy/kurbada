@@ -1,3 +1,5 @@
+import Constants from 'expo-constants';
+import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
 import Purchases, {
   type CustomerInfo,
@@ -164,6 +166,63 @@ export async function getCurrentOfferingPackage(forceRefresh = false) {
 export async function getPremiumAccessState() {
   const customerInfo = await getCustomerInfo();
   return Boolean(customerInfo?.entitlements.active.premium);
+}
+
+export async function getRevenueCatSubscriptionSummary() {
+  const customerInfo = await getCustomerInfo(true);
+  if (!customerInfo) {
+    return {
+      hasPremium: false,
+      status: 'inactive' as const,
+      periodType: null,
+      expirationDate: null,
+      willRenew: false,
+      productIdentifier: null,
+    };
+  }
+
+  const entitlement = customerInfo.entitlements.active.premium;
+  if (!entitlement) {
+    return {
+      hasPremium: false,
+      status: 'inactive' as const,
+      periodType: null,
+      expirationDate: null,
+      willRenew: false,
+      productIdentifier: null,
+    };
+  }
+
+  const periodType = entitlement.periodType ?? null;
+  const status =
+    periodType === 'TRIAL'
+      ? 'trialing'
+      : entitlement.willRenew
+        ? 'active'
+        : 'canceled';
+
+  return {
+    hasPremium: true,
+    status,
+    periodType,
+    expirationDate: entitlement.expirationDate ?? null,
+    willRenew: Boolean(entitlement.willRenew),
+    productIdentifier: entitlement.productIdentifier ?? null,
+  };
+}
+
+export async function openNativeSubscriptionManagement() {
+  const appId =
+    Constants.expoConfig?.ios?.bundleIdentifier
+    ?? Constants.expoConfig?.android?.package
+    ?? 'com.sajedph.kurbada';
+
+  const iosUrl = 'https://apps.apple.com/account/subscriptions';
+  const androidUrl = `https://play.google.com/store/account/subscriptions?package=${appId}`;
+  const fallbackUrl = 'https://play.google.com/store/account/subscriptions';
+  const targetUrl = Platform.OS === 'ios' ? iosUrl : Platform.OS === 'android' ? androidUrl : fallbackUrl;
+
+  await Linking.openURL(targetUrl);
 }
 
 export async function purchasePremium() {

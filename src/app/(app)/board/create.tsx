@@ -21,7 +21,12 @@ const paceOptions: { value: RidePace; label: string }[] = [
 ];
 
 function isValidLobbyUrl(url: string) {
-  return /^https:\/\/(m\.me|t\.me)\/.+/.test(url.trim());
+  try {
+    const parsed = new URL(url.trim());
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
 }
 
 export default function CreateRideScreen() {
@@ -46,7 +51,7 @@ export default function CreateRideScreen() {
     }
 
     if (!isValidLobbyUrl(lobbyLink)) {
-      Alert.alert('Invalid lobby link', 'Please enter a valid Messenger (m.me) or Telegram (t.me) link.');
+      Alert.alert('Invalid lobby link', 'Please enter a valid ride lobby URL.');
       return;
     }
 
@@ -70,7 +75,7 @@ export default function CreateRideScreen() {
         <AppText variant="eyebrow">Create Ride</AppText>
         <AppText variant="screenTitle">Post a group ride.</AppText>
         <AppText variant="body">
-          Set the meetup, pace, and share your Messenger or Telegram lobby link.
+          Set the meetup, pace, and add the chat or group link riders should join.
         </AppText>
       </View>
 
@@ -177,13 +182,10 @@ export default function CreateRideScreen() {
           label="Lobby Link"
           value={lobbyLink}
           onChangeText={setLobbyLink}
-          placeholder="https://m.me/join/abc123 or https://t.me/kurbadaride"
+          placeholder="https://chat.whatsapp.com/... or your group URL"
           keyboardType="url"
           autoCapitalize="none"
         />
-        <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 11 }}>
-          Must be a valid Messenger (m.me) or Telegram (t.me) link.
-        </AppText>
       </GlassCard>
 
       <Button title="Post Ride" onPress={handlePost} style={{ backgroundColor: palette.danger }} />

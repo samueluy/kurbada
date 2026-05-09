@@ -7,6 +7,7 @@ import { AppText } from '@/components/ui/app-text';
 import { AppScreen } from '@/components/ui/app-screen';
 import { Button } from '@/components/ui/button';
 import { palette, radius } from '@/constants/theme';
+import { getOnboardingRoute } from '@/lib/onboarding-flow';
 import { useAppStore } from '@/store/app-store';
 
 export default function OnboardingScreen() {
@@ -55,7 +56,7 @@ export default function OnboardingScreen() {
             title="Set Up My Garage"
             onPress={() => {
               setOnboardingStep(2);
-              router.replace('/(public)/bike-setup?flow=onboarding');
+              router.push(getOnboardingRoute(2) as any);
             }}
             style={{
               backgroundColor: palette.danger,

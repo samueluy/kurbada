@@ -1,11 +1,12 @@
 import { router } from 'expo-router';
-import { Modal, Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScrollScreen } from '@/components/ui/app-screen';
 import { Button } from '@/components/ui/button';
 import { FloatingField } from '@/components/ui/floating-field';
 import { GlassCard } from '@/components/ui/glass-card';
+import { KeyboardSheet } from '@/components/ui/keyboard-sheet';
 import { ListRow } from '@/components/ui/list-row';
 import { SectionHeader } from '@/components/ui/section-header';
 import { palette } from '@/constants/theme';
@@ -105,7 +106,7 @@ export default function ProfileTabScreen() {
           icon="card-outline"
           title="Billing"
           subtitle={profile.data?.subscription_status ?? 'inactive'}
-          onPress={() => router.push('/(public)/paywall')}
+          onPress={() => router.push('/(app)/profile/billing')}
         />
       </GlassCard>
 
@@ -118,51 +119,48 @@ export default function ProfileTabScreen() {
       </View>
     </AppScrollScreen>
 
-      <Modal visible={showFuelPrice} transparent animationType="fade">
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }} onPress={() => setShowFuelPrice(false)}>
-          <Pressable onPress={() => undefined}>
-            <View style={{ backgroundColor: '#1E1E1E', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 16 }}>
-              <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: palette.surfaceStrong, alignSelf: 'center' }} />
-              <AppText variant="sectionTitle" style={{ fontSize: 20 }}>Fuel Price per Liter</AppText>
-              <AppText variant="body" style={{ color: palette.textSecondary }}>Set a custom fuel price. Leave blank to use your latest fuel log average.</AppText>
-              <FloatingField
-                label="PRICE PER LITER (PHP)"
-                value={fuelPriceInput}
-                onChangeText={setFuelPriceInput}
-                placeholder="65.00"
-                keyboardType="decimal-pad"
-              />
-              <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 11 }}>Defaults to your latest fuel log price if left blank.</AppText>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Button
-                    title="Clear"
-                    variant="ghost"
-                    onPress={() => {
-                      setCustomFuelPrice(null);
-                      setShowFuelPrice(false);
-                    }}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Button
-                    title="Save"
-                    onPress={() => {
-                      const value = parseFloat(fuelPriceInput);
-                      if (fuelPriceInput.trim() && !isNaN(value) && value > 0) {
-                        setCustomFuelPrice(value);
-                      } else {
-                        setCustomFuelPrice(null);
-                      }
-                      setShowFuelPrice(false);
-                    }}
-                    style={{ backgroundColor: '#C0392B', borderRadius: 13, minHeight: 48 }}
-                  />
-                </View>
-              </View>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <KeyboardSheet
+        visible={showFuelPrice}
+        onClose={() => setShowFuelPrice(false)}
+        title="Fuel Price per Liter"
+        subtitle="Set a custom fuel price, or leave it blank to keep using your latest fuel log average.">
+        <FloatingField
+          label="PRICE PER LITER (PHP)"
+          value={fuelPriceInput}
+          onChangeText={setFuelPriceInput}
+          placeholder="65.00"
+          keyboardType="decimal-pad"
+        />
+        <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 11 }}>
+          Defaults to your latest fuel log price if left blank.
+        </AppText>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ flex: 1 }}>
+            <Button
+              title="Clear"
+              variant="ghost"
+              onPress={() => {
+                setCustomFuelPrice(null);
+                setShowFuelPrice(false);
+              }}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button
+              title="Save"
+              onPress={() => {
+                const value = parseFloat(fuelPriceInput);
+                if (fuelPriceInput.trim() && !isNaN(value) && value > 0) {
+                  setCustomFuelPrice(value);
+                } else {
+                  setCustomFuelPrice(null);
+                }
+                setShowFuelPrice(false);
+              }}
+              style={{ backgroundColor: '#C0392B', borderRadius: 13, minHeight: 48 }}
+            />
+          </View>
+        </View>
+      </KeyboardSheet>
     </>  );
 }

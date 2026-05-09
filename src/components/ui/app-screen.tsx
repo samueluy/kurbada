@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, ScrollView, View, type ScrollViewProps, type ViewProps } from 'react-native';
+import { Animated, Easing, KeyboardAvoidingView, Platform, ScrollView, View, type ScrollViewProps, type ViewProps } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { layout, palette, spacing } from '@/constants/theme';
@@ -85,23 +85,34 @@ export function AppScrollScreen({
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
-      <ScrollView
-        {...rest}
-        showsVerticalScrollIndicator={false}
-        style={[{ flex: 1, backgroundColor: palette.background }, style]}
-        contentContainerStyle={[
-          {
-            paddingHorizontal: layout.screenPadding,
-            paddingTop: spacing.md,
-            paddingBottom: 120,
-          },
-          contentContainerStyle,
-        ]}>
-        <Animated.View style={{ opacity, transform: [{ translateY }], gap: spacing.section }}>
-          {showWordmark ? <Wordmark /> : null}
-          {children}
-        </Animated.View>
-      </ScrollView>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+        <ScrollView
+          {...rest}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+          overScrollMode="never"
+          keyboardShouldPersistTaps="always"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+          contentInsetAdjustmentBehavior="always"
+          style={[{ flex: 1, backgroundColor: palette.background }, style]}
+          contentContainerStyle={[
+            {
+              paddingHorizontal: layout.screenPadding,
+              paddingTop: spacing.md,
+              paddingBottom: 160,
+            },
+            contentContainerStyle,
+          ]}>
+          <Animated.View style={{ opacity, transform: [{ translateY }], gap: spacing.section }}>
+            {showWordmark ? <Wordmark /> : null}
+            {children}
+          </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

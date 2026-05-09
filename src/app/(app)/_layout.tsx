@@ -1,4 +1,4 @@
-import { Redirect, Stack } from 'expo-router';
+import { Redirect, Stack, usePathname } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { ActivityIndicator, Alert } from 'react-native';
 
@@ -13,11 +13,13 @@ import { useAppStore } from '@/store/app-store';
 
 export default function AppLayout() {
   const { session, loading } = useAuth();
+  const pathname = usePathname();
   const hasCompletedBikeSetup = useAppStore((state) => state.hasCompletedBikeSetup);
   const access = useUserAccess(session?.user.id);
   const referrals = useReferrals(session?.user.id);
   const { markReferralNotified } = useReferralMutations(session?.user.id);
   const bypassGate = env.devBypassAppGate;
+  const isBillingRoute = pathname === '/profile/billing';
   const shownReferralIdRef = useRef<string | null>(null);
 
   useMaintenanceReminders();
@@ -62,7 +64,7 @@ export default function AppLayout() {
     return <Redirect href="/(public)/auth/sign-in" />;
   }
 
-  if (!bypassGate && !access.data?.hasAccess) {
+  if (!bypassGate && !access.data?.hasAccess && !isBillingRoute) {
     return <Redirect href="/(public)/paywall" />;
   }
 
@@ -82,6 +84,7 @@ export default function AppLayout() {
       <Stack.Screen name="garage/[bikeId]" />
       <Stack.Screen name="board/create" options={{ presentation: 'modal' }} />
       <Stack.Screen name="fuel/reports" />
+      <Stack.Screen name="profile/billing" />
       <Stack.Screen name="profile/emergency" />
       <Stack.Screen name="profile/notifications" />
     </Stack>

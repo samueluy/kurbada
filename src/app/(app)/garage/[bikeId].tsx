@@ -8,6 +8,7 @@ import { AppScrollScreen } from '@/components/ui/app-screen';
 import { Button } from '@/components/ui/button';
 import { FloatingField } from '@/components/ui/floating-field';
 import { GlassCard } from '@/components/ui/glass-card';
+import { KeyboardSheet } from '@/components/ui/keyboard-sheet';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Colors, palette, radius } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
@@ -279,75 +280,67 @@ export default function BikeProfileScreen() {
       </View>
 
       {/* Log Service Confirmation Modal */}
-      <Modal visible={Boolean(confirmTask)} transparent animationType="fade">
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }} onPress={() => setConfirmTask(null)}>
-          <Pressable onPress={() => undefined}>
-            <View style={{ backgroundColor: Colors.s2, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 16 }}>
-              <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: palette.surfaceStrong, alignSelf: 'center' }} />
-              <AppText variant="sectionTitle" style={{ fontSize: 20 }}>Log Service</AppText>
-              <AppText variant="bodyBold" style={{ color: palette.textSecondary }}>{confirmTask?.task_name}</AppText>
-              <AppText variant="body" style={{ color: palette.textSecondary }}>
-                This will reset the interval counter to your current odometer: {bike.current_odometer_km.toLocaleString()} km.
-              </AppText>
-              <View style={{ gap: 6 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <AppText variant="meta" style={{ color: palette.textTertiary }}>Current odometer</AppText>
-                  <AppText variant="meta">{bike.current_odometer_km.toLocaleString()} km</AppText>
-                </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <AppText variant="meta" style={{ color: palette.textTertiary }}>Next due at</AppText>
-                  <AppText variant="meta">{(bike.current_odometer_km + (confirmTask?.interval_km ?? 0)).toLocaleString()} km</AppText>
-                </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <AppText variant="meta" style={{ color: palette.textTertiary }}>Date</AppText>
-                  <AppText variant="meta">{new Date().toISOString().slice(0, 10)}</AppText>
-                </View>
-              </View>
-              <Button
-                title="Confirm Service"
-                onPress={() => handleLogService(confirmTask)}
-                style={{ backgroundColor: Colors.red, borderRadius: 13, minHeight: 48 }}
-              />
-              <Button title="Cancel" variant="ghost" onPress={() => setConfirmTask(null)} />
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <KeyboardSheet
+        visible={Boolean(confirmTask)}
+        onClose={() => setConfirmTask(null)}
+        title="Log Service"
+        subtitle={confirmTask?.task_name}>
+        <AppText variant="body" style={{ color: palette.textSecondary }}>
+          This will reset the interval counter to your current odometer: {bike.current_odometer_km.toLocaleString()} km.
+        </AppText>
+        <View style={{ gap: 6 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <AppText variant="meta" style={{ color: palette.textTertiary }}>Current odometer</AppText>
+            <AppText variant="meta">{bike.current_odometer_km.toLocaleString()} km</AppText>
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <AppText variant="meta" style={{ color: palette.textTertiary }}>Next due at</AppText>
+            <AppText variant="meta">{(bike.current_odometer_km + (confirmTask?.interval_km ?? 0)).toLocaleString()} km</AppText>
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <AppText variant="meta" style={{ color: palette.textTertiary }}>Date</AppText>
+            <AppText variant="meta">{new Date().toISOString().slice(0, 10)}</AppText>
+          </View>
+        </View>
+        <Button
+          title="Confirm Service"
+          onPress={() => handleLogService(confirmTask)}
+          style={{ backgroundColor: Colors.red, borderRadius: 13, minHeight: 48 }}
+        />
+        <Button title="Cancel" variant="ghost" onPress={() => setConfirmTask(null)} />
+      </KeyboardSheet>
 
       {/* Edit Interval Modal */}
-      <Modal visible={Boolean(editTask)} transparent animationType="fade">
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }} onPress={() => setEditTask(null)}>
-          <Pressable onPress={() => undefined}>
-            <View style={{ backgroundColor: Colors.s2, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 16 }}>
-              <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: palette.surfaceStrong, alignSelf: 'center' }} />
-              <AppText variant="sectionTitle" style={{ fontSize: 20 }}>Edit {editTask?.task_name}</AppText>
-              <FloatingField
-                label="INTERVAL (KM)"
-                value={editIntervalKm}
-                onChangeText={setEditIntervalKm}
-                placeholder={editTask?.interval_km.toString()}
-                keyboardType="number-pad"
-              />
-              <FloatingField
-                label="INTERVAL (MONTHS)"
-                value={editIntervalMonths}
-                onChangeText={setEditIntervalMonths}
-                placeholder={editTask?.interval_days ? Math.round(editTask.interval_days / 30).toString() : ''}
-                keyboardType="number-pad"
-              />
-              <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 11 }}>Leave blank to track by km only</AppText>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Button title="Cancel" variant="ghost" onPress={() => setEditTask(null)} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Button title="Save" onPress={handleEditSave} style={{ backgroundColor: Colors.red, borderRadius: 13, minHeight: 48 }} />
-                </View>
-              </View>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <KeyboardSheet
+        visible={Boolean(editTask)}
+        onClose={() => setEditTask(null)}
+        title={`Edit ${editTask?.task_name ?? 'Task'}`}>
+        <FloatingField
+          label="INTERVAL (KM)"
+          value={editIntervalKm}
+          onChangeText={setEditIntervalKm}
+          placeholder={editTask?.interval_km.toString()}
+          keyboardType="number-pad"
+        />
+        <FloatingField
+          label="INTERVAL (MONTHS)"
+          value={editIntervalMonths}
+          onChangeText={setEditIntervalMonths}
+          placeholder={editTask?.interval_days ? Math.round(editTask.interval_days / 30).toString() : ''}
+          keyboardType="number-pad"
+        />
+        <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 11 }}>
+          Leave blank to track by km only.
+        </AppText>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ flex: 1 }}>
+            <Button title="Cancel" variant="ghost" onPress={() => setEditTask(null)} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button title="Save" onPress={handleEditSave} style={{ backgroundColor: Colors.red, borderRadius: 13, minHeight: 48 }} />
+          </View>
+        </View>
+      </KeyboardSheet>
 
       {/* Context Menu Modal */}
       <Modal visible={Boolean(menuTask)} transparent animationType="fade">
