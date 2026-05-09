@@ -13,12 +13,9 @@
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Kurbada needs photo access so riders can pick a photo and share ride overlays to Instagram.",
         "NSPhotoLibraryAddUsageDescription": "Kurbada saves your exported ride overlays locally before sharing them to Instagram.",
-        "UIBackgroundModes": [
-          "location",
-          "location"
-        ]
+        "UIBackgroundModes": ["location", "location"]
       },
-      "bundleIdentifier": "com.sajedph.kurbada"
+      "bundleIdentifier": "com.samueluy.kurbada"
     },
     "android": {
       "package": "com.sajedph.kurbada",
@@ -75,21 +72,14 @@
       [
         "react-native-share",
         {
-          "ios": [
-            "instagram"
-          ],
-          "android": [
-            "com.instagram.android"
-          ]
+          "ios": ["instagram"],
+          "android": ["com.instagram.android"]
         }
       ],
       "expo-sharing",
       "expo-secure-store",
       "expo-sqlite",
-      [
-        "@rnmapbox/maps",
-        {}
-      ],
+      ["@rnmapbox/maps", {}],
       "@react-native-community/datetimepicker",
       "expo-asset",
       "expo-build-properties"
