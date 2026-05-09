@@ -79,6 +79,13 @@
       "expo-sharing",
       "expo-secure-store",
       "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Kurbada uses your photos to create shareable ride cards.",
+          "cameraPermission": false
+        }
+      ],
       ["@rnmapbox/maps", {}],
       "@react-native-community/datetimepicker",
       "expo-asset",
