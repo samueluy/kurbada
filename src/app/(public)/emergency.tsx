@@ -2,10 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
-import { AppScrollScreen } from '@/components/ui/app-screen';
+import { AppScreen, AppScrollScreen } from '@/components/ui/app-screen';
 import { Button } from '@/components/ui/button';
 import { FloatingField } from '@/components/ui/floating-field';
 import { GlassCard } from '@/components/ui/glass-card';
@@ -65,73 +65,101 @@ export default function OnboardingEmergencyScreen() {
     }
   };
 
+  const content = (
+    <>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        {isOnboarding ? (
+          <Pressable onPress={() => { setOnboardingStep(3); router.replace(getOnboardingRoute(3) as any); }}>
+            <Ionicons name="arrow-back" size={20} color={palette.textSecondary} />
+          </Pressable>
+        ) : null}
+        <AppText variant="label" style={{ color: palette.textSecondary }}>Step 4 of {ONBOARDING_TOTAL_STEPS}</AppText>
+      </View>
+
+      <View style={{ alignItems: 'center', gap: 16 }}>
+        {isOnboarding ? (
+          <>
+            <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(198,69,55,0.1)', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="shield-checkmark-outline" size={40} color={palette.danger} />
+            </View>
+            <View style={{ alignItems: 'center', gap: 8 }}>
+              <AppText variant="screenTitle" style={{ fontSize: 30, textAlign: 'center' }}>Ride with peace of mind.</AppText>
+              <AppText variant="meta" style={{ color: palette.textSecondary, textAlign: 'center' }}>Generate your Emergency QR lockscreen.</AppText>
+            </View>
+          </>
+        ) : (
+          <>
+            <AppText variant="screenTitle" style={{ fontSize: 30 }}>Emergency Info</AppText>
+            <AppText variant="meta" style={{ color: palette.textSecondary }}>Store rider details and generate a QR wallpaper for your lock screen.</AppText>
+          </>
+        )}
+      </View>
+
+      <View style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: radius.lg, padding: 16, gap: 12 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+          <View style={{ flex: 1, gap: 6 }}>
+            <View style={{ alignSelf: 'flex-start', backgroundColor: 'rgba(198,69,55,0.16)', borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 }}>
+              <AppText variant="label" style={{ color: palette.danger, fontSize: 11 }}>CRASH SAFETY</AppText>
+            </View>
+            <AppText variant="bodyBold">Your QR is ready</AppText>
+            <AppText variant="meta" style={{ color: palette.textSecondary }}>Fill details so bystanders can help.</AppText>
+          </View>
+          <View style={{ width: 84, height: 84, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' }}>
+            {form.full_name || form.contact1_phone ? <QRCode value={qrValue} size={68} /> : <Ionicons name="qr-code-outline" size={36} color={palette.textTertiary} />}
+          </View>
+        </View>
+      </View>
+
+      <FloatingField label="Full Name" value={form.full_name} onChangeText={(value) => setForm({ ...form, full_name: value })} placeholder="Juan dela Cruz" />
+      <FloatingField label="Emergency Contact Name" value={form.contact1_name} onChangeText={(value) => setForm({ ...form, contact1_name: value })} placeholder="Mark dela Cruz" />
+
+      <View style={{ gap: 8 }}>
+        <AppText variant="label" style={{ color: palette.textSecondary, fontSize: 12 }}>Blood Type</AppText>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {bloodTypes.map((bloodType) => (
+            <Pressable key={bloodType} onPress={() => setForm({ ...form, blood_type: bloodType })} style={{ borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: form.blood_type === bloodType ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.04)' }}>
+              <AppText variant="button" style={{ color: form.blood_type === bloodType ? palette.text : palette.textSecondary, fontSize: 13 }}>{bloodType}</AppText>
+            </Pressable>
+          ))}
+          <Pressable onPress={() => setForm({ ...form, blood_type: 'O+' as EmergencyBloodType })} style={{ borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: 'rgba(255,255,255,0.04)' }}>
+            <AppText variant="button" style={{ color: palette.textTertiary, fontSize: 12 }}>I don&apos;t know</AppText>
+          </Pressable>
+        </View>
+      </View>
+
+      <FloatingField label="Emergency Contact Number" value={form.contact1_phone} onChangeText={(value) => setForm({ ...form, contact1_phone: value })} placeholder="+63917..." keyboardType="phone-pad" />
+
+      <AppText variant="meta" style={{ color: palette.textSecondary, textAlign: 'center', fontSize: 12 }}>This is stored privately and only encoded in your QR code.</AppText>
+    </>
+  );
+
+  if (isOnboarding) {
+    return (
+      <AppScreen style={{ padding: 0 }} showWordmark={false}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <GlassCard style={{ flex: 1, borderRadius: 0, padding: 22, gap: 18 }}>
+            <ScrollView
+              contentContainerStyle={{ gap: 18, paddingBottom: 24 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="always">
+              {content}
+            </ScrollView>
+            <View style={{ gap: 10 }}>
+              <Button title="Generate My Safety ID" onPress={() => handleContinue(false)} />
+              <Button title="Skip, I'll do this later" variant="ghost" onPress={() => handleContinue(true)} />
+            </View>
+          </GlassCard>
+        </KeyboardAvoidingView>
+      </AppScreen>
+    );
+  }
+
   return (
     <AppScrollScreen contentContainerStyle={{ flexGrow: 1 }}>
       <GlassCard style={{ gap: 18, padding: 22 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          {isOnboarding ? (
-            <Pressable onPress={() => { setOnboardingStep(3); router.replace(getOnboardingRoute(3) as any); }}>
-              <Ionicons name="arrow-back" size={20} color={palette.textSecondary} />
-            </Pressable>
-          ) : null}
-          <AppText variant="label" style={{ color: palette.textSecondary }}>Step 4 of {ONBOARDING_TOTAL_STEPS}</AppText>
-        </View>
-
-        <View style={{ alignItems: 'center', gap: 16 }}>
-          {isOnboarding ? (
-            <>
-              <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(198,69,55,0.1)', alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="shield-checkmark-outline" size={40} color={palette.danger} />
-              </View>
-              <View style={{ alignItems: 'center', gap: 8 }}>
-                <AppText variant="screenTitle" style={{ fontSize: 30, textAlign: 'center' }}>Ride with peace of mind.</AppText>
-                <AppText variant="meta" style={{ color: palette.textSecondary, textAlign: 'center' }}>Generate your Emergency QR lockscreen.</AppText>
-              </View>
-            </>
-          ) : (
-            <>
-              <AppText variant="screenTitle" style={{ fontSize: 30 }}>Emergency Info</AppText>
-              <AppText variant="meta" style={{ color: palette.textSecondary }}>Store rider details and generate a QR wallpaper for your lock screen.</AppText>
-            </>
-          )}
-        </View>
-
-        <View style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: radius.lg, padding: 16, gap: 12 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
-            <View style={{ flex: 1, gap: 6 }}>
-              <View style={{ alignSelf: 'flex-start', backgroundColor: 'rgba(198,69,55,0.16)', borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 }}>
-                <AppText variant="label" style={{ color: palette.danger, fontSize: 11 }}>CRASH SAFETY</AppText>
-              </View>
-              <AppText variant="bodyBold">Your QR is ready</AppText>
-              <AppText variant="meta" style={{ color: palette.textSecondary }}>Fill details so bystanders can help.</AppText>
-            </View>
-            <View style={{ width: 84, height: 84, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' }}>
-              {form.full_name || form.contact1_phone ? <QRCode value={qrValue} size={68} /> : <Ionicons name="qr-code-outline" size={36} color={palette.textTertiary} />}
-            </View>
-          </View>
-        </View>
-
-        <FloatingField label="Full Name" value={form.full_name} onChangeText={(value) => setForm({ ...form, full_name: value })} placeholder="Juan dela Cruz" />
-        <FloatingField label="Emergency Contact Name" value={form.contact1_name} onChangeText={(value) => setForm({ ...form, contact1_name: value })} placeholder="Mark dela Cruz" />
-
-        <View style={{ gap: 8 }}>
-          <AppText variant="label" style={{ color: palette.textSecondary, fontSize: 12 }}>Blood Type</AppText>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {bloodTypes.map((bloodType) => (
-              <Pressable key={bloodType} onPress={() => setForm({ ...form, blood_type: bloodType })} style={{ borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: form.blood_type === bloodType ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.04)' }}>
-                <AppText variant="button" style={{ color: form.blood_type === bloodType ? palette.text : palette.textSecondary, fontSize: 13 }}>{bloodType}</AppText>
-              </Pressable>
-            ))}
-            <Pressable onPress={() => setForm({ ...form, blood_type: 'O+' as EmergencyBloodType })} style={{ borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: 'rgba(255,255,255,0.04)' }}>
-              <AppText variant="button" style={{ color: palette.textTertiary, fontSize: 12 }}>I don&apos;t know</AppText>
-            </Pressable>
-          </View>
-        </View>
-
-        <FloatingField label="Emergency Contact Number" value={form.contact1_phone} onChangeText={(value) => setForm({ ...form, contact1_phone: value })} placeholder="+63917..." keyboardType="phone-pad" />
-
-        <AppText variant="meta" style={{ color: palette.textSecondary, textAlign: 'center', fontSize: 12 }}>This is stored privately and only encoded in your QR code.</AppText>
-
+        {content}
         <Button title="Generate My Safety ID" onPress={() => handleContinue(false)} />
         <Button title="Skip, I'll do this later" variant="ghost" onPress={() => handleContinue(true)} />
       </GlassCard>

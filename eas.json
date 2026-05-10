@@ -12,6 +12,15 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "cache": {
+        "disabled": false,
+        "key": "v1",
+        "paths": ["node_modules", ".expo", "~/.npm"]
+      },
+      "env": {
+        "EXPO_USE_FAST_RESOLVER": "1",
+        "EAS_GRADLE_CACHE": "1"
       }
     },
     "production": {

@@ -1,11 +1,8 @@
-import Constants from 'expo-constants';
-import Share from 'react-native-share';
 import * as ImagePicker from 'expo-image-picker';
-import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { Alert, Platform, ScrollView, View } from 'react-native';
+import { Alert, ScrollView, View } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 
 import { RouteMapPreview } from '@/components/ride/route-map-preview';
@@ -64,11 +61,6 @@ export default function RideSummaryScreen() {
         return;
       }
 
-      const permission = await MediaLibrary.requestPermissionsAsync();
-      if (!permission.granted) {
-        throw new Error('Media library permission is required to export the story.');
-      }
-
       setTimeout(async () => {
         try {
           const uri = await storyShotRef.current?.capture?.();
@@ -76,32 +68,11 @@ export default function RideSummaryScreen() {
             throw new Error('Could not capture the story card.');
           }
 
-          try {
-            await Share.shareSingle({
-              social: Share.Social.INSTAGRAM_STORIES as any,
-              backgroundImage: uri,
-              appId:
-                Constants.expoConfig?.android?.package
-                ?? Constants.expoConfig?.ios?.bundleIdentifier
-                ?? 'com.sajedph.kurbada',
-              forceDialog: Platform.OS === 'android',
-              useInternalStorage: Platform.OS === 'android',
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(uri, {
+              mimeType: 'image/png',
+              dialogTitle: 'Share ride to Instagram',
             });
-          } catch {
-            try {
-              await Share.shareSingle({
-                social: Share.Social.INSTAGRAM as any,
-                url: uri,
-                type: 'image/png',
-                forceDialog: Platform.OS === 'android',
-                useInternalStorage: Platform.OS === 'android',
-              });
-            } catch {
-              await MediaLibrary.saveToLibraryAsync(uri);
-              if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(uri);
-              }
-            }
           }
         } catch (error) {
           Alert.alert('Export failed', error instanceof Error ? error.message : 'Please try again.');

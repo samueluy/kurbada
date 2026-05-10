@@ -50,7 +50,7 @@ export default function SignInScreen() {
 
   return (
     <AppScrollScreen contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
-      <GlassCard style={{ gap: 18, padding: 22 }}>
+      <GlassCard style={{ gap: 18, padding: 22, overflow: 'visible' }}>
         <View style={{ gap: 6 }}>
           <AppText variant="brand" style={{ fontSize: 34, letterSpacing: 5 }}>
             KURBADA

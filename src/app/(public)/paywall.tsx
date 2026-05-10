@@ -1,21 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
-import { AppScrollScreen } from '@/components/ui/app-screen';
+import { AppScreen, AppScrollScreen } from '@/components/ui/app-screen';
 import { Button } from '@/components/ui/button';
 import { GlassCard } from '@/components/ui/glass-card';
-import { palette, radius, typography } from '@/constants/theme';
+import { palette, radius } from '@/constants/theme';
 import { env } from '@/lib/env';
-import { getOnboardingRoute, ONBOARDING_TOTAL_STEPS } from '@/lib/onboarding-flow';
 import { normalizeReferralCode, validateReferralCode } from '@/lib/referrals';
 import { getCurrentOffering, getCurrentOfferingPackage, purchasePremium, restorePremiumPurchases, type RevenueCatPackage } from '@/services/revenuecat';
 import { useAuth } from '@/hooks/use-auth';
 import { useReferralMutations } from '@/hooks/use-kurbada-data';
 import { useUserProfile } from '@/hooks/use-user-access';
 import { useAppStore } from '@/store/app-store';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const features = [
   ['Lean Angle Tracker', 'Weekend runs with live motorcycle telemetry.'],
@@ -156,16 +156,15 @@ export default function PaywallScreen() {
     }
   };
 
-  return (
-    <AppScrollScreen contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
-      <View style={{ gap: 18 }}>
+  const body = (
+    <View style={{ gap: 18 }}>
         {isOnboardingPaywall ? (
           <>
             <AppText variant="label" style={{ color: palette.textSecondary, textAlign: 'center' }}>
-              Step 7 of {ONBOARDING_TOTAL_STEPS}
+              Step 7 of 7
             </AppText>
             <Pressable
-              onPress={() => { setOnboardingStep(6); router.replace(getOnboardingRoute(6) as any); }}
+              onPress={() => { setOnboardingStep(6); router.replace('/(public)/permissions' as any); }}
               style={{ alignSelf: 'center', padding: 4 }}>
               <Ionicons name="arrow-back" size={20} color={palette.textSecondary} />
             </Pressable>
@@ -224,7 +223,7 @@ export default function PaywallScreen() {
                     borderColor: referralError ? palette.danger : palette.border,
                     backgroundColor: 'rgba(255,255,255,0.06)',
                     color: palette.text,
-                    fontFamily: typography.body,
+                    fontFamily: 'DMSans_400Regular',
                     fontSize: 15,
                   }}
                 />
@@ -314,6 +313,34 @@ export default function PaywallScreen() {
           By continuing you agree to the subscription and trial terms.
         </AppText>
       </View>
+  );
+
+  if (isOnboardingPaywall) {
+    return (
+      <AppScreen style={{ padding: 0 }} showWordmark={false}>
+        <LinearGradient colors={['#060606', '#0A0A0A', '#0D0D0D']} style={{ position: 'absolute', inset: 0 }} />
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <GlassCard style={{ flex: 1, borderRadius: 0, padding: 22, backgroundColor: 'transparent', borderWidth: 0 }}>
+            <ScrollView
+              contentContainerStyle={{ paddingBottom: 40 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="always">
+              {body}
+            </ScrollView>
+          </GlassCard>
+        </KeyboardAvoidingView>
+      </AppScreen>
+    );
+  }
+
+  return (
+    <AppScrollScreen contentContainerStyle={{ paddingBottom: 40 }}>
+      <LinearGradient colors={['#060606', '#0A0A0A', '#0D0D0D']} style={{ position: 'absolute', inset: 0 }} />
+      <GlassCard style={{ gap: 18, padding: 22 }}>
+        {body}
+      </GlassCard>
     </AppScrollScreen>
   );
 }

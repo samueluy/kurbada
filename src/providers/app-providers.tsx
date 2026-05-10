@@ -24,6 +24,7 @@ import { env } from '@/lib/env';
 import { getMapboxModule } from '@/lib/mapbox';
 import { queryClient } from '@/lib/query-client';
 import { supabase } from '@/lib/supabase';
+import { OnboardingSyncBridge } from '@/providers/onboarding-sync-bridge';
 import { configureRevenueCat, subscribeToCustomerInfo, syncRevenueCatIdentity } from '@/services/revenuecat';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -119,6 +120,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         <QueryClientProvider client={queryClient}>
           <BottomSheetModalProvider>
             <StatusBar style="light" translucent backgroundColor="transparent" />
+            <OnboardingSyncBridge />
             {children}
           </BottomSheetModalProvider>
         </QueryClientProvider>

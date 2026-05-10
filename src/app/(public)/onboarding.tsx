@@ -7,11 +7,11 @@ import { AppText } from '@/components/ui/app-text';
 import { AppScreen } from '@/components/ui/app-screen';
 import { Button } from '@/components/ui/button';
 import { palette, radius } from '@/constants/theme';
-import { getOnboardingRoute } from '@/lib/onboarding-flow';
 import { useAppStore } from '@/store/app-store';
 
 export default function OnboardingScreen() {
   const setOnboardingStep = useAppStore((state) => state.setOnboardingStep);
+  const completeOnboarding = useAppStore((state) => state.completeOnboarding);
 
   return (
     <AppScreen style={{ justifyContent: 'center' }}>
@@ -56,7 +56,7 @@ export default function OnboardingScreen() {
             title="Set Up My Garage"
             onPress={() => {
               setOnboardingStep(2);
-              router.push(getOnboardingRoute(2) as any);
+              router.replace('/(public)/bike-setup?flow=onboarding');
             }}
             style={{
               backgroundColor: palette.danger,
@@ -72,6 +72,7 @@ export default function OnboardingScreen() {
             title="Already have an account?"
             variant="ghost"
             onPress={() => {
+              completeOnboarding();
               router.replace('/(public)/auth/sign-in');
             }}
           />

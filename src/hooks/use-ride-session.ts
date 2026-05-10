@@ -15,8 +15,8 @@ import { clearStoredCoords, getStoredCoords, LOCATION_TASK_NAME } from '@/tasks/
 import { useAppStore } from '@/store/app-store';
 import type { LeanCalibration, RideMode, RidePoint } from '@/types/domain';
 
-Accelerometer.setUpdateInterval(16);
-Gyroscope.setUpdateInterval(16);
+Accelerometer.setUpdateInterval(100);
+Gyroscope.setUpdateInterval(100);
 
 export function useRideSession() {
   const { session } = useAuth();
@@ -26,10 +26,8 @@ export function useRideSession() {
   const latestAccelRef = useRef({ x: 0, y: 0, z: 1 });
   const filteredAccelRef = useRef({ x: 0, y: 0, z: 1 });
   const rollRef = useRef(0);
-  const lastGyroTimestampRef = useRef<number | null>(null);
   const locationSubscriptionRef = useRef<Location.LocationSubscription | null>(null);
   const accelSubscriptionRef = useRef<{ remove: () => void } | null>(null);
-  const gyroSubscriptionRef = useRef<{ remove: () => void } | null>(null);
   const crashThresholdSinceRef = useRef<number | null>(null);
   const calibrationRef = useRef<LeanCalibration | undefined>(store.calibration);
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -74,7 +72,10 @@ export function useRideSession() {
         z: 0.8 * filteredAccelRef.current.z + 0.2 * reading.z,
       };
 
-      const accelRoll = (Math.atan2(filteredAccelRef.current.x, filteredAccelRef.current.z) * 180) / Math.PI;
+      const fx = filteredAccelRef.current.x;
+      const fy = filteredAccelRef.current.y;
+      const fz = filteredAccelRef.current.z;
+      const accelRoll = (Math.atan2(fx, Math.sqrt(fy * fy + fz * fz)) * 180) / Math.PI;
       rollRef.current = 0.92 * rollRef.current + 0.08 * accelRoll;
 
       const gForce = Math.sqrt(reading.x ** 2 + reading.y ** 2 + reading.z ** 2);
@@ -92,19 +93,6 @@ export function useRideSession() {
         maybeTriggerCrashAlert(gForce);
       }
     });
-
-    if (store.mode === 'weekend') {
-      gyroSubscriptionRef.current = Gyroscope.addListener((reading) => {
-        const now = Date.now();
-        if (lastGyroTimestampRef.current) {
-          const dt = (now - lastGyroTimestampRef.current) / 1000;
-          rollRef.current =
-            0.92 * (rollRef.current + (reading.y * dt * 180) / Math.PI) +
-            0.08 * ((Math.atan2(filteredAccelRef.current.x, filteredAccelRef.current.z) * 180) / Math.PI);
-        }
-        lastGyroTimestampRef.current = now;
-      });
-    }
 
     startLocationWatch().catch(() => undefined);
 
@@ -125,7 +113,6 @@ export function useRideSession() {
     store.resetRide();
     foregroundPointsRef.current = [];
     rollRef.current = 0;
-    lastGyroTimestampRef.current = null;
     calibrationRef.current = undefined;
     crashThresholdSinceRef.current = null;
     store.setMode(mode);
@@ -203,7 +190,6 @@ export function useRideSession() {
       leanAngleDeg: 0,
       maxLeanAngleDeg: 0,
     });
-    lastGyroTimestampRef.current = null;
     rollRef.current = 0;
     store.setState('calibrating');
   };
@@ -366,10 +352,8 @@ export function useRideSession() {
     }
 
     accelSubscriptionRef.current?.remove();
-    gyroSubscriptionRef.current?.remove();
     locationSubscriptionRef.current?.remove();
     accelSubscriptionRef.current = null;
-    gyroSubscriptionRef.current = null;
     locationSubscriptionRef.current = null;
   }
 
