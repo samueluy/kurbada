@@ -19,12 +19,14 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/app-text';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { palette } from '@/constants/theme';
 import { env } from '@/lib/env';
 import { getMapboxModule } from '@/lib/mapbox';
 import { queryClient } from '@/lib/query-client';
 import { supabase } from '@/lib/supabase';
 import { OnboardingSyncBridge } from '@/providers/onboarding-sync-bridge';
+import { DailySummaryBridge } from '@/providers/daily-summary-bridge';
 import { configureRevenueCat, subscribeToCustomerInfo, syncRevenueCatIdentity } from '@/services/revenuecat';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -120,8 +122,11 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         <QueryClientProvider client={queryClient}>
           <BottomSheetModalProvider>
             <StatusBar style="light" translucent backgroundColor="transparent" />
-            <OnboardingSyncBridge />
-            {children}
+            <ErrorBoundary>
+              <OnboardingSyncBridge />
+              <DailySummaryBridge />
+              {children}
+            </ErrorBoundary>
           </BottomSheetModalProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

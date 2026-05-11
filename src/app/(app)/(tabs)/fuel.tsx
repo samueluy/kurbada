@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { FloatingField } from '@/components/ui/floating-field';
 import { GlassCard } from '@/components/ui/glass-card';
 import { SectionHeader } from '@/components/ui/section-header';
+import { TabTransition } from '@/components/navigation/tab-transition';
 import { FuelEntryCard } from '@/features/fuel/components/fuel-entry-card';
 import { FuelSummaryCard } from '@/features/fuel/components/fuel-summary-card';
 import { palette, radius } from '@/constants/theme';
@@ -40,6 +41,20 @@ export default function FuelTabScreen() {
     };
   }, [fuelLogs.data]);
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const refetches = [
+        (fuelLogs as { refetch?: () => Promise<unknown> }).refetch,
+        (bikes as { refetch?: () => Promise<unknown> }).refetch,
+      ].filter(Boolean) as (() => Promise<unknown>)[];
+      await Promise.all(refetches.map((fn) => fn()));
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [fuelLogs, bikes]);
+
   useEffect(() => {
     Animated.parallel([
       Animated.timing(formProgress, {
@@ -61,7 +76,8 @@ export default function FuelTabScreen() {
   });
 
   return (
-    <AppScrollScreen>
+    <TabTransition>
+      <AppScrollScreen refreshing={isRefreshing} onRefresh={handleRefresh}>
       <View style={{ gap: 8 }}>
         <AppText variant="eyebrow">Fuel Ledger</AppText>
         <AppText variant="screenTitle">Ownership has a cost. Make it look good.</AppText>
@@ -160,5 +176,6 @@ export default function FuelTabScreen() {
         </GlassCard>
       )}
     </AppScrollScreen>
+    </TabTransition>
   );
 }

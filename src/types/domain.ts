@@ -85,8 +85,15 @@ export type RideListing = {
   pace: RidePace;
   lobby_link: string;
   is_reported: boolean;
+  report_count?: number;
+  is_hidden?: boolean;
   display_name: string;
   created_at: string;
+  city?: string | null;
+  photo_urls?: string[] | null;
+  is_verified_host?: boolean | null;
+  rsvp_going_count?: number;
+  rsvp_maybe_count?: number;
 };
 
 export type RideRecord = {
@@ -101,10 +108,41 @@ export type RideRecord = {
   avg_speed_kmh: number;
   max_lean_angle_deg?: number | null;
   fuel_used_liters?: number | null;
+  elevation_gain_m?: number | null;
+  mood?: RideMood | null;
   route_geojson: GeoJSON.Feature<GeoJSON.LineString>;
   route_point_count_raw: number;
   route_point_count_simplified: number;
   route_bounds: RouteBounds;
+};
+
+export type RideMood = 'send_it' | 'epic' | 'chill' | 'brutal' | 'meh';
+
+export type GearCategory =
+  | 'helmet'
+  | 'jacket'
+  | 'gloves'
+  | 'boots'
+  | 'pants'
+  | 'tire_front'
+  | 'tire_rear'
+  | 'chain'
+  | 'battery'
+  | 'other';
+
+export type GearItem = {
+  id: string;
+  user_id: string;
+  bike_id?: string | null;
+  name: string;
+  category: GearCategory;
+  install_date: string; // ISO date (YYYY-MM-DD)
+  install_odometer_km?: number | null;
+  expected_lifetime_months?: number | null;
+  expected_lifetime_km?: number | null;
+  notes?: string | null;
+  archived?: boolean;
+  created_at?: string;
 };
 
 export type EmergencyBloodType = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
@@ -132,6 +170,33 @@ export type Profile = {
   subscription_expires_at?: string | null;
   access_override: AccessOverride;
   referral_code: string;
+  is_verified_host?: boolean | null;
+  home_city?: string | null;
+};
+
+export type PlatformTag = 'grab' | 'lalamove' | 'foodpanda' | 'moveit' | 'joyride' | 'other';
+
+export type RideEarnings = {
+  id: string;
+  user_id: string;
+  ride_id?: string | null;
+  bike_id?: string | null;
+  earned_at: string; // ISO date
+  amount: number;
+  platform: PlatformTag;
+  notes?: string | null;
+  created_at?: string;
+};
+
+export type RSVPStatus = 'going' | 'maybe';
+
+export type RideRSVP = {
+  id: string;
+  listing_id: string;
+  user_id: string;
+  display_name: string;
+  status: RSVPStatus;
+  created_at?: string;
 };
 
 export type ReferralRecord = {

@@ -40,11 +40,11 @@ export function ListRow({
         }}>
         <Ionicons name={icon} size={18} color={palette.text} />
       </View>
-      <View style={{ flex: 1 }}>
-        <AppText variant="h3">{title}</AppText>
-        {subtitle ? <AppText variant="meta" numberOfLines={1}>{subtitle}</AppText> : null}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <AppText variant="h3" numberOfLines={1} ellipsizeMode="tail">{title}</AppText>
+        {subtitle ? <AppText variant="meta" numberOfLines={1} ellipsizeMode="tail">{subtitle}</AppText> : null}
       </View>
-      {value ? <AppText variant="meta" style={{ color: palette.text }}>{value}</AppText> : null}
+      {value ? <AppText variant="meta" numberOfLines={1} style={{ color: palette.text, flexShrink: 0 }}>{value}</AppText> : null}
       <Ionicons name="chevron-forward" size={16} color={palette.textTertiary} />
     </Pressable>
   );

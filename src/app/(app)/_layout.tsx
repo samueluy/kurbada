@@ -77,16 +77,26 @@ export default function AppLayout() {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: palette.background },
+        gestureEnabled: true,
+        fullScreenGestureEnabled: true,
+        gestureDirection: 'horizontal',
       }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="ride/active" options={{ presentation: 'modal', gestureEnabled: true }} />
       <Stack.Screen name="ride/summary" options={{ presentation: 'modal' }} />
       <Stack.Screen name="garage/[bikeId]" />
       <Stack.Screen name="board/create" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="board/community-guidelines" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="board/blocked-users" />
+      <Stack.Screen name="board/leaderboard" />
       <Stack.Screen name="fuel/reports" />
       <Stack.Screen name="profile/billing" />
       <Stack.Screen name="profile/emergency" />
       <Stack.Screen name="profile/notifications" />
+      <Stack.Screen name="profile/work-mode" />
+      <Stack.Screen name="profile/gear/index" />
+      <Stack.Screen name="profile/gear/add" />
+      <Stack.Screen name="profile/delete-account" />
     </Stack>
   );
 }

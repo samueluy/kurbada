@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
 import { Accelerometer } from 'expo-sensors';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
@@ -27,6 +28,7 @@ export default function PermissionsScreen() {
 
   const handleEnableTelemetry = async () => {
     await Location.requestForegroundPermissionsAsync();
+    await Notifications.requestPermissionsAsync();
     Accelerometer.setUpdateInterval(100);
     const sub = Accelerometer.addListener(() => undefined);
     setTimeout(() => sub.remove(), 1000);
@@ -88,6 +90,10 @@ export default function PermissionsScreen() {
             <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name="phone-portrait-outline" size={16} color={palette.textSecondary} />
               <AppText variant="meta" style={{ color: palette.textTertiary }}>Motion sensors for lean angle</AppText>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="notifications-outline" size={16} color={palette.textSecondary} />
+              <AppText variant="meta" style={{ color: palette.textTertiary }}>Notifications for maintenance + crash alerts</AppText>
             </View>
             <Button title="Enable Telemetry" onPress={handleEnableTelemetry} />
           </View>

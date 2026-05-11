@@ -24,15 +24,15 @@ export function HUDStatCard({
         paddingVertical: 10,
         gap: 4,
       }}>
-      <AppText variant="label" style={{ color: 'rgba(255,255,255,0.3)', fontSize: 8, letterSpacing: 1.2 }}>
+      <AppText variant="label" numberOfLines={1} ellipsizeMode="tail" style={{ color: 'rgba(255,255,255,0.3)', fontSize: 8, letterSpacing: 1.2 }}>
         {label}
       </AppText>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 4 }}>
-        <AppText variant="cardMetric" style={{ fontSize: 24, lineHeight: 26 }}>
+        <AppText variant="cardMetric" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ fontSize: 24, lineHeight: 26, flexShrink: 1, minWidth: 0 }}>
           {value}
         </AppText>
         {unit ? (
-          <AppText variant="meta" style={{ color: 'rgba(255,255,255,0.25)', fontSize: 9 }}>
+          <AppText variant="meta" numberOfLines={1} style={{ color: 'rgba(255,255,255,0.25)', fontSize: 9, flexShrink: 0 }}>
             {unit}
           </AppText>
         ) : null}

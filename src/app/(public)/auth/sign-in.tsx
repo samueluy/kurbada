@@ -1,4 +1,4 @@
-import { Link, Redirect } from 'expo-router';
+import { Link, Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, TextInput, View } from 'react-native';
 
@@ -82,6 +82,11 @@ export default function SignInScreen() {
               setBusy(false);
             }
           }}
+        />
+        <Button
+          title="Forgot password?"
+          variant="ghost"
+          onPress={() => router.push('/(public)/auth/forgot-password' as any)}
         />
         <Link href="/(public)/auth/sign-up" asChild>
           <Button title="Create Account" variant="secondary" />

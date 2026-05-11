@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Modal, Pressable, Switch, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, Switch, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScrollScreen } from '@/components/ui/app-screen';
@@ -17,6 +17,10 @@ export default function NotificationsScreen() {
   const setMaintenanceRemindersEnabled = useAppStore((state) => state.setMaintenanceRemindersEnabled);
   const thresholds = useAppStore((state) => state.maintenanceReminderThresholds);
   const setThresholds = useAppStore((state) => state.setMaintenanceReminderThresholds);
+  const dailySummaryEnabled = useAppStore((state) => state.dailySummaryEnabled);
+  const setDailySummaryEnabled = useAppStore((state) => state.setDailySummaryEnabled);
+  const dailySummaryHour = useAppStore((state) => state.dailySummaryHour);
+  const setDailySummaryHour = useAppStore((state) => state.setDailySummaryHour);
   const [showAddThreshold, setShowAddThreshold] = useState(false);
   const [newThreshold, setNewThreshold] = useState('');
 
@@ -53,6 +57,56 @@ export default function NotificationsScreen() {
             thumbColor={crashAlertsEnabled ? '#FFFFFF' : palette.textTertiary}
           />
         </View>
+      </GlassCard>
+
+      <SectionHeader title="Daily Summary" />
+      <GlassCard style={{ padding: 18, gap: 12 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <AppText variant="bodyBold">Daily ride summary</AppText>
+            <AppText variant="meta" style={{ color: palette.textSecondary }}>
+              A gentle end-of-day nudge with today&apos;s distance, fuel, and net earnings.
+            </AppText>
+          </View>
+          <Switch
+            value={dailySummaryEnabled}
+            onValueChange={setDailySummaryEnabled}
+            trackColor={{ false: palette.surfaceMuted, true: palette.lime }}
+            thumbColor={dailySummaryEnabled ? '#FFFFFF' : palette.textTertiary}
+          />
+        </View>
+
+        {dailySummaryEnabled ? (
+          <View style={{ gap: 8 }}>
+            <AppText variant="label" style={{ color: palette.textTertiary, fontSize: 11, marginTop: 4 }}>
+              DELIVER AT
+            </AppText>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+              {[17, 18, 19, 20, 21, 22].map((h) => {
+                const active = dailySummaryHour === h;
+                return (
+                  <Pressable
+                    key={h}
+                    onPress={() => setDailySummaryHour(h)}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      borderRadius: 999,
+                      backgroundColor: active ? palette.text : 'rgba(255,255,255,0.06)',
+                      borderWidth: 0.5,
+                      borderColor: active ? palette.text : palette.border,
+                    }}>
+                    <AppText
+                      variant="button"
+                      style={{ fontSize: 12, color: active ? palette.background : palette.textSecondary }}>
+                      {h === 12 ? '12 PM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        ) : null}
       </GlassCard>
 
       <SectionHeader title="Maintenance" />

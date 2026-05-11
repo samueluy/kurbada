@@ -1,4 +1,5 @@
 import { ChevronRight, Droplets } from 'lucide-react-native';
+import { memo } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { GlassCard } from '@/components/ui/glass-card';
@@ -7,7 +8,7 @@ import { palette, radius } from '@/constants/theme';
 import { formatCurrencyPhp } from '@/lib/format';
 import type { FuelLog } from '@/types/domain';
 
-export function FuelEntryCard({ entry, onPress }: { entry: FuelLog; onPress?: () => void }) {
+function FuelEntryCardImpl({ entry, onPress }: { entry: FuelLog; onPress?: () => void }) {
   const octaneStyle =
     entry.octane_rating >= 100
       ? { backgroundColor: 'rgba(192,57,43,0.15)', color: palette.danger }
@@ -24,17 +25,17 @@ export function FuelEntryCard({ entry, onPress }: { entry: FuelLog; onPress?: ()
           <View style={{ width: 36, height: 36, borderRadius: radius.md, backgroundColor: palette.surfaceMuted, alignItems: 'center', justifyContent: 'center' }}>
             <Droplets size={16} color={palette.text} />
           </View>
-          <View style={{ flex: 1, gap: 4 }}>
+          <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <AppText variant="h3">{entry.liters.toFixed(1)}L · Octane {entry.octane_rating}</AppText>
-              <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.xs, backgroundColor: octaneStyle.backgroundColor }}>
+              <AppText variant="h3" numberOfLines={1} ellipsizeMode="tail" style={{ flexShrink: 1, minWidth: 0 }}>{entry.liters.toFixed(1)}L · Octane {entry.octane_rating}</AppText>
+              <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.xs, backgroundColor: octaneStyle.backgroundColor, flexShrink: 0 }}>
                 <AppText variant="label" style={{ color: octaneStyle.color, letterSpacing: 0.8 }}>{entry.octane_rating}</AppText>
               </View>
             </View>
-            <AppText variant="meta">{entry.logged_at} · {entry.station_name ?? 'Fuel stop'}</AppText>
+            <AppText variant="meta" numberOfLines={1} ellipsizeMode="tail">{entry.logged_at} · {entry.station_name ?? 'Fuel stop'}</AppText>
           </View>
-          <View style={{ alignItems: 'flex-end', gap: 4 }}>
-            <AppText variant="mono">{formatCurrencyPhp(entry.total_cost)}</AppText>
+          <View style={{ alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+            <AppText variant="mono" numberOfLines={1}>{formatCurrencyPhp(entry.total_cost)}</AppText>
             <ChevronRight size={14} color={palette.textTertiary} />
           </View>
         </View>
@@ -42,3 +43,5 @@ export function FuelEntryCard({ entry, onPress }: { entry: FuelLog; onPress?: ()
     </Pressable>
   );
 }
+
+export const FuelEntryCard = memo(FuelEntryCardImpl);

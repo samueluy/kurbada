@@ -38,7 +38,8 @@ export default function CreateRideScreen() {
   const [meetupCoords, setMeetupCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [showMapPin, setShowMapPin] = useState(false);
   const [destination, setDestination] = useState('');
-  const [rideDate, setRideDate] = useState(new Date(Date.now() + 86_400_000));
+  const [city, setCity] = useState('');
+  const [rideDate, setRideDate] = useState(() => new Date(Date.now() + 86_400_000));
   const [pace, setPace] = useState<RidePace>('moderate');
   const [lobbyLink, setLobbyLink] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -64,6 +65,7 @@ export default function CreateRideScreen() {
       pace,
       lobby_link: lobbyLink.trim(),
       display_name: session?.user.user_metadata.display_name ?? 'Kurbada Rider',
+      city: city.trim() || null,
     });
 
     router.back();
@@ -117,6 +119,7 @@ export default function CreateRideScreen() {
         )}
 
         <FloatingField label="Destination / Route" value={destination} onChangeText={setDestination} placeholder="Marilaque to Infanta" />
+        <FloatingField label="City (optional)" value={city} onChangeText={setCity} placeholder="Metro Manila" autoCapitalize="words" />
 
         <View style={{ gap: 6 }}>
           <AppText variant="label" style={{ color: palette.textSecondary, fontSize: 12 }}>Date & Time</AppText>

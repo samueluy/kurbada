@@ -40,11 +40,9 @@ export const ShareCard = forwardRef<View, { ride: RideRecord; photoUri?: string 
               <AppText variant="largeMetric" style={{ color: '#fff', fontSize: 42 }}>
                 TOP {ride.max_speed_kmh.toFixed(0)} KM/H
               </AppText>
-              {ride.max_lean_angle_deg ? (
-                <AppText variant="largeMetric" style={{ color: '#fff', fontSize: 42 }}>
-                  MAX {ride.max_lean_angle_deg.toFixed(0)}°
-                </AppText>
-              ) : null}
+              <AppText variant="largeMetric" style={{ color: '#fff', fontSize: 42 }}>
+                AVG {ride.avg_speed_kmh.toFixed(0)} KM/H
+              </AppText>
             </View>
           </View>
         </LinearGradient>

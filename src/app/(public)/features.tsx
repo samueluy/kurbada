@@ -1,79 +1,49 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScreen } from '@/components/ui/app-screen';
 import { Button } from '@/components/ui/button';
 import { GlassCard } from '@/components/ui/glass-card';
-import { palette } from '@/constants/theme';
+import { palette, radius } from '@/constants/theme';
 import { getOnboardingRoute, ONBOARDING_TOTAL_STEPS } from '@/lib/onboarding-flow';
-import { useAppStore } from '@/store/app-store';
+import { useAppStore, type RidingPersona } from '@/store/app-store';
 
-const weekendFeatures = [
-  { icon: 'speedometer-outline', title: 'Tilt Sensor', body: 'Track your lean angle in real-time while attacking the twisties.' },
-  { icon: 'map-outline', title: 'Route Trace', body: 'See your route on the map — every curve, elevation, and checkpoint.' },
-  { icon: 'camera-outline', title: 'IG Story Card', body: 'Turn your best ride into a shareable card. Post on social media.' },
-  { icon: 'people-outline', title: 'Ride Lobby', body: 'Plan group rides and join lobbies before the engines fire up.' },
-  { icon: 'water-outline', title: 'Fuel Logging', body: 'Log every full tank and track your real-world fuel consumption.' },
-  { icon: 'cash-outline', title: 'Cost Per Run', body: 'See estimated pesos per ride so you know the real cost of each trip.' },
+type PersonaOption = {
+  id: RidingPersona;
+  icon: string;
+  title: string;
+  body: string;
+};
+
+const options: PersonaOption[] = [
+  { id: 'leisure', icon: 'compass-outline', title: 'Weekend / Leisure', body: 'Twisties, long rides, group runs on your day off.' },
+  { id: 'commute', icon: 'bicycle-outline', title: 'Daily Commute', body: 'To work and back. Fuel and maintenance matter most.' },
+  { id: 'work', icon: 'briefcase-outline', title: 'Work / Delivery', body: 'Grab, Lalamove, FoodPanda, courier. Income tracking.' },
+  { id: 'mix', icon: 'shuffle-outline', title: 'A Mix of Everything', body: 'Daily grind + weekend rides. Use the full app.' },
 ];
-
-const dailyFeatures = [
-  { icon: 'water-outline', title: 'Fuel Logging', body: 'Track your fuel spending. Log fill-ups and see spending trends over time.' },
-  { icon: 'cash-outline', title: 'Cost Per Run', body: 'See estimated fuel cost per ride and daily commute instantly.' },
-  { icon: 'build-outline', title: 'Maintenance Alerts', body: 'Oil changes, chain, brakes — reminders keep your bike road-ready.' },
-  { icon: 'shield-checkmark-outline', title: 'Emergency QR', body: 'Save emergency contacts and blood type. Generate a QR for your lock screen.' },
-  { icon: 'camera-outline', title: 'IG Story Card', body: 'Overlay your ride stats on a gallery photo and share to social media.' },
-  { icon: 'bar-chart-outline', title: 'Ride History', body: 'Every ride recorded — route, speed, lean angle. Revisit your best runs.' },
-];
-
-
-function FeatureRow({ icon, title, body, index }: { icon: string; title: string; body: string; index: number }) {
-  return (
-    <Animated.View entering={FadeInDown.delay(index * 400).duration(400)} style={{ flexDirection: 'row', gap: 14, alignItems: 'flex-start' }}>
-      <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
-        <Ionicons name={icon as any} size={22} color={palette.lime} />
-      </View>
-      <View style={{ flex: 1, gap: 4 }}>
-        <AppText variant="bodyBold">{title}</AppText>
-        <AppText variant="meta" style={{ color: palette.textSecondary }}>{body}</AppText>
-      </View>
-    </Animated.View>
-  );
-}
 
 export default function OnboardingFeaturesScreen() {
   const setOnboardingStep = useAppStore((state) => state.setOnboardingStep);
-  const onboardingData = useAppStore((state) => state.onboardingData);
-  const isWeekend = onboardingData.ridingStyle === 'weekend';
-  const features = isWeekend ? weekendFeatures : dailyFeatures;
-  const [revealCount, setRevealCount] = useState(0);
-  const [showButton, setShowButton] = useState(false);
+  const setRidingPersona = useAppStore((state) => state.setRidingPersona);
+  const setWorkMode = useAppStore((state) => state.setWorkMode);
+  const ridingPersona = useAppStore((state) => state.ridingPersona);
+  const [selected, setSelected] = useState<RidingPersona>(ridingPersona ?? 'leisure');
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setRevealCount((prev) => {
-        const next = prev + 1;
-        if (next >= features.length) {
-          clearInterval(interval);
-          setTimeout(() => setShowButton(true), 300);
-        }
-        return next;
-      });
-    }, 500);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const handleContinue = () => {
+    setRidingPersona(selected);
+    // Auto-enable work mode if the rider picks work persona
+    if (selected === 'work') setWorkMode(true);
+    setOnboardingStep(6);
+    router.push(getOnboardingRoute(6) as any);
+  };
 
   return (
     <AppScreen style={{ padding: 0 }} showWordmark={false}>
-      <GlassCard style={{ flex: 1, borderRadius: 0, paddingVertical: 28, paddingHorizontal: 24, gap: 20 }}>
-        <ScrollView
-          contentContainerStyle={{ gap: 20, paddingBottom: 24 }}
-          showsVerticalScrollIndicator={false}>
+      <GlassCard style={{ flex: 1, borderRadius: 0, paddingVertical: 28, paddingHorizontal: 24, gap: 18 }}>
+        <ScrollView contentContainerStyle={{ gap: 20, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <Pressable onPress={() => { setOnboardingStep(4); router.replace(getOnboardingRoute(4) as any); }}>
               <Ionicons name="arrow-back" size={20} color={palette.textSecondary} />
@@ -83,27 +53,54 @@ export default function OnboardingFeaturesScreen() {
 
           <View style={{ alignItems: 'center', gap: 10 }}>
             <AppText variant="screenTitle" style={{ textAlign: 'center', fontSize: 28 }}>
-              What You Get
+              How do you ride?
             </AppText>
             <AppText variant="meta" style={{ textAlign: 'center', color: palette.textSecondary }}>
-              {isWeekend ? 'Everything you need for the twisties.' : 'Everything you need for the daily ride.'}
+              We&apos;ll prioritize the right screens for you. Change it anytime in Profile.
             </AppText>
           </View>
 
-          <View style={{ gap: 18, minHeight: features.length * 78 }}>
-            {features.map((feature, i) => (
-              <View key={feature.title} style={{ minHeight: 60, justifyContent: 'center' }}>
-                {i < revealCount ? <FeatureRow {...feature} index={i} /> : null}
-              </View>
-            ))}
+          <View style={{ gap: 12 }}>
+            {options.map((opt) => {
+              const active = selected === opt.id;
+              return (
+                <Pressable
+                  key={opt.id}
+                  onPress={() => setSelected(opt.id)}
+                  style={{
+                    flexDirection: 'row',
+                    gap: 14,
+                    padding: 16,
+                    borderRadius: radius.lg,
+                    borderWidth: 1,
+                    borderColor: active ? palette.danger : palette.border,
+                    backgroundColor: active ? 'rgba(198,69,55,0.08)' : 'rgba(255,255,255,0.03)',
+                  }}>
+                  <View
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      backgroundColor: active ? 'rgba(198,69,55,0.15)' : 'rgba(255,255,255,0.06)',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                    <Ionicons name={opt.icon as any} size={22} color={active ? palette.danger : palette.text} />
+                  </View>
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <AppText variant="bodyBold">{opt.title}</AppText>
+                    <AppText variant="meta" style={{ color: palette.textSecondary }}>
+                      {opt.body}
+                    </AppText>
+                  </View>
+                  {active ? <Ionicons name="checkmark-circle" size={22} color={palette.danger} /> : null}
+                </Pressable>
+              );
+            })}
           </View>
         </ScrollView>
 
-        {showButton ? (
-          <Animated.View entering={FadeInDown.duration(300)}>
-            <Button title="Next →" onPress={() => { setOnboardingStep(6); router.push(getOnboardingRoute(6) as any); }} />
-          </Animated.View>
-        ) : null}
+        <Button title="Next →" onPress={handleContinue} style={{ backgroundColor: palette.danger }} />
       </GlassCard>
     </AppScreen>
   );

@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View, type LayoutChangeEvent } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScreen, AppScrollScreen } from '@/components/ui/app-screen';
@@ -46,6 +46,8 @@ export default function OnboardingEmergencyScreen() {
     contact1_phone: onboardingData.emergencyContactPhone,
   });
   const isOnboarding = params.flow === 'onboarding';
+  const onboardingScrollRef = useRef<ScrollView>(null);
+  const phoneFieldYRef = useRef<number>(0);
 
   const qrValue = useMemo(
     () => `EMERGENCY INFO\nName: ${form.full_name}\nBlood: ${form.blood_type}\nContact: ${form.contact1_name} (${form.contact1_phone})`,
@@ -65,10 +67,20 @@ export default function OnboardingEmergencyScreen() {
     }
   };
 
-  const content = (
+  const handlePhoneFieldLayout = useCallback((event: LayoutChangeEvent) => {
+    phoneFieldYRef.current = event.nativeEvent.layout.y;
+  }, []);
+
+  const handlePhoneFieldFocus = useCallback(() => {
+    // Scroll the field toward the top of the visible area so the keyboard doesn't hide it
+    const targetY = Math.max(phoneFieldYRef.current - 80, 0);
+    onboardingScrollRef.current?.scrollTo({ y: targetY, animated: true });
+  }, []);
+
+  const renderContent = (forOnboarding: boolean) => (
     <>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        {isOnboarding ? (
+        {forOnboarding ? (
           <Pressable onPress={() => { setOnboardingStep(3); router.replace(getOnboardingRoute(3) as any); }}>
             <Ionicons name="arrow-back" size={20} color={palette.textSecondary} />
           </Pressable>
@@ -77,7 +89,7 @@ export default function OnboardingEmergencyScreen() {
       </View>
 
       <View style={{ alignItems: 'center', gap: 16 }}>
-        {isOnboarding ? (
+        {forOnboarding ? (
           <>
             <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(198,69,55,0.1)', alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name="shield-checkmark-outline" size={40} color={palette.danger} />
@@ -127,7 +139,16 @@ export default function OnboardingEmergencyScreen() {
         </View>
       </View>
 
-      <FloatingField label="Emergency Contact Number" value={form.contact1_phone} onChangeText={(value) => setForm({ ...form, contact1_phone: value })} placeholder="+63917..." keyboardType="phone-pad" />
+      <View onLayout={forOnboarding ? handlePhoneFieldLayout : undefined}>
+        <FloatingField
+          label="Emergency Contact Number"
+          value={form.contact1_phone}
+          onChangeText={(value) => setForm({ ...form, contact1_phone: value })}
+          placeholder="+63917..."
+          keyboardType="phone-pad"
+          onFocus={forOnboarding ? handlePhoneFieldFocus : undefined}
+        />
+      </View>
 
       <AppText variant="meta" style={{ color: palette.textSecondary, textAlign: 'center', fontSize: 12 }}>This is stored privately and only encoded in your QR code.</AppText>
     </>
@@ -138,13 +159,15 @@ export default function OnboardingEmergencyScreen() {
       <AppScreen style={{ padding: 0 }} showWordmark={false}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}>
           <GlassCard style={{ flex: 1, borderRadius: 0, padding: 22, gap: 18 }}>
             <ScrollView
-              contentContainerStyle={{ gap: 18, paddingBottom: 24 }}
+              ref={onboardingScrollRef}
+              contentContainerStyle={{ gap: 18, paddingBottom: 140 }}
               showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="always">
-              {content}
+              keyboardShouldPersistTaps="handled">
+              {renderContent(true)}
             </ScrollView>
             <View style={{ gap: 10 }}>
               <Button title="Generate My Safety ID" onPress={() => handleContinue(false)} />
@@ -157,9 +180,9 @@ export default function OnboardingEmergencyScreen() {
   }
 
   return (
-    <AppScrollScreen contentContainerStyle={{ flexGrow: 1 }}>
+    <AppScrollScreen contentContainerStyle={{ flexGrow: 1, paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
       <GlassCard style={{ gap: 18, padding: 22 }}>
-        {content}
+        {renderContent(false)}
         <Button title="Generate My Safety ID" onPress={() => handleContinue(false)} />
         <Button title="Skip, I'll do this later" variant="ghost" onPress={() => handleContinue(true)} />
       </GlassCard>

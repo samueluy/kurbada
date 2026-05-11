@@ -7,6 +7,10 @@ import type { Bike, EmergencyBloodType, MaintenancePresetKey, RideMode } from '@
 export type OnboardingStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type OnboardingSyncStatus = 'idle' | 'pending' | 'syncing' | 'completed' | 'failed';
 
+export type RidingPersona = 'leisure' | 'commute' | 'work' | 'mix';
+
+export type PlatformTag = 'grab' | 'lalamove' | 'foodpanda' | 'moveit' | 'joyride' | 'other';
+
 export type OnboardingData = {
   bikeBrand: string;
   bikeModel: string;
@@ -60,6 +64,14 @@ type AppStore = {
   maintenanceReminderThresholds: number[];
   maintenanceReminderLastNotified: Record<string, number>;
   didSignOut: boolean;
+  activeBikeId: string | null;
+  ridingPersona: RidingPersona;
+  workMode: boolean;
+  dailyEarningsGoal: number;
+  hasSeenCommunityGuidelines: boolean;
+  dailySummaryEnabled: boolean;
+  dailySummaryHour: number; // 0-23, local time
+  acknowledgedBikeMilestones: Record<string, number[]>; // bikeId -> list of odo km thresholds
   setHasSeenSplash: () => void;
   completeOnboarding: () => void;
   completeBikeSetup: () => void;
@@ -74,10 +86,19 @@ type AppStore = {
   setMaintenanceReminderThresholds: (thresholds: number[]) => void;
   setMaintenanceReminderLastNotified: (taskId: string, threshold: number) => void;
   setDidSignOut: (value: boolean) => void;
+  setActiveBikeId: (bikeId: string | null) => void;
+  setRidingPersona: (persona: RidingPersona) => void;
+  setWorkMode: (value: boolean) => void;
+  setDailyEarningsGoal: (value: number) => void;
+  setHasSeenCommunityGuidelines: (value: boolean) => void;
+  setDailySummaryEnabled: (value: boolean) => void;
+  setDailySummaryHour: (hour: number) => void;
+  acknowledgeBikeMilestone: (bikeId: string, milestoneKm: number) => void;
   resetForSignOut: () => void;
   markOnboardingSyncing: () => void;
   markOnboardingSyncComplete: (payload: { userId: string; bikeId?: string | null; emergencyId?: string | null }) => void;
   markOnboardingSyncFailed: () => void;
+  resetOnboardingSyncStatus: () => void;
   resetOnboardingData: () => void;
 };
 
@@ -102,6 +123,14 @@ export const useAppStore = create<AppStore>()(
       maintenanceReminderThresholds: [50, 80, 90, 95, 100],
       maintenanceReminderLastNotified: {},
       didSignOut: false,
+      activeBikeId: null,
+      ridingPersona: 'leisure',
+      workMode: false,
+      dailyEarningsGoal: 1500,
+      hasSeenCommunityGuidelines: false,
+      dailySummaryEnabled: false,
+      dailySummaryHour: 21,
+      acknowledgedBikeMilestones: {},
       setHasSeenSplash: () => set({ hasSeenSplash: true }),
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
       completeBikeSetup: () => set({ hasCompletedBikeSetup: true }),
@@ -123,6 +152,24 @@ export const useAppStore = create<AppStore>()(
           maintenanceReminderLastNotified: { ...state.maintenanceReminderLastNotified, [taskId]: threshold },
         })),
       setDidSignOut: (didSignOut) => set({ didSignOut }),
+      setActiveBikeId: (activeBikeId) => set({ activeBikeId }),
+      setRidingPersona: (ridingPersona) => set({ ridingPersona }),
+      setWorkMode: (workMode) => set({ workMode }),
+      setDailyEarningsGoal: (dailyEarningsGoal) => set({ dailyEarningsGoal }),
+      setHasSeenCommunityGuidelines: (hasSeenCommunityGuidelines) => set({ hasSeenCommunityGuidelines }),
+      setDailySummaryEnabled: (dailySummaryEnabled) => set({ dailySummaryEnabled }),
+      setDailySummaryHour: (dailySummaryHour) => set({ dailySummaryHour }),
+      acknowledgeBikeMilestone: (bikeId, milestoneKm) =>
+        set((state) => {
+          const existing = state.acknowledgedBikeMilestones[bikeId] ?? [];
+          if (existing.includes(milestoneKm)) return state;
+          return {
+            acknowledgedBikeMilestones: {
+              ...state.acknowledgedBikeMilestones,
+              [bikeId]: [...existing, milestoneKm].sort((a, b) => a - b),
+            },
+          };
+        }),
       resetForSignOut: () => set({ hasCompletedOnboarding: false, hasCompletedBikeSetup: false, didSignOut: true }),
       markOnboardingSyncing: () => set({ onboardingSyncStatus: 'syncing' }),
       markOnboardingSyncComplete: ({ userId, bikeId = null, emergencyId = null }) =>
@@ -134,6 +181,7 @@ export const useAppStore = create<AppStore>()(
           onboardingSyncedEmergencyId: emergencyId,
         }),
       markOnboardingSyncFailed: () => set({ onboardingSyncStatus: 'failed' }),
+      resetOnboardingSyncStatus: () => set({ onboardingSyncStatus: 'pending' }),
       resetOnboardingData: () =>
         set({
           onboardingData: defaultOnboardingData,
@@ -176,6 +224,14 @@ export const useAppStore = create<AppStore>()(
         maintenanceRemindersEnabled: state.maintenanceRemindersEnabled,
         maintenanceReminderThresholds: state.maintenanceReminderThresholds,
         maintenanceReminderLastNotified: state.maintenanceReminderLastNotified,
+        activeBikeId: state.activeBikeId,
+        ridingPersona: state.ridingPersona,
+        workMode: state.workMode,
+        dailyEarningsGoal: state.dailyEarningsGoal,
+        hasSeenCommunityGuidelines: state.hasSeenCommunityGuidelines,
+        dailySummaryEnabled: state.dailySummaryEnabled,
+        dailySummaryHour: state.dailySummaryHour,
+        acknowledgedBikeMilestones: state.acknowledgedBikeMilestones,
       }),
     },
   ),

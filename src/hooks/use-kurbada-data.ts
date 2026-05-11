@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { Alert } from 'react-native';
 
 import { createId } from '@/lib/id';
 import {
@@ -495,6 +497,8 @@ export function useRideMutations(userId?: string) {
           avg_speed_kmh: ride.avg_speed_kmh,
           max_lean_angle_deg: ride.max_lean_angle_deg ?? null,
           fuel_used_liters: ride.fuel_used_liters ?? null,
+          elevation_gain_m: ride.elevation_gain_m ?? null,
+          mood: ride.mood ?? null,
           route_geojson: ride.route_geojson,
           route_point_count_raw: ride.route_point_count_raw,
           route_point_count_simplified: ride.route_point_count_simplified,
@@ -517,7 +521,36 @@ export function useRideMutations(userId?: string) {
     },
   });
 
-  return { saveRide };
+  const updateRideMood = useMutation({
+    mutationFn: async ({ rideId, mood }: { rideId: string; mood: RideRecord['mood'] }) => {
+      if (supabase && userId) {
+        const { data, error } = await (supabase as any)
+          .from('rides')
+          .update({ mood })
+          .eq('id', rideId)
+          .eq('user_id', userId)
+          .select('*')
+          .single();
+        if (error) throw error;
+        return data as RideRecord;
+      }
+      // local mode: mutate the local store in place via saveRide (upsert semantics)
+      // find and replace the ride
+      const store = (useLocalAppStore as any).getState?.();
+      if (store?.rides) {
+        const existing = store.rides.find((r: any) => r.id === rideId);
+        if (existing) {
+          saveRideLocal({ ...existing, mood });
+        }
+      }
+      return { id: rideId, mood } as unknown as RideRecord;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['rides', userId ?? 'local'] });
+    },
+  });
+
+  return { saveRide, updateRideMood };
 }
 
 export function useFuelMutations(userId?: string) {
@@ -695,6 +728,7 @@ export function useOnboardingSync(userId?: string) {
   const markOnboardingSyncing = useAppStore((state) => state.markOnboardingSyncing);
   const markOnboardingSyncComplete = useAppStore((state) => state.markOnboardingSyncComplete);
   const markOnboardingSyncFailed = useAppStore((state) => state.markOnboardingSyncFailed);
+  const resetOnboardingSyncStatus = useAppStore((state) => state.resetOnboardingSyncStatus);
   const completeBikeSetup = useAppStore((state) => state.completeBikeSetup);
   const bikes = useBikes(userId);
   const emergency = useEmergencyInfo(userId);
@@ -728,6 +762,17 @@ export function useOnboardingSync(userId?: string) {
   const needsSync =
     onboardingSyncStatus !== 'completed'
     || onboardingSyncedUserId !== localKey;
+
+  // Reset stale sync status when the user context changes (e.g., after fresh sign-up)
+  useEffect(() => {
+    if (
+      onboardingSyncStatus === 'failed'
+      || (onboardingSyncStatus === 'completed' && onboardingSyncedUserId !== localKey)
+    ) {
+      resetOnboardingSyncStatus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localKey]);
 
   useQuery({
     queryKey: ['onboarding-sync', localKey, onboardingSyncStatus, onboardingSyncedUserId, onboardingData],
@@ -797,6 +842,13 @@ export function useOnboardingSync(userId?: string) {
         return { syncedBikeId, syncedEmergencyId };
       } catch (error) {
         markOnboardingSyncFailed();
+        console.warn('Onboarding sync failed:', error);
+        Alert.alert(
+          'Setup sync failed',
+          error instanceof Error
+            ? `Could not save your bike or emergency info: ${error.message}`
+            : 'Could not save your setup data. Please check your connection and try again.',
+        );
         throw error;
       }
     },
@@ -860,6 +912,8 @@ export function useBoardMutations(userId?: string) {
             pace: listing.pace,
             lobby_link: listing.lobby_link,
             display_name: listing.display_name,
+            city: listing.city ?? null,
+            photo_urls: listing.photo_urls ?? [],
           } as any)
           .select()
           .single();
@@ -912,4 +966,319 @@ export function useBoardMutations(userId?: string) {
   });
 
   return { createRideListing, deleteRideListing, reportRideListing };
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Earnings (Work Mode)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function useEarnings(userId?: string) {
+  const useRemote = useRemoteMode(userId);
+
+  const query = useQuery({
+    queryKey: ['earnings', userId ?? 'local'],
+    enabled: useRemote,
+    queryFn: async () => {
+      if (!supabase || !userId) return [] as import('@/types/domain').RideEarnings[];
+      const { data, error } = await (supabase as any)
+        .from('ride_earnings')
+        .select('*')
+        .eq('user_id', userId)
+        .order('earned_at', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as import('@/types/domain').RideEarnings[];
+    },
+  });
+
+  if (!useRemote) {
+    return { data: [] as import('@/types/domain').RideEarnings[], isLoading: false, error: null, isFetching: false };
+  }
+  return query;
+}
+
+export function useEarningsMutations(userId?: string) {
+  const client = useQueryClient();
+
+  const saveEarnings = useMutation({
+    mutationFn: async (payload: Omit<import('@/types/domain').RideEarnings, 'id' | 'created_at'>) => {
+      if (supabase && userId) {
+        const { data, error } = await (supabase as any)
+          .from('ride_earnings')
+          .insert({ ...payload, user_id: userId })
+          .select('*')
+          .single();
+        if (error) throw error;
+        return data as import('@/types/domain').RideEarnings;
+      }
+      return { ...payload, id: createId(), created_at: new Date().toISOString() } as import('@/types/domain').RideEarnings;
+    },
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ['earnings', userId ?? 'local'] });
+    },
+  });
+
+  return { saveEarnings };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Maintenance tasks across every bike the user owns (for amortization totals)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function useMaintenanceTasksAllBikes(userId?: string) {
+  const localTasks = useLocalAppStore((state) => state.maintenanceTasks);
+  const useRemote = useRemoteMode(userId);
+
+  const query = useQuery({
+    queryKey: ['maintenance-all', userId ?? 'local'],
+    enabled: useRemote,
+    queryFn: async () => {
+      if (!supabase || !userId) return localTasks;
+      const { data: bikeRows, error: bikeErr } = await supabase.from('bikes').select('id').eq('user_id', userId);
+      if (bikeErr) throw bikeErr;
+      const bikeIds = (bikeRows ?? []).map((b: any) => b.id);
+      if (!bikeIds.length) return [] as MaintenanceTask[];
+      const { data, error } = await supabase.from('maintenance_tasks').select('*').in('bike_id', bikeIds);
+      if (error) throw error;
+      return (data ?? []) as MaintenanceTask[];
+    },
+  });
+
+  if (!useRemote) {
+    return { data: localTasks, isLoading: false, error: null, isFetching: false };
+  }
+  return query;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Lobby RSVPs
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function useRideListingRsvps(listingId?: string) {
+  const useRemote = isSupabaseConfigured && Boolean(listingId);
+
+  const query = useQuery({
+    queryKey: ['ride-listing-rsvps', listingId ?? 'none'],
+    enabled: useRemote,
+    queryFn: async () => {
+      if (!supabase || !listingId) return [] as import('@/types/domain').RideRSVP[];
+      const { data, error } = await (supabase as any)
+        .from('ride_listing_rsvps')
+        .select('*')
+        .eq('listing_id', listingId);
+      if (error) throw error;
+      return (data ?? []) as import('@/types/domain').RideRSVP[];
+    },
+  });
+
+  if (!useRemote) {
+    return { data: [] as import('@/types/domain').RideRSVP[], isLoading: false, error: null, isFetching: false };
+  }
+  return query;
+}
+
+export function useRsvpMutations(userId?: string) {
+  const client = useQueryClient();
+
+  const setRsvp = useMutation({
+    mutationFn: async ({
+      listingId,
+      status,
+      displayName,
+    }: {
+      listingId: string;
+      status: import('@/types/domain').RSVPStatus;
+      displayName: string;
+    }) => {
+      if (!supabase || !userId) throw new Error('Sign in to RSVP.');
+      const { data, error } = await (supabase as any)
+        .from('ride_listing_rsvps')
+        .upsert(
+          { listing_id: listingId, user_id: userId, status, display_name: displayName },
+          { onConflict: 'listing_id,user_id' },
+        )
+        .select('*')
+        .single();
+      if (error) throw error;
+      return data as import('@/types/domain').RideRSVP;
+    },
+    onSuccess: async (_, variables) => {
+      await client.invalidateQueries({ queryKey: ['ride-listing-rsvps', variables.listingId] });
+      await client.invalidateQueries({ queryKey: ['ride-listings', userId ?? 'local'] });
+    },
+  });
+
+  const cancelRsvp = useMutation({
+    mutationFn: async (listingId: string) => {
+      if (!supabase || !userId) throw new Error('Sign in to cancel RSVP.');
+      const { error } = await (supabase as any)
+        .from('ride_listing_rsvps')
+        .delete()
+        .eq('listing_id', listingId)
+        .eq('user_id', userId);
+      if (error) throw error;
+      return listingId;
+    },
+    onSuccess: async (listingId) => {
+      await client.invalidateQueries({ queryKey: ['ride-listing-rsvps', listingId] });
+      await client.invalidateQueries({ queryKey: ['ride-listings', userId ?? 'local'] });
+    },
+  });
+
+  return { setRsvp, cancelRsvp };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Weekly referral leaderboard
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type WeeklyReferralLeader = {
+  referrer_user_id: string;
+  display_name: string;
+  referral_count: number;
+  is_verified_host?: boolean | null;
+};
+
+export function useWeeklyReferralLeaderboard() {
+  const useRemote = isSupabaseConfigured;
+
+  const query = useQuery({
+    queryKey: ['referral-leaderboard', 'week'],
+    enabled: useRemote,
+    queryFn: async () => {
+      if (!supabase) return [] as WeeklyReferralLeader[];
+      // Uses view `weekly_referral_leaderboard` if present, else falls back to client-side aggregation.
+      const client = supabase as any;
+      const { data, error } = await client
+        .from('weekly_referral_leaderboard')
+        .select('*')
+        .limit(20);
+      if (error || !data) {
+        // Fallback: aggregate from referrals table
+        const start = new Date();
+        const day = start.getDay();
+        start.setDate(start.getDate() - day);
+        start.setHours(0, 0, 0, 0);
+        const { data: referrals, error: rErr } = await client
+          .from('referrals')
+          .select('*, profiles:referrer_user_id(display_name,is_verified_host)')
+          .gte('rewarded_at', start.toISOString())
+          .eq('status', 'rewarded');
+        if (rErr) return [] as WeeklyReferralLeader[];
+        const counts = new Map<string, WeeklyReferralLeader>();
+        for (const r of (referrals ?? []) as any[]) {
+          const key = r.referrer_user_id as string;
+          const existing = counts.get(key);
+          const name = r.profiles?.display_name ?? 'Kurbada Rider';
+          if (existing) {
+            existing.referral_count += 1;
+          } else {
+            counts.set(key, {
+              referrer_user_id: key,
+              display_name: name,
+              referral_count: 1,
+              is_verified_host: r.profiles?.is_verified_host ?? false,
+            });
+          }
+        }
+        return Array.from(counts.values()).sort((a, b) => b.referral_count - a.referral_count);
+      }
+      return (data ?? []) as WeeklyReferralLeader[];
+    },
+  });
+
+  if (!useRemote) {
+    return { data: [] as WeeklyReferralLeader[], isLoading: false, error: null, isFetching: false };
+  }
+  return query;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Gear tracker
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function useGearItems(userId?: string) {
+  const useRemote = useRemoteMode(userId);
+
+  const query = useQuery({
+    queryKey: ['gear-items', userId ?? 'local'],
+    enabled: useRemote,
+    queryFn: async () => {
+      if (!supabase || !userId) return [] as import('@/types/domain').GearItem[];
+      const { data, error } = await (supabase as any)
+        .from('gear_items')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('archived', false)
+        .order('install_date', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as import('@/types/domain').GearItem[];
+    },
+  });
+
+  if (!useRemote) {
+    return {
+      data: [] as import('@/types/domain').GearItem[],
+      isLoading: false,
+      error: null,
+      isFetching: false,
+    };
+  }
+  return query;
+}
+
+export function useGearMutations(userId?: string) {
+  const client = useQueryClient();
+
+  const saveGearItem = useMutation({
+    mutationFn: async (payload: Omit<import('@/types/domain').GearItem, 'id' | 'created_at' | 'user_id'> & { id?: string }) => {
+      if (!supabase || !userId) throw new Error('Sign in to save gear.');
+      if (payload.id) {
+        const { data, error } = await (supabase as any)
+          .from('gear_items')
+          .update({
+            bike_id: payload.bike_id ?? null,
+            name: payload.name,
+            category: payload.category,
+            install_date: payload.install_date,
+            install_odometer_km: payload.install_odometer_km ?? null,
+            expected_lifetime_months: payload.expected_lifetime_months ?? null,
+            expected_lifetime_km: payload.expected_lifetime_km ?? null,
+            notes: payload.notes ?? null,
+            archived: payload.archived ?? false,
+          })
+          .eq('id', payload.id)
+          .eq('user_id', userId)
+          .select('*')
+          .single();
+        if (error) throw error;
+        return data as import('@/types/domain').GearItem;
+      }
+      const { data, error } = await (supabase as any)
+        .from('gear_items')
+        .insert({ ...payload, user_id: userId })
+        .select('*')
+        .single();
+      if (error) throw error;
+      return data as import('@/types/domain').GearItem;
+    },
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ['gear-items', userId ?? 'local'] });
+    },
+  });
+
+  const deleteGearItem = useMutation({
+    mutationFn: async (id: string) => {
+      if (!supabase || !userId) throw new Error('Sign in to delete gear.');
+      const { error } = await (supabase as any).from('gear_items').delete().eq('id', id).eq('user_id', userId);
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ['gear-items', userId ?? 'local'] });
+    },
+  });
+
+  return { saveGearItem, deleteGearItem };
 }

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { GlassCard } from '@/components/ui/glass-card';
 import { SectionHeader } from '@/components/ui/section-header';
 import { palette } from '@/constants/theme';
+import { formatSubscriptionStatusLabel } from '@/lib/format';
 import { useAuth } from '@/hooks/use-auth';
 import { useUserProfile } from '@/hooks/use-user-access';
 import {
@@ -15,19 +16,6 @@ import {
   openNativeSubscriptionManagement,
   restorePremiumPurchases,
 } from '@/services/revenuecat';
-
-function formatStatusLabel(status: string) {
-  switch (status) {
-    case 'trialing':
-      return 'Trial active';
-    case 'active':
-      return 'Premium active';
-    case 'canceled':
-      return 'Ends at renewal';
-    default:
-      return 'Inactive';
-  }
-}
 
 export default function BillingScreen() {
   const { session } = useAuth();
@@ -102,7 +90,7 @@ export default function BillingScreen() {
                 CURRENT STATUS
               </AppText>
               <AppText variant="title" style={{ fontSize: 24 }}>
-                {formatStatusLabel(summary?.status ?? profile.data?.subscription_status ?? 'inactive')}
+                {formatSubscriptionStatusLabel(summary?.status ?? profile.data?.subscription_status ?? 'inactive')}
               </AppText>
             </View>
 

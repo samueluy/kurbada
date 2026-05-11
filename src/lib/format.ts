@@ -59,3 +59,18 @@ export function weatherFromCode(code: number): { label: string; icon: string } {
   if (code >= 95 && code <= 99) return { label: 'Thunderstorm', icon: 'thunderstorm-outline' };
   return { label: 'Partly cloudy', icon: 'cloudy-outline' };
 }
+
+export function formatSubscriptionStatusLabel(status: string | null | undefined) {
+  switch (status) {
+    case 'trialing':
+      return 'Trial active';
+    case 'active':
+      return 'Premium active';
+    case 'canceled':
+      return 'Ends at renewal';
+    case 'grace_period':
+      return 'Grace period';
+    default:
+      return 'Inactive';
+  }
+}

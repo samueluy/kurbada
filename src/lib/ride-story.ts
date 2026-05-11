@@ -2,28 +2,44 @@ import type { RideRecord } from '@/types/domain';
 
 export type RideStoryTemplateId =
   | 'distance_hero'
-  | 'max_lean_hero'
   | 'top_speed_hero'
   | 'route_stats'
-  | 'fuel_burn';
+  | 'fuel_burn'
+  | 'minimal_mono'
+  | 'center_hero';
 
-export const rideStoryTemplates: {
+export type RideStoryLayout =
+  | 'corner-tl'
+  | 'corner-tr'
+  | 'center'
+  | 'bottom-band'
+  | 'left-rail';
+
+export type RideStoryTemplate = {
   id: RideStoryTemplateId;
   label: string;
-}[] = [
-  { id: 'distance_hero', label: 'Distance Hero' },
-  { id: 'max_lean_hero', label: 'Max Lean Hero' },
-  { id: 'top_speed_hero', label: 'Top Speed Hero' },
-  { id: 'route_stats', label: 'Route + Stats' },
-  { id: 'fuel_burn', label: 'Cost Per Run' },
+  layout: RideStoryLayout;
+};
+
+export const rideStoryTemplates: RideStoryTemplate[] = [
+  { id: 'distance_hero', label: 'Distance', layout: 'corner-tl' },
+  { id: 'fuel_burn', label: 'Cost/Run', layout: 'corner-tr' },
+  { id: 'top_speed_hero', label: 'Top Speed', layout: 'center' },
+  { id: 'route_stats', label: 'Route', layout: 'bottom-band' },
+  { id: 'minimal_mono', label: 'Minimal', layout: 'left-rail' },
+  { id: 'center_hero', label: 'Centered', layout: 'center' },
 ];
+
+export function getRideStoryTemplate(id: RideStoryTemplateId): RideStoryTemplate {
+  return rideStoryTemplates.find((t) => t.id === id) ?? rideStoryTemplates[0];
+}
 
 export function getRideStoryTitle(ride: RideRecord) {
   const dateLabel = new Date(ride.started_at).toLocaleDateString('en-PH', {
     month: 'short',
     day: 'numeric',
   });
-  return `${ride.mode === 'weekend' ? 'Weekend Run' : 'Daily Run'} · ${dateLabel}`;
+  return `Ride · ${dateLabel}`;
 }
 
 export function getRideStoryPrimaryValue(
@@ -33,16 +49,13 @@ export function getRideStoryPrimaryValue(
 ): { value: string; unit: string; subtitle: string } {
   switch (templateId) {
     case 'distance_hero':
+    case 'center_hero':
+    case 'minimal_mono':
+    case 'route_stats':
       return {
         value: ride.distance_km.toFixed(1),
         unit: 'KM',
         subtitle: 'Distance covered in this run',
-      };
-    case 'max_lean_hero':
-      return {
-        value: (ride.max_lean_angle_deg ?? 0).toFixed(0),
-        unit: '°',
-        subtitle: ride.max_lean_angle_deg ? 'Maximum lean angle hit' : 'Lean angle not captured this ride',
       };
     case 'top_speed_hero':
       return {
@@ -50,26 +63,18 @@ export function getRideStoryPrimaryValue(
         unit: 'KM/H',
         subtitle: 'Top speed recorded',
       };
-    case 'fuel_burn': {
+    case 'fuel_burn':
       if (ride.fuel_used_liters && fuelPricePerLiter) {
         return {
           value: `₱${(ride.fuel_used_liters * fuelPricePerLiter).toFixed(0)}`,
           unit: '',
-          subtitle: `${ride.fuel_used_liters.toFixed(1)}L burned at ₱${fuelPricePerLiter.toFixed(2)}/L`,
+          subtitle: `${ride.fuel_used_liters.toFixed(1)}L at ₱${fuelPricePerLiter.toFixed(2)}/L`,
         };
       }
-
       return {
         value: (ride.fuel_used_liters ?? 0).toFixed(1),
         unit: 'L',
         subtitle: 'Estimated fuel burned this ride',
-      };
-    }
-    case 'route_stats':
-      return {
-        value: ride.distance_km.toFixed(1),
-        unit: 'KM',
-        subtitle: 'Route summary with ride stats',
       };
     default:
       return {
@@ -78,4 +83,8 @@ export function getRideStoryPrimaryValue(
         subtitle: 'Distance covered in this run',
       };
   }
+}
+
+export function isAccentTemplate(templateId: RideStoryTemplateId): boolean {
+  return templateId === 'fuel_burn';
 }

@@ -16,9 +16,16 @@ export function FuelSummaryCard({
 
   return (
     <GlassCard style={{ flex: 1, padding: 14, gap: 6, borderRadius: 14 }}>
-      <AppText variant="label">{label}</AppText>
-      <AppText variant="cardMetric" style={{ fontSize: 22, lineHeight: 24, color: valueColor }}>{value}</AppText>
-      {caption ? <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 11 }}>{caption}</AppText> : null}
+      <AppText variant="label" numberOfLines={1} ellipsizeMode="tail">{label}</AppText>
+      <AppText
+        variant="cardMetric"
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.6}
+        style={{ fontSize: 22, lineHeight: 24, color: valueColor }}>
+        {value}
+      </AppText>
+      {caption ? <AppText variant="meta" numberOfLines={2} ellipsizeMode="tail" style={{ color: palette.textTertiary, fontSize: 11 }}>{caption}</AppText> : null}
     </GlassCard>
   );
 }

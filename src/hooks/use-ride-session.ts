@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
 import * as Location from 'expo-location';
-import { Accelerometer, Gyroscope } from 'expo-sensors';
+import { Accelerometer } from 'expo-sensors';
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
@@ -13,29 +13,20 @@ import { useRideMutations } from '@/hooks/use-kurbada-data';
 import { useRideStore } from '@/store/ride-store';
 import { clearStoredCoords, getStoredCoords, LOCATION_TASK_NAME } from '@/tasks/location-task';
 import { useAppStore } from '@/store/app-store';
-import type { LeanCalibration, RideMode, RidePoint } from '@/types/domain';
+import type { RidePoint } from '@/types/domain';
 
 Accelerometer.setUpdateInterval(100);
-Gyroscope.setUpdateInterval(100);
 
 export function useRideSession() {
   const { session } = useAuth();
   const { saveRide } = useRideMutations(session?.user.id);
   const store = useRideStore();
   const crashAlertsEnabled = useAppStore((state) => state.crashAlertsEnabled);
-  const latestAccelRef = useRef({ x: 0, y: 0, z: 1 });
-  const filteredAccelRef = useRef({ x: 0, y: 0, z: 1 });
-  const rollRef = useRef(0);
   const locationSubscriptionRef = useRef<Location.LocationSubscription | null>(null);
   const accelSubscriptionRef = useRef<{ remove: () => void } | null>(null);
   const crashThresholdSinceRef = useRef<number | null>(null);
-  const calibrationRef = useRef<LeanCalibration | undefined>(store.calibration);
-  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const foregroundPointsRef = useRef<RidePoint[]>([]);
-
-  useEffect(() => {
-    calibrationRef.current = store.calibration;
-  }, [store.calibration]);
+  const rideStartedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -52,6 +43,14 @@ export function useRideSession() {
           store.setCrashCountdown(store.crashCountdown - 1);
         }
       }
+
+      // Fatigue nudge: after 3h continuous ride, prompt a break once
+      if (store.state === 'active' && rideStartedAtRef.current) {
+        const minutes = Math.floor((Date.now() - rideStartedAtRef.current) / 60000);
+        if (minutes >= 180 && !store.fatiguePromptShown) {
+          store.setFatiguePromptShown(true);
+        }
+      }
     }, 1000);
 
     return () => clearInterval(interval);
@@ -59,50 +58,27 @@ export function useRideSession() {
   }, []);
 
   useEffect(() => {
-    if (!['calibrating', 'active'].includes(store.state)) {
+    if (store.state !== 'active') {
       cleanupSubscriptions();
       return;
     }
 
+    // Keep accelerometer only for crash detection (g-force spike).
     accelSubscriptionRef.current = Accelerometer.addListener((reading) => {
-      latestAccelRef.current = reading;
-      filteredAccelRef.current = {
-        x: 0.8 * filteredAccelRef.current.x + 0.2 * reading.x,
-        y: 0.8 * filteredAccelRef.current.y + 0.2 * reading.y,
-        z: 0.8 * filteredAccelRef.current.z + 0.2 * reading.z,
-      };
-
-      const fx = filteredAccelRef.current.x;
-      const fy = filteredAccelRef.current.y;
-      const fz = filteredAccelRef.current.z;
-      const accelRoll = (Math.atan2(fx, Math.sqrt(fy * fy + fz * fz)) * 180) / Math.PI;
-      rollRef.current = 0.92 * rollRef.current + 0.08 * accelRoll;
-
       const gForce = Math.sqrt(reading.x ** 2 + reading.y ** 2 + reading.z ** 2);
       store.updateTelemetry({ gForce });
-
-      if (store.state === 'active' && calibrationRef.current) {
-        const adjustedLean = rollRef.current - calibrationRef.current.zeroRollDeg;
-        store.updateTelemetry({
-          leanAngleDeg: adjustedLean,
-          maxLeanAngleDeg: Math.max(store.telemetry.maxLeanAngleDeg, Math.abs(adjustedLean)),
-        });
-      }
-
-      if (store.state === 'active') {
-        maybeTriggerCrashAlert(gForce);
-      }
+      maybeTriggerCrashAlert(gForce);
     });
 
     startLocationWatch().catch(() => undefined);
 
     return cleanupSubscriptions;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.state, store.mode]);
+  }, [store.state]);
 
   const latestPosition = foregroundPointsRef.current[foregroundPointsRef.current.length - 1];
 
-  const startRide = async (mode: RideMode, bikeId: string, fuelPricePerLiter: number, fuelRateKmPerLiter: number) => {
+  const startRide = async (bikeId: string, fuelPricePerLiter: number, fuelRateKmPerLiter: number) => {
     const fgPerm = await Location.requestForegroundPermissionsAsync();
     if (!fgPerm.granted) {
       throw new Error('Location permission is required to start a ride.');
@@ -110,17 +86,24 @@ export function useRideSession() {
 
     await Location.requestBackgroundPermissionsAsync().catch(() => undefined);
 
+    // Android 13+: foreground service notification won't show without this
+    if (Platform.OS === 'android') {
+      try {
+        const { PermissionsAndroid } = require('react-native');
+        await PermissionsAndroid.request('android.permission.POST_NOTIFICATIONS');
+      } catch {
+        // ignore — pre-Android 13 devices don't support this
+      }
+    }
+
     store.resetRide();
     foregroundPointsRef.current = [];
-    rollRef.current = 0;
-    calibrationRef.current = undefined;
     crashThresholdSinceRef.current = null;
-    store.setMode(mode);
     store.setBikeId(bikeId);
     store.setFuelPricePerLiter(fuelPricePerLiter);
     store.setFuelRateKmPerLiter(fuelRateKmPerLiter);
-    store.setDashboardView(mode === 'weekend' ? 'speed' : 'economy');
     store.setStartedAt(Date.now());
+    rideStartedAtRef.current = Date.now();
 
     await clearStoredCoords();
 
@@ -137,80 +120,11 @@ export function useRideSession() {
     }).catch(() => undefined);
 
     store.setState('starting');
-    await sleep(500);
-    store.setState(mode === 'weekend' ? 'calibrating' : 'active');
-  };
-
-  const completeCalibration = async () => {
-    if (store.mode !== 'weekend') {
-      store.setState('active');
-      return;
-    }
-
-    let countdown = 3;
-    store.setCalibrationCountdown(countdown);
-
-    countdownIntervalRef.current = setInterval(() => {
-      countdown--;
-      store.setCalibrationCountdown(countdown);
-
-      if (countdown <= 0) {
-        if (countdownIntervalRef.current) {
-          clearInterval(countdownIntervalRef.current);
-          countdownIntervalRef.current = null;
-        }
-
-        const calibration = {
-          zeroRollDeg: rollRef.current,
-          capturedAt: new Date().toISOString(),
-          mountProfileId: 'ride-start',
-        };
-        calibrationRef.current = calibration;
-        store.setCalibration(calibration);
-        store.setCalibrationCountdown(null);
-        store.setState('active');
-      }
-    }, 1000);
-  };
-
-  const recalibrateLean = async () => {
-    if (store.mode !== 'weekend') {
-      return;
-    }
-
-    if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current);
-      countdownIntervalRef.current = null;
-    }
-
-    calibrationRef.current = undefined;
-    store.setCalibration(undefined);
-    store.setCalibrationCountdown(null);
-    store.updateTelemetry({
-      leanAngleDeg: 0,
-      maxLeanAngleDeg: 0,
-    });
-    rollRef.current = 0;
-    store.setState('calibrating');
+    await sleep(400);
+    store.setState('active');
   };
 
   const stopRide = async () => {
-    if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current);
-      countdownIntervalRef.current = null;
-    }
-
-    if (!calibrationRef.current && store.mode === 'weekend' && rollRef.current !== undefined) {
-      const calibration = {
-        zeroRollDeg: rollRef.current,
-        capturedAt: new Date().toISOString(),
-        mountProfileId: 'ride-stop',
-      };
-      calibrationRef.current = calibration;
-      store.setCalibration(calibration);
-      store.setCalibrationCountdown(null);
-    }
-
     if (!store.startedAt) {
       store.setStartedAt(Date.now() - store.telemetry.durationSeconds * 1000);
     }
@@ -249,7 +163,7 @@ export function useRideSession() {
       id: createId(),
       bike_id: store.bikeId,
       user_id: session?.user.id,
-      mode: store.mode,
+      mode: 'hustle' as const, // kept for DB backwards compat; UI no longer branches
       started_at: new Date(startedAt).toISOString(),
       ended_at: new Date().toISOString(),
       distance_km: Number(totalDistance.toFixed(1)),
@@ -258,8 +172,10 @@ export function useRideSession() {
         store.telemetry.durationSeconds > 0
           ? Number((totalDistance / (store.telemetry.durationSeconds / 3600)).toFixed(1))
           : 0,
-      max_lean_angle_deg: store.mode === 'weekend' ? Number(store.telemetry.maxLeanAngleDeg.toFixed(1)) : null,
+      max_lean_angle_deg: null,
       fuel_used_liters: Number(store.telemetry.estimatedFuelLiters.toFixed(2)),
+      elevation_gain_m: Number(store.telemetry.elevationGainM.toFixed(1)),
+      mood: null,
       route_geojson: routeGeoJson,
       route_point_count_raw: allPoints.length,
       route_point_count_simplified: simplified.length,
@@ -270,6 +186,7 @@ export function useRideSession() {
     try {
       await saveRide.mutateAsync(ride);
       await clearStoredCoords();
+      rideStartedAtRef.current = null;
       store.resetRide();
       return ride;
     } catch {
@@ -288,6 +205,10 @@ export function useRideSession() {
     Linking.openURL('tel:911').catch(() => undefined);
   };
 
+  const dismissFatiguePrompt = () => {
+    store.setFatiguePromptShown(false);
+  };
+
   function maybeTriggerCrashAlert(gForce: number) {
     if (!crashAlertsEnabled) return;
     if (gForce > 4.5) {
@@ -295,7 +216,8 @@ export function useRideSession() {
         crashThresholdSinceRef.current = Date.now();
       } else if (Date.now() - crashThresholdSinceRef.current > 150 && store.crashCountdown === null) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
-        store.setCrashCountdown(30);
+        // 15-second cancellable countdown (rider can abort if false positive)
+        store.setCrashCountdown(15);
       }
     } else {
       crashThresholdSinceRef.current = null;
@@ -308,7 +230,7 @@ export function useRideSession() {
     locationSubscriptionRef.current = await Location.watchPositionAsync(
       {
         accuracy: Location.Accuracy.BestForNavigation,
-        timeInterval: store.mode === 'weekend' ? 5000 : 10000,
+        timeInterval: 5000,
         distanceInterval: 8,
       },
       (location) => {
@@ -322,10 +244,17 @@ export function useRideSession() {
 
         const previous = foregroundPointsRef.current[foregroundPointsRef.current.length - 1];
         const distanceDelta = previous ? haversineDistanceKm(previous, point) : 0;
+        // Positive altitude deltas only; ignore small GPS jitter (<3m) to keep the total clean.
+        let elevationDelta = 0;
+        if (previous && previous.altitude != null && point.altitude != null) {
+          const rawDelta = point.altitude - previous.altitude;
+          if (rawDelta > 3) elevationDelta = rawDelta;
+        }
         foregroundPointsRef.current = [...foregroundPointsRef.current, point];
         store.appendForegroundPoint(point);
 
         const newDistance = store.telemetry.distanceKm + distanceDelta;
+        const newElevationGain = store.telemetry.elevationGainM + elevationDelta;
         const fuelRate = store.fuelRateKmPerLiter;
         const fuelLiters = newDistance / fuelRate;
         const fuelCost = fuelLiters * store.fuelPricePerLiter;
@@ -336,6 +265,7 @@ export function useRideSession() {
           speedKmh: point.speedKmh,
           altitudeMeters: point.altitude ?? 0,
           distanceKm: newDistance,
+          elevationGainM: newElevationGain,
           maxSpeedKmh: Math.max(store.telemetry.maxSpeedKmh, point.speedKmh),
           estimatedFuelLiters: fuelLiters,
           estimatedFuelCost: fuelCost,
@@ -346,11 +276,6 @@ export function useRideSession() {
   }
 
   function cleanupSubscriptions() {
-    if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current);
-      countdownIntervalRef.current = null;
-    }
-
     accelSubscriptionRef.current?.remove();
     locationSubscriptionRef.current?.remove();
     accelSubscriptionRef.current = null;
@@ -367,11 +292,10 @@ export function useRideSession() {
     routePreview,
     latestPosition,
     startRide,
-    completeCalibration,
-    recalibrateLean,
     stopRide,
     dismissCrashAlert,
     requestHelp,
+    dismissFatiguePrompt,
     crashEnabled: Platform.OS !== 'web',
   };
 }

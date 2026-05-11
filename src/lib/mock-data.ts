@@ -66,7 +66,7 @@ export const sampleRides: RideRecord[] = [
     distance_km: 42.8,
     max_speed_kmh: 118,
     avg_speed_kmh: 62,
-    max_lean_angle_deg: 34,
+    max_lean_angle_deg: null,
     fuel_used_liters: 1.8,
     route_geojson: sampleRoute,
     route_point_count_raw: samplePoints.length,

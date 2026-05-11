@@ -1,51 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScreen, AppScrollScreen } from '@/components/ui/app-screen';
 import { Button } from '@/components/ui/button';
 import { GlassCard } from '@/components/ui/glass-card';
-import { PickerSheet, type PickerSheetRef } from '@/components/ui/picker-sheet';
-import { palette, radius, typography } from '@/constants/theme';
-import { useAppStore } from '@/store/app-store';
+import { palette } from '@/constants/theme';
+import { OnboardingHeader } from '@/components/ui/onboarding-header';
+import { BikeIdentityForm, BIKE_IDENTITY_EMPTY, resolveBikeIdentity, type BikeIdentityDraft } from '@/features/garage/components/bike-identity-form';
 import { bikeBrands, getModelsForBrand } from '@/lib/bike-models';
 import { getOnboardingRoute, ONBOARDING_TOTAL_STEPS } from '@/lib/onboarding-flow';
+import { useAppStore } from '@/store/app-store';
 import type { RideMode } from '@/types/domain';
-
-const ridingStyles: { mode: RideMode; label: string; subtitle: string; icon: string }[] = [
-  { mode: 'weekend', label: 'Weekend Twisties', subtitle: 'Cinematic telemetry, curves, max lean', icon: 'speedometer-outline' },
-  { mode: 'hustle', label: 'Daily Ride', subtitle: 'Traffic efficiency, fuel tracking, battery smart', icon: 'timer-outline' },
-];
-
-function PickerTrigger({ label, value, placeholder, onPress }: { label: string; value: string; placeholder: string; onPress: () => void }) {
-  return (
-    <View style={{ gap: 6 }}>
-      <AppText variant="label" style={{ color: palette.textSecondary, fontSize: 12 }}>{label}</AppText>
-      <Pressable
-        onPress={onPress}
-        style={{ paddingVertical: 14, paddingHorizontal: 16, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 0.5, borderColor: palette.border }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <AppText variant="body" style={{ color: value ? palette.text : palette.textTertiary }}>{value || placeholder}</AppText>
-          <Ionicons name="chevron-down" size={20} color={palette.textSecondary} />
-        </View>
-      </Pressable>
-    </View>
-  );
-}
-
-const inputStyle = {
-  minHeight: 48,
-  borderRadius: radius.md,
-  borderWidth: 0.5,
-  borderColor: palette.border,
-  paddingHorizontal: 16,
-  backgroundColor: 'rgba(255,255,255,0.04)',
-  color: palette.text,
-  fontFamily: typography.body,
-  fontSize: 15,
-} as const;
 
 export default function BikeSetupScreen() {
   const params = useLocalSearchParams<{ flow?: string }>();
@@ -54,71 +22,44 @@ export default function BikeSetupScreen() {
   const setOnboardingData = useAppStore((state) => state.setOnboardingData);
   const onboardingData = useAppStore((state) => state.onboardingData);
   const isOnboarding = params.flow === 'onboarding';
-  const initialBrand = onboardingData.bikeBrand && !bikeBrands.includes(onboardingData.bikeBrand)
-    ? 'Other'
-    : onboardingData.bikeBrand || '';
 
-  const [brand, setBrand] = useState(initialBrand);
-  const [brandCustom, setBrandCustom] = useState(initialBrand === 'Other' ? onboardingData.bikeBrand : '');
+  const initialBrand = onboardingData.bikeBrand && !bikeBrands.includes(onboardingData.bikeBrand) ? 'Other' : onboardingData.bikeBrand || '';
   const initialModels = initialBrand && initialBrand !== 'Other' ? getModelsForBrand(initialBrand) : [];
   const initialModelIsCustom = Boolean(onboardingData.bikeModel && initialModels.length && !initialModels.some((item) => item.name === onboardingData.bikeModel));
-  const [model, setModel] = useState(initialModelIsCustom ? 'Other' : onboardingData.bikeModel || '');
-  const [modelCustom, setModelCustom] = useState(initialModelIsCustom ? onboardingData.bikeModel : '');
-  const [year, setYear] = useState(onboardingData.bikeYear || '');
-  const [cc, setCc] = useState(onboardingData.bikeEngineCc || '');
-  const [odometer, setOdometer] = useState(onboardingData.bikeOdometerKm || '');
-  const [ridingStyle, setRidingStyle] = useState<RideMode>((onboardingData.ridingStyle as RideMode) || 'weekend');
 
-  const brandSheetRef = useRef<PickerSheetRef>(null);
-  const modelSheetRef = useRef<PickerSheetRef>(null);
+  const [draft, setDraft] = useState<BikeIdentityDraft>({
+    ...BIKE_IDENTITY_EMPTY,
+    brand: initialBrand,
+    brandCustom: initialBrand === 'Other' ? onboardingData.bikeBrand : '',
+    model: initialModelIsCustom ? 'Other' : onboardingData.bikeModel || '',
+    modelCustom: initialModelIsCustom ? onboardingData.bikeModel : '',
+    year: onboardingData.bikeYear || '',
+    engineCc: onboardingData.bikeEngineCc || '',
+    odometerKm: onboardingData.bikeOdometerKm || '',
+    ridingStyle: (onboardingData.ridingStyle as RideMode) || 'weekend',
+  });
 
-  const brandModels = useMemo(() => (brand ? getModelsForBrand(brand) : []), [brand]);
-  const finalBrand = brand === 'Other' ? brandCustom.trim() : brand.trim();
-  const finalModel = model === 'Other' ? modelCustom.trim() : model.trim();
-  const finalYear = year.trim();
-  const finalCc = cc.trim();
-  const finalOdometer = odometer.trim();
-  const isBikeValid = Boolean(finalBrand && finalModel && finalYear && finalCc && finalOdometer);
-
-  const brandOptions = useMemo(() => bikeBrands.map((b) => ({ label: b, value: b })), []);
-  const modelOptions = useMemo(
-    () => [...brandModels.map((m) => ({ label: m.name, value: m.name })), { label: 'Other', value: 'Other' }],
-    [brandModels],
-  );
-
-  const syncDraft = (data: Partial<typeof onboardingData>) => {
-    setOnboardingData(data);
-  };
-
-  const handleBrandSelect = (b: string) => {
-    setBrand(b);
-    setModel('');
-    setModelCustom('');
-    setCc('');
-    if (b !== 'Other') setBrandCustom('');
-    syncDraft({
-      bikeBrand: b === 'Other' ? '' : b,
-      bikeModel: '',
-      bikeEngineCc: '',
+  const handleChange = (partial: Partial<BikeIdentityDraft>) => {
+    setDraft((prev) => {
+      const next = { ...prev, ...partial };
+      // Sync draft to onboardingData zustand store so useOnboardingSync can pick it up
+      const resolved = resolveBikeIdentity(next);
+      setOnboardingData({
+        bikeBrand: resolved.finalBrand,
+        bikeModel: resolved.finalModel,
+        bikeYear: resolved.finalYear,
+        bikeEngineCc: resolved.finalCc,
+        bikeOdometerKm: resolved.finalOdometer,
+        ridingStyle: next.ridingStyle,
+      });
+      return next;
     });
   };
 
-  const handleModelSelect = (modelName: string) => {
-    setModel(modelName);
-    if (modelName === 'Other') {
-      setModelCustom('');
-      setCc('');
-      syncDraft({ bikeModel: '', bikeEngineCc: '' });
-      return;
-    }
-    const found = brandModels.find((m) => m.name === modelName);
-    const nextCc = found ? found.cc.toString() : '';
-    if (found) setCc(nextCc);
-    syncDraft({ bikeModel: modelName, bikeEngineCc: nextCc || cc });
-  };
+  const { isValid, finalBrand, finalModel, finalYear, finalCc, finalOdometer } = resolveBikeIdentity(draft);
 
   const handleNext = () => {
-    if (!isBikeValid) {
+    if (!isValid) {
       return;
     }
 
@@ -128,9 +69,9 @@ export default function BikeSetupScreen() {
       bikeYear: finalYear,
       bikeEngineCc: finalCc,
       bikeOdometerKm: finalOdometer,
-      ridingStyle,
+      ridingStyle: draft.ridingStyle,
     });
-    setPreferredMode(ridingStyle);
+    setPreferredMode(draft.ridingStyle);
 
     if (isOnboarding) {
       setOnboardingStep(4);
@@ -140,18 +81,11 @@ export default function BikeSetupScreen() {
     }
   };
 
-  const brandDisplay = brand === 'Other' && brandCustom ? brandCustom : brand;
-
   const content = (
     <>
-      {isOnboarding ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Pressable onPress={() => { setOnboardingStep(1); router.replace(getOnboardingRoute(1) as any); }}>
-            <Ionicons name="arrow-back" size={20} color={palette.textSecondary} />
-          </Pressable>
-          <AppText variant="label" style={{ color: palette.textSecondary }}>Step 2 of {ONBOARDING_TOTAL_STEPS}</AppText>
-        </View>
-      ) : null}
+        {isOnboarding ? (
+          <OnboardingHeader step={2} onBack={() => { setOnboardingStep(1); router.replace(getOnboardingRoute(1) as any); }} />
+        ) : null}
       <View style={{ gap: 8 }}>
         <AppText variant="screenTitle" style={{ fontSize: 30 }}>What do you ride?</AppText>
         <AppText variant="meta" style={{ color: palette.textSecondary }}>
@@ -159,121 +93,7 @@ export default function BikeSetupScreen() {
         </AppText>
       </View>
 
-      <PickerTrigger label="Brand" value={brandDisplay} placeholder="Select brand" onPress={() => brandSheetRef.current?.present()} />
-
-      {brand === 'Other' && (
-        <TextInput
-          value={brandCustom}
-          onChangeText={(value) => {
-            setBrandCustom(value);
-            syncDraft({ bikeBrand: value.trim() });
-          }}
-          placeholder="Enter brand name"
-          placeholderTextColor={palette.textTertiary}
-          selectionColor={palette.danger}
-          style={inputStyle}
-        />
-      )}
-
-      {brand && brand !== 'Other' && (
-        <PickerTrigger label="Model" value={model} placeholder="Select model" onPress={() => modelSheetRef.current?.present()} />
-      )}
-
-      {(brand === 'Other' || model === 'Other') && (
-        <TextInput
-          value={model === 'Other' ? modelCustom : model}
-          onChangeText={(value) => {
-            if (model === 'Other') {
-              setModelCustom(value);
-            } else {
-              setModel(value);
-            }
-            syncDraft({ bikeModel: value.trim() });
-          }}
-          placeholder="Model"
-          placeholderTextColor={palette.textTertiary}
-          selectionColor={palette.danger}
-          style={inputStyle}
-        />
-      )}
-
-      <TextInput
-        value={year}
-        onChangeText={(value) => {
-          setYear(value);
-          syncDraft({ bikeYear: value.trim() });
-        }}
-        placeholder="Year (e.g. 2023)"
-        placeholderTextColor={palette.textTertiary}
-        keyboardType="number-pad"
-        maxLength={4}
-        selectionColor={palette.danger}
-        style={inputStyle}
-      />
-
-      <TextInput
-        value={cc}
-        onChangeText={(value) => {
-          setCc(value);
-          syncDraft({ bikeEngineCc: value.trim() });
-        }}
-        placeholder="Engine CC"
-        placeholderTextColor={palette.textTertiary}
-        keyboardType="number-pad"
-        selectionColor={palette.danger}
-        style={inputStyle}
-      />
-
-      <TextInput
-        value={odometer}
-        onChangeText={(value) => {
-          setOdometer(value);
-          syncDraft({ bikeOdometerKm: value.trim() });
-        }}
-        placeholder="Current Odometer (km)"
-        placeholderTextColor={palette.textTertiary}
-        keyboardType="number-pad"
-        selectionColor={palette.danger}
-        style={inputStyle}
-      />
-
-      <View style={{ gap: 8 }}>
-        <AppText variant="label" style={{ color: palette.textSecondary, fontSize: 12 }}>Riding Style</AppText>
-        {ridingStyles.map((style) => (
-          <Pressable
-            key={style.mode}
-            onPress={() => {
-              setRidingStyle(style.mode);
-              syncDraft({ ridingStyle: style.mode });
-            }}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: radius.md, borderWidth: ridingStyle === style.mode ? 0 : 1.5, borderColor: palette.border, backgroundColor: ridingStyle === style.mode ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)', paddingHorizontal: 16, paddingVertical: 14 }}>
-            <Ionicons name={style.icon as any} size={22} color={ridingStyle === style.mode ? palette.text : palette.textSecondary} />
-            <View style={{ flex: 1, gap: 2 }}>
-              <AppText variant="bodyBold" style={{ color: ridingStyle === style.mode ? palette.text : palette.textSecondary }}>{style.label}</AppText>
-              <AppText variant="meta" style={{ fontSize: 12, color: palette.textTertiary }}>{style.subtitle}</AppText>
-            </View>
-          </Pressable>
-        ))}
-      </View>
-    </>
-  );
-
-  const pickerSheets = (
-    <>
-      <PickerSheet
-        ref={brandSheetRef}
-        title="Select brand"
-        options={brandOptions}
-        selectedValue={brand}
-        onSelect={handleBrandSelect}
-      />
-      <PickerSheet
-        ref={modelSheetRef}
-        title="Select model"
-        options={modelOptions}
-        selectedValue={model}
-        onSelect={handleModelSelect}
-      />
+      <BikeIdentityForm value={draft} onChange={handleChange} showRidingStyle />
     </>
   );
 
@@ -287,26 +107,24 @@ export default function BikeSetupScreen() {
             <ScrollView
               contentContainerStyle={{ gap: 18, paddingBottom: 24 }}
               showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="always">
+              keyboardShouldPersistTaps="handled">
               {content}
             </ScrollView>
-            <Button title="Next →" onPress={handleNext} disabled={!isBikeValid} />
+            <Button title="Next →" onPress={handleNext} disabled={!isValid} />
           </GlassCard>
         </KeyboardAvoidingView>
-        {pickerSheets}
       </AppScreen>
     );
   }
 
   return (
     <AppScrollScreen
-      keyboardShouldPersistTaps="always"
+      keyboardShouldPersistTaps="handled"
       contentContainerStyle={{ flexGrow: 1 }}>
       <GlassCard style={{ gap: 18, padding: 22 }}>
         {content}
-        <Button title="Next →" onPress={handleNext} disabled={!isBikeValid} />
+        <Button title="Next →" onPress={handleNext} disabled={!isValid} />
       </GlassCard>
-      {pickerSheets}
     </AppScrollScreen>
   );
 }
