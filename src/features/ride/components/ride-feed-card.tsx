@@ -10,10 +10,20 @@ import { formatDateLabel } from '@/lib/format';
 import { palette } from '@/constants/theme';
 import type { RideRecord } from '@/types/domain';
 
-function RideFeedCardImpl({ ride, onPress, onShare }: { ride: RideRecord; onPress?: () => void; onShare?: () => void }) {
+function RideFeedCardImpl({
+  ride,
+  bikeLabel,
+  onPress,
+  onShare,
+}: {
+  ride: RideRecord;
+  bikeLabel?: string;
+  onPress?: () => void;
+  onShare?: () => void;
+}) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [{ opacity: pressed ? 0.92 : 1 }]}>
-      <GlassCard style={{ padding: 14, gap: 12 }}>
+    <Pressable onPress={onPress} style={({ pressed }) => [{ opacity: pressed ? 0.92 : 1, alignSelf: 'stretch' }]}>
+      <GlassCard style={{ padding: 14, gap: 12, alignSelf: 'stretch' }}>
         <RideMapThumbnail ride={ride} />
         <View style={{ gap: 6 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
@@ -35,6 +45,11 @@ function RideFeedCardImpl({ ride, onPress, onShare }: { ride: RideRecord; onPres
               </Pressable>
             ) : null}
           </View>
+          {bikeLabel ? (
+            <AppText variant="meta" numberOfLines={1} ellipsizeMode="tail" style={{ color: palette.textTertiary }}>
+              {bikeLabel}
+            </AppText>
+          ) : null}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Timer size={14} color={palette.textSecondary} />

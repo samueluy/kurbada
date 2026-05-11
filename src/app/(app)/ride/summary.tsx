@@ -2,7 +2,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { Alert, InteractionManager, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Image, InteractionManager, Modal, PanResponder, Pressable, ScrollView, View } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 
 import { RouteMapPreview } from '@/components/ride/route-map-preview';
@@ -38,121 +38,102 @@ export default function RideSummaryScreen() {
   const rides = useRides(session?.user.id);
   const fuelLogs = useFuelLogs(session?.user.id);
   const ride = rides.data?.find((item) => item.id === params.rideId) ?? rides.data?.[0];
-  const workMode = useAppStore((s) => s.workMode);
-  const { saveEarnings } = useEarningsMutations(session?.user.id);
-  const { updateRideMood } = useRideMutations(session?.user.id);
-  const storyShotRef = useRef<any>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState<RideStoryTemplateId>('distance_hero');
-  const [storyPhoto, setStoryPhoto] = useState<string | undefined>();
-  const [amountInput, setAmountInput] = useState('');
-  const [platform, setPlatform] = useState<PlatformTag>('grab');
-  const [earningsSaved, setEarningsSaved] = useState(false);
-  const [mood, setMood] = useState<RideMood | null>(null);
-  const [moodSaved, setMoodSaved] = useState(false);
   const latestFuelPrice = useMemo(() => {
     const logs = fuelLogs.data ?? [];
-    return logs.length ? logs[0].price_per_liter : undefined;
+    return logs[0]?.price_per_liter ?? 65;
   }, [fuelLogs.data]);
+  const workMode = useAppStore((s) => s.workMode);
 
-  if (!ride) {
-    return null;
-  }
+  if (!ride) return null;
+
+  const totalSeconds = ride.started_at && ride.ended_at
+    ? Math.round((new Date(ride.ended_at).getTime() - new Date(ride.started_at).getTime()) / 1000)
+    : 0;
+  const [mood, setMood] = useState<RideMood | null>(ride.mood ?? null);
+  const [moodSaved, setMoodSaved] = useState(false);
+  const [earningsSaved, setEarningsSaved] = useState(false);
+  const [amountInput, setAmountInput] = useState('');
+  const [platform, setPlatform] = useState<PlatformTag>('grab');
+  const { saveEarnings } = useEarningsMutations(session?.user.id);
+  const { updateRideMood, deleteRide } = useRideMutations(session?.user.id);
+  const storyShotRef = useRef<any>(null);
 
   const handleSaveMood = async (next: RideMood) => {
     setMood(next);
+    try { await updateRideMood.mutateAsync({ rideId: ride.id, mood: next }); setMoodSaved(true); } catch { /* */ }
+  };
+
+  const handleSaveEarnings = async () => {
+    const amount = Number(amountInput);
+    if (!Number.isFinite(amount) || amount <= 0) { Alert.alert('Invalid amount', 'Enter a valid amount.'); return; }
     try {
-      await updateRideMood.mutateAsync({ rideId: ride.id, mood: next });
-      setMoodSaved(true);
-    } catch {
-      // No-op: mood is soft state; keep the selection for next attempt.
-    }
+      await saveEarnings.mutateAsync({ user_id: session!.user.id, ride_id: ride.id, bike_id: ride.bike_id, earned_at: ride.ended_at.slice(0, 10), amount, platform, notes: null });
+      setEarningsSaved(true);
+    } catch (error) { Alert.alert('Save failed', error instanceof Error ? error.message : 'Please try again.'); }
   };
 
   const pickStoryPhoto = async () => {
     try {
-      const pickerResult = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 1,
-      });
-
-      if (pickerResult.canceled || !pickerResult.assets?.length) {
-        return;
-      }
-
+      const pickerResult = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+      if (pickerResult.canceled || !pickerResult.assets?.length) return;
       setStoryPhoto(pickerResult.assets[0].uri);
-    } catch (error) {
-      Alert.alert('Photo picker failed', error instanceof Error ? error.message : 'Could not open photo library.');
-    }
+      setPhotoScale(1.3); setPhotoOffsetX(0); setPhotoOffsetY(-40);
+      setShowPhotoAdjust(true);
+    } catch (error) { Alert.alert('Photo picker failed', error instanceof Error ? error.message : 'Could not open photo library.'); }
   };
 
   const captureAndShare = async () => {
     try {
       const uri = await storyShotRef.current?.capture?.();
-      if (!uri) {
-        throw new Error('Could not capture the story card.');
-      }
-
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'image/png',
-          dialogTitle: 'Share ride to Instagram',
-        });
-      } else {
-        throw new Error('Sharing is not available on this device.');
-      }
-    } catch (error) {
-      Alert.alert('Export failed', error instanceof Error ? error.message : 'Please try again.');
-    }
+      if (!uri) throw new Error('Could not capture the story card.');
+      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share ride image' });
+    } catch (error) { Alert.alert('Export failed', error instanceof Error ? error.message : 'Please try again.'); }
   };
 
   const handleShareToStories = async () => {
-    try {
-      if (!storyPhoto) {
-        await pickStoryPhoto();
-        return;
+    if (!storyPhoto) { await pickStoryPhoto(); return; }
+    InteractionManager.runAfterInteractions(() => { void captureAndShare(); });
+  };
+  const [selectedTemplate, setSelectedTemplate] = useState<RideStoryTemplateId>('distance_hero');
+  const [storyPhoto, setStoryPhoto] = useState<string | undefined>();
+  const [showPhotoAdjust, setShowPhotoAdjust] = useState(false);
+  const [photoScale, setPhotoScale] = useState(1.3);
+  const [photoOffsetX, setPhotoOffsetX] = useState(0);
+  const [photoOffsetY, setPhotoOffsetY] = useState(-40);
+  const lastDistance = useRef(0);
+  const lastOffset = useRef({ x: 0, y: 0 });
+  const currentScale = useRef(1.3);
+  const currentOffset = useRef({ x: 0, y: -40 });
+
+  const photoPanResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 2 || Math.abs(g.dy) > 2,
+    onPanResponderGrant: () => {
+      lastDistance.current = 0;
+      lastOffset.current = { x: currentOffset.current.x, y: currentOffset.current.y };
+    },
+    onPanResponderMove: (evt, gs) => {
+      if (evt.nativeEvent.touches?.length === 2) {
+        const dx = evt.nativeEvent.touches[1].pageX - evt.nativeEvent.touches[0].pageX;
+        const dy = evt.nativeEvent.touches[1].pageY - evt.nativeEvent.touches[0].pageY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (lastDistance.current > 0 && dist > 0) {
+          currentScale.current = Math.max(1, Math.min(3, currentScale.current * (dist / lastDistance.current)));
+          setPhotoScale(currentScale.current);
+        }
+        lastDistance.current = dist;
+      } else {
+        lastDistance.current = 0;
+        currentOffset.current = {
+          x: lastOffset.current.x + gs.dx,
+          y: lastOffset.current.y + gs.dy,
+        };
+        setPhotoOffsetX(currentOffset.current.x);
+        setPhotoOffsetY(currentOffset.current.y);
       }
-
-      InteractionManager.runAfterInteractions(() => {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            void captureAndShare();
-          });
-        });
-      });
-    } catch (error) {
-      Alert.alert('Export failed', error instanceof Error ? error.message : 'Please try again.');
-    }
-  };
-
-  const handleSaveEarnings = async () => {
-    const amount = Number(amountInput);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      Alert.alert('Invalid amount', 'Enter a valid earnings amount.');
-      return;
-    }
-    if (!session?.user.id) {
-      Alert.alert('Sign in required', 'You must be signed in to save earnings.');
-      return;
-    }
-    try {
-      await saveEarnings.mutateAsync({
-        user_id: session.user.id,
-        ride_id: ride.id,
-        bike_id: ride.bike_id,
-        earned_at: ride.ended_at.slice(0, 10),
-        amount,
-        platform,
-        notes: null,
-      });
-      setEarningsSaved(true);
-    } catch (error) {
-      Alert.alert('Save failed', error instanceof Error ? error.message : 'Please try again.');
-    }
-  };
-
-  const totalSeconds = ride.started_at && ride.ended_at
-    ? Math.round((new Date(ride.ended_at).getTime() - new Date(ride.started_at).getTime()) / 1000)
-    : 0;
+    },
+    onPanResponderRelease: () => { lastDistance.current = 0; },
+  }), []);
   const estimatedFuelCost = (ride.fuel_used_liters ?? 0) * (latestFuelPrice ?? 65);
 
   return (
@@ -300,14 +281,67 @@ export default function RideSummaryScreen() {
               />
             ) : null}
             <Button
-              title="Share to Instagram"
+              title="Share"
               onPress={handleShareToStories}
               style={{ backgroundColor: palette.danger }}
             />
           </View>
         </GlassCard>
         <Button title="Done" variant="secondary" onPress={() => router.replace('/(app)/(tabs)/ride')} />
+        <Button
+          title="Delete Ride"
+          variant="ghost"
+          onPress={() => {
+            Alert.alert('Delete this ride?', 'This will permanently remove the ride record and its route data.', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Delete', style: 'destructive', onPress: () => { deleteRide.mutate(ride.id); router.replace('/(app)/(tabs)/ride'); } },
+            ]);
+          }}
+        />
       </AppScrollScreen>
+
+      <Modal visible={showPhotoAdjust} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <View style={{ flex: 1, overflow: 'hidden' }} {...photoPanResponder.panHandlers}>
+            <Image
+              source={{ uri: storyPhoto }}
+              style={{
+                flex: 1,
+                transform: [
+                  { scale: photoScale },
+                  { translateX: photoOffsetX },
+                  { translateY: photoOffsetY },
+                ],
+              }}
+              resizeMode="cover"
+            />
+            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingBottom: 40, gap: 8 }}>
+              <AppText variant="meta" style={{ color: palette.textSecondary, textAlign: 'center', fontSize: 12 }}>
+                Pinch to zoom · Drag to position
+              </AppText>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    title="Change Photo"
+                    variant="secondary"
+                    onPress={() => { setShowPhotoAdjust(false); pickStoryPhoto(); }}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    title="Continue"
+                    onPress={() => {
+                      setShowPhotoAdjust(false);
+                      setTimeout(() => void captureAndShare(), 150);
+                    }}
+                    style={{ backgroundColor: palette.danger }}
+                  />
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <View
         pointerEvents="none"
@@ -328,6 +362,9 @@ export default function RideSummaryScreen() {
             photoUri={storyPhoto}
             templateId={selectedTemplate}
             fuelPricePerLiter={latestFuelPrice}
+            photoScale={photoScale}
+            photoOffsetX={photoOffsetX}
+            photoOffsetY={photoOffsetY}
             width={1080}
           />
         </ViewShot>

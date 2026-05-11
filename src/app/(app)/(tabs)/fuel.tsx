@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, View } from 'react-native';
+import { Alert, Animated, Pressable, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScrollScreen } from '@/components/ui/app-screen';
@@ -16,6 +16,7 @@ import { palette, radius } from '@/constants/theme';
 import { formatCurrencyPhp } from '@/lib/format';
 import { useAuth } from '@/hooks/use-auth';
 import { useBikes, useFuelLogs, useFuelMutations } from '@/hooks/use-kurbada-data';
+import type { FuelLog } from '@/types/domain';
 
 export default function FuelTabScreen() {
   const { session } = useAuth();
@@ -29,6 +30,12 @@ export default function FuelTabScreen() {
   const [octane, setOctane] = useState<'91' | '95' | '97' | '100'>('95');
   const formProgress = useRef(new Animated.Value(0)).current;
   const currentBike = bikes.data?.[0];
+  const resetForm = useCallback(() => {
+    setLiters('');
+    setPrice('');
+    setStation('');
+    setOctane('95');
+  }, []);
 
   const summary = useMemo(() => {
     const logs = fuelLogs.data ?? [];
@@ -60,7 +67,7 @@ export default function FuelTabScreen() {
       Animated.timing(formProgress, {
         toValue: showForm ? 1 : 0,
         duration: showForm ? 220 : 180,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
     ]).start();
   }, [formProgress, showForm]);
@@ -74,6 +81,33 @@ export default function FuelTabScreen() {
     inputRange: [0, 1],
     outputRange: [0, 1],
   });
+
+  const handleEntryPress = useCallback((item: FuelLog) => {
+    Alert.alert(
+      `${item.liters.toFixed(1)}L · Octane ${item.octane_rating}`,
+      [
+        item.station_name ?? 'Fuel stop',
+        item.logged_at,
+        formatCurrencyPhp(item.total_cost),
+      ].join('\n'),
+      [{ text: 'Close', style: 'cancel' }],
+    );
+  }, []);
+
+  const handleDeleteEntry = useCallback((item: FuelLog) => {
+    Alert.alert(
+      'Delete fuel entry?',
+      'This log will be removed from your fuel history.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => deleteFuelLog.mutate(item.id),
+        },
+      ],
+    );
+  }, [deleteFuelLog]);
 
   return (
     <TabTransition>
@@ -110,6 +144,9 @@ export default function FuelTabScreen() {
           <FloatingField label="Liters" value={liters} onChangeText={setLiters} placeholder="7.0" keyboardType="decimal-pad" />
           <FloatingField label="Price per Liter" value={price} onChangeText={setPrice} placeholder="66" keyboardType="decimal-pad" />
           <FloatingField label="Station Name" value={station} onChangeText={setStation} placeholder="Shell Katipunan" />
+          <AppText variant="label" style={{ color: palette.textSecondary, fontSize: 12 }}>
+            Octane
+          </AppText>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {(['91', '95', '97', '100'] as const).map((value) => (
               <Pressable
@@ -148,6 +185,7 @@ export default function FuelTabScreen() {
                 octane_rating: Number(octane) as 91 | 95 | 97 | 100,
                 station_name: station,
               });
+              resetForm();
               setShowForm(false);
             }}
           />
@@ -167,7 +205,12 @@ export default function FuelTabScreen() {
       {fuelLogs.data?.length ? (
         <View style={{ gap: 12 }}>
           {fuelLogs.data.map((item) => (
-            <FuelEntryCard key={item.id} entry={item} onPress={() => deleteFuelLog.mutate(item.id)} />
+            <FuelEntryCard
+              key={item.id}
+              entry={item}
+              onPress={() => handleEntryPress(item)}
+              onLongPress={() => handleDeleteEntry(item)}
+            />
           ))}
         </View>
       ) : (

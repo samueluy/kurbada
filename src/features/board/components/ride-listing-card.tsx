@@ -113,6 +113,7 @@ function RideListingCardImpl({
     expanded.value = expanded.value ? 0 : 1;
     onPress?.();
   };
+  const displayTitle = listing.title?.trim() || listing.destination;
 
   return (
     <Pressable onPress={handlePress} style={({ pressed }) => [{ opacity: pressed ? 0.94 : 1 }]}>
@@ -121,7 +122,7 @@ function RideListingCardImpl({
         {listing.photo_urls?.length ? <PhotoStrip urls={listing.photo_urls} /> : null}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
           <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-            <AppText variant="h2" numberOfLines={2} ellipsizeMode="tail">{listing.destination}</AppText>
+            <AppText variant="h2" numberOfLines={2} ellipsizeMode="tail">{displayTitle}</AppText>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <MapPin size={12} color={palette.textTertiary} />
               <AppText
@@ -129,13 +130,18 @@ function RideListingCardImpl({
                 numberOfLines={1}
                 ellipsizeMode="tail"
                 style={{ color: palette.textSecondary, flex: 1, minWidth: 0 }}>
+                {listing.destination}
+                {listing.destination && listing.meetup_point ? ' · ' : ''}
                 {listing.meetup_point}
                 {listing.city ? ` · ${listing.city}` : ''}
               </AppText>
             </View>
           </View>
           <Pressable
-            onPress={() => onReport?.()}
+            onPress={(event) => {
+              event.stopPropagation?.();
+              onReport?.();
+            }}
             hitSlop={8}
             style={{ padding: 4, flexShrink: 0 }}
           >

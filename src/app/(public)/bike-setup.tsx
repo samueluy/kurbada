@@ -1,7 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScreen, AppScrollScreen } from '@/components/ui/app-screen';
@@ -10,8 +9,8 @@ import { GlassCard } from '@/components/ui/glass-card';
 import { palette } from '@/constants/theme';
 import { OnboardingHeader } from '@/components/ui/onboarding-header';
 import { BikeIdentityForm, BIKE_IDENTITY_EMPTY, resolveBikeIdentity, type BikeIdentityDraft } from '@/features/garage/components/bike-identity-form';
-import { bikeBrands, getModelsForBrand } from '@/lib/bike-models';
-import { getOnboardingRoute, ONBOARDING_TOTAL_STEPS } from '@/lib/onboarding-flow';
+import { bikeBrands, getModelsForBrand, inferBikeCategory } from '@/lib/bike-models';
+import { getOnboardingRoute } from '@/lib/onboarding-flow';
 import { useAppStore } from '@/store/app-store';
 import type { RideMode } from '@/types/domain';
 
@@ -40,21 +39,22 @@ export default function BikeSetupScreen() {
   });
 
   const handleChange = (partial: Partial<BikeIdentityDraft>) => {
-    setDraft((prev) => {
-      const next = { ...prev, ...partial };
-      // Sync draft to onboardingData zustand store so useOnboardingSync can pick it up
-      const resolved = resolveBikeIdentity(next);
-      setOnboardingData({
-        bikeBrand: resolved.finalBrand,
-        bikeModel: resolved.finalModel,
-        bikeYear: resolved.finalYear,
-        bikeEngineCc: resolved.finalCc,
-        bikeOdometerKm: resolved.finalOdometer,
-        ridingStyle: next.ridingStyle,
-      });
-      return next;
-    });
+    setDraft((prev) => ({ ...prev, ...partial }));
   };
+
+  useEffect(() => {
+    const resolved = resolveBikeIdentity(draft);
+    setOnboardingData({
+      bikeBrand: resolved.finalBrand,
+      bikeModel: resolved.finalModel,
+      bikeYear: resolved.finalYear,
+      bikeEngineCc: resolved.finalCc,
+      bikeOdometerKm: resolved.finalOdometer,
+      bikeCategory: inferBikeCategory({ model: resolved.finalModel, cc: resolved.finalCc }),
+      ridingStyle: draft.ridingStyle,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft]);
 
   const { isValid, finalBrand, finalModel, finalYear, finalCc, finalOdometer } = resolveBikeIdentity(draft);
 
@@ -69,13 +69,14 @@ export default function BikeSetupScreen() {
       bikeYear: finalYear,
       bikeEngineCc: finalCc,
       bikeOdometerKm: finalOdometer,
+      bikeCategory: inferBikeCategory({ model: finalModel, cc: finalCc }),
       ridingStyle: draft.ridingStyle,
     });
     setPreferredMode(draft.ridingStyle);
 
     if (isOnboarding) {
-      setOnboardingStep(4);
-      router.push(getOnboardingRoute(4) as any);
+      setOnboardingStep(3);
+      router.push(getOnboardingRoute(3) as any);
     } else {
       router.replace('/(app)/(tabs)/ride');
     }

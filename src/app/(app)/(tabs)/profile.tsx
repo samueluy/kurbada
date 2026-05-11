@@ -169,19 +169,19 @@ export default function ProfileTabScreen() {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
           <GlassCard style={{ width: '47%', padding: 14, borderRadius: 14 }}>
             <AppText variant="label">Rides</AppText>
-            <AppText variant="cardMetric" numberOfLines={1} adjustsFontSizeToFit style={{ color: statValueColor(rides.data?.length ?? 0) }}>{rides.data?.length ?? 0}</AppText>
+            <AppText variant="cardMetric" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 22, color: statValueColor(rides.data?.length ?? 0) }}>{rides.data?.length ?? 0}</AppText>
           </GlassCard>
-          <GlassCard style={{ width: '47%', padding: 14, borderRadius: 14 }}>
+          <GlassCard style={{ width: '47%', padding: 16 }}>
             <AppText variant="label">Distance</AppText>
-            <AppText variant="cardMetric" numberOfLines={1} adjustsFontSizeToFit style={{ color: statValueColor(totalDistance) }}>{totalDistance.toFixed(1)} km</AppText>
+            <AppText variant="cardMetric" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 22, color: statValueColor(totalDistance) }}>{totalDistance.toFixed(1)} km</AppText>
           </GlassCard>
-          <GlassCard style={{ width: '47%', padding: 14, borderRadius: 14 }}>
+          <GlassCard style={{ width: '47%', padding: 16 }}>
             <AppText variant="label">Fuel Logged</AppText>
             <AppText variant="cardMetric" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 22, color: statValueColor(totalFuel) }}>{formatCurrencyPhp(totalFuel)}</AppText>
           </GlassCard>
-          <GlassCard style={{ width: '47%', padding: 14, borderRadius: 14 }}>
+          <GlassCard style={{ width: '47%', padding: 16 }}>
             <AppText variant="label">Bikes</AppText>
-            <AppText variant="cardMetric" numberOfLines={1} adjustsFontSizeToFit style={{ color: statValueColor(bikes.data?.length ?? 0) }}>{bikes.data?.length ?? 0}</AppText>
+            <AppText variant="cardMetric" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 22, color: statValueColor(bikes.data?.length ?? 0) }}>{bikes.data?.length ?? 0}</AppText>
           </GlassCard>
         </View>
 
@@ -330,7 +330,7 @@ export default function ProfileTabScreen() {
         </View>
 
         {appVersion ? (
-          <View style={{ paddingBottom: 24, alignItems: 'center' }}>
+          <View style={{ paddingTop: 8, alignItems: 'center' }}>
             <AppText variant="meta" style={{ fontSize: 10, opacity: 0.35 }}>
               Kurbada {appVersion}
             </AppText>

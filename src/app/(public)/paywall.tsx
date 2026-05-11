@@ -32,6 +32,9 @@ export default function PaywallScreen() {
   const { applyReferralCode } = useReferralMutations(session?.user.id);
   const setOnboardingStep = useAppStore((state) => state.setOnboardingStep);
   const setPurchaseCompleted = useAppStore((state) => state.setPurchaseCompleted);
+  const completeOnboarding = useAppStore((state) => state.completeOnboarding);
+  const hasCompletedOnboarding = useAppStore((state) => state.hasCompletedOnboarding);
+  const purchaseCompleted = useAppStore((state) => state.purchaseCompleted);
   const pendingReferralCode = useAppStore((state) => state.pendingReferralCode);
   const setPendingReferralCode = useAppStore((state) => state.setPendingReferralCode);
   const [showReferralField, setShowReferralField] = useState(Boolean(pendingReferralCode));
@@ -44,6 +47,13 @@ export default function PaywallScreen() {
   const [purchaseError, setPurchaseError] = useState('');
   const [isPurchasing, setIsPurchasing] = useState(false);
   const isOnboardingPaywall = params.context === 'onboarding';
+
+  useEffect(() => {
+    // Returning user: auto-complete onboarding so gate doesn't loop
+    if (session && !hasCompletedOnboarding && !isOnboardingPaywall) {
+      completeOnboarding();
+    }
+  }, [session, hasCompletedOnboarding, isOnboardingPaywall, completeOnboarding]);
 
   useEffect(() => {
     if (pendingReferralCode) {
@@ -196,7 +206,7 @@ export default function PaywallScreen() {
 
           <View style={{ alignSelf: 'flex-start', backgroundColor: palette.danger, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 10, gap: 2 }}>
             <AppText variant="bodyBold" style={{ color: palette.background, fontSize: 22, lineHeight: 26 }}>
-              {offeringPackage?.product.priceString ?? '₱59'}
+              {offeringPackage?.packageType === 'ANNUAL' ? '₱590' : '₱59'}
             </AppText>
             <AppText variant="meta" style={{ color: palette.background }}>
               /{offeringPackage?.packageType === 'MONTHLY' ? 'month' : 'plan'}

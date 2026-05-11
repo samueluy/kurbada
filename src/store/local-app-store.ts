@@ -18,6 +18,7 @@ type LocalAppState = {
   upsertBike: (bike: Bike) => void;
   deleteBike: (bikeId: string) => void;
   saveRide: (ride: RideRecord) => void;
+  deleteRide: (rideId: string) => void;
   saveFuelLog: (fuelLog: FuelLog) => void;
   deleteFuelLog: (fuelLogId: string) => void;
   updateEmergencyInfo: (info: EmergencyInfo) => void;
@@ -29,6 +30,7 @@ type LocalAppState = {
   updateMaintenanceTask: (task: MaintenanceTask) => void;
   deleteMaintenanceTask: (taskId: string) => void;
   addRideListing: (listing: RideListing) => void;
+  updateRideListing: (listing: RideListing) => void;
   deleteRideListing: (listingId: string) => void;
   reportRideListing: (listingId: string) => void;
 };
@@ -61,6 +63,7 @@ export const useLocalAppStore = create<LocalAppState>()(
           fuelLogs: state.fuelLogs.filter((item) => item.bike_id !== bikeId),
         })),
       saveRide: (ride) => set((state) => ({ rides: [ride, ...state.rides] })),
+      deleteRide: (rideId) => set((state) => ({ rides: state.rides.filter((r) => r.id !== rideId) })),
       saveFuelLog: (fuelLog) =>
         set((state) => ({
           fuelLogs: state.fuelLogs.some((item) => item.id === fuelLog.id)
@@ -88,6 +91,10 @@ export const useLocalAppStore = create<LocalAppState>()(
       addRideListing: (listing) =>
         set((state) => ({
           rideListings: [listing, ...state.rideListings],
+        })),
+      updateRideListing: (listing) =>
+        set((state) => ({
+          rideListings: state.rideListings.map((item) => (item.id === listing.id ? listing : item)),
         })),
       deleteRideListing: (listingId) =>
         set((state) => ({

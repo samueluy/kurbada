@@ -13,6 +13,9 @@ export function StatCard({ label, value, unit, accent = false }: { label: string
       <View style={{ gap: 3 }}>
         <AppText
           variant="mono"
+          adjustsFontSizeToFit
+          minimumFontScale={0.55}
+          numberOfLines={1}
           style={{ fontSize: 22, lineHeight: 24, color: isEmpty ? palette.textTertiary : accent ? palette.danger : palette.text }}>
           {String(value)}
         </AppText>

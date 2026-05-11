@@ -8,7 +8,15 @@ import { palette, radius } from '@/constants/theme';
 import { formatCurrencyPhp } from '@/lib/format';
 import type { FuelLog } from '@/types/domain';
 
-function FuelEntryCardImpl({ entry, onPress }: { entry: FuelLog; onPress?: () => void }) {
+function FuelEntryCardImpl({
+  entry,
+  onPress,
+  onLongPress,
+}: {
+  entry: FuelLog;
+  onPress?: () => void;
+  onLongPress?: () => void;
+}) {
   const octaneStyle =
     entry.octane_rating >= 100
       ? { backgroundColor: 'rgba(192,57,43,0.15)', color: palette.danger }
@@ -19,7 +27,7 @@ function FuelEntryCardImpl({ entry, onPress }: { entry: FuelLog; onPress?: () =>
           : { backgroundColor: palette.surfaceStrong, color: palette.textTertiary };
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [{ opacity: pressed ? 0.92 : 1 }]}>
+    <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={250} style={({ pressed }) => [{ opacity: pressed ? 0.92 : 1 }]}>
       <GlassCard style={{ padding: 14 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <View style={{ width: 36, height: 36, borderRadius: radius.md, backgroundColor: palette.surfaceMuted, alignItems: 'center', justifyContent: 'center' }}>

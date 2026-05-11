@@ -12,7 +12,7 @@ import { KeyboardSheet } from '@/components/ui/keyboard-sheet';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Colors, palette, radius } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
-import { useBikes, useMaintenanceMutations, useMaintenanceTasks } from '@/hooks/use-kurbada-data';
+import { useBikeMutations, useBikes, useMaintenanceMutations, useMaintenanceTasks } from '@/hooks/use-kurbada-data';
 import type { MaintenanceTask } from '@/types/domain';
 
 const defaultIntervals: Record<string, { km: number; days: number | null }> = {
@@ -51,7 +51,7 @@ function Toast({ message }: { message: string }) {
   return (
     <Animated.View style={{
       position: 'absolute',
-      bottom: 40,
+      bottom: 100,
       left: 20,
       right: 20,
       opacity,
@@ -75,29 +75,36 @@ export default function BikeProfileScreen() {
   const bike = bikes.data?.find((item) => item.id === params.bikeId);
   const tasks = useMaintenanceTasks(bike?.id);
   const { addMaintenanceTask, updateMaintenanceTask, deleteMaintenanceTask } = useMaintenanceMutations(session?.user.id);
+  const { saveBike } = useBikeMutations(session?.user.id);
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [customTaskName, setCustomTaskName] = useState('');
   const [customInterval, setCustomInterval] = useState('');
   const [customIntervalMonths, setCustomIntervalMonths] = useState('');
+  const [customCost, setCustomCost] = useState('');
+  const [showOdometerEdit, setShowOdometerEdit] = useState(false);
+  const [odometerInput, setOdometerInput] = useState('');
+  const [nicknameInput, setNicknameInput] = useState('');
+  const [showNicknameEdit, setShowNicknameEdit] = useState(false);
   const autoSeededRef = useRef(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [confirmTask, setConfirmTask] = useState<MaintenanceTask | null>(null);
   const [editTask, setEditTask] = useState<MaintenanceTask | null>(null);
   const [editIntervalKm, setEditIntervalKm] = useState('');
   const [editIntervalMonths, setEditIntervalMonths] = useState('');
+  const [editCost, setEditCost] = useState('');
   const [menuTask, setMenuTask] = useState<MaintenanceTask | null>(null);
 
   useEffect(() => {
     if (bike && tasks.data && tasks.data.length === 0 && !autoSeededRef.current) {
       autoSeededRef.current = true;
       const defaults = [
-        { task_name: 'Engine Oil Change', interval_km: 3000, interval_days: 180 },
-        { task_name: 'Chain Tension & Lube', interval_km: 600, interval_days: 90 },
-        { task_name: 'Brake Fluid', interval_km: 12000, interval_days: 730 },
-        { task_name: 'Air Filter', interval_km: 9000, interval_days: 365 },
-        { task_name: 'Spark Plugs', interval_km: 12000, interval_days: 730 },
-        { task_name: 'Coolant', interval_km: 18000, interval_days: 730 },
-        { task_name: 'Tire Pressure Check', interval_km: 200, interval_days: 14 },
+        { task_name: 'Engine Oil Change', interval_km: 3000, interval_days: 180, cost: 500 },
+        { task_name: 'Chain Tension & Lube', interval_km: 600, interval_days: 90, cost: 150 },
+        { task_name: 'Brake Fluid', interval_km: 12000, interval_days: 730, cost: 300 },
+        { task_name: 'Air Filter', interval_km: 9000, interval_days: 365, cost: 400 },
+        { task_name: 'Spark Plugs', interval_km: 12000, interval_days: 730, cost: 350 },
+        { task_name: 'Coolant', interval_km: 18000, interval_days: 730, cost: 500 },
+        { task_name: 'Tire Pressure Check', interval_km: 200, interval_days: 14, cost: 0 },
       ];
       defaults.forEach((tpl) => {
         addMaintenanceTask.mutate({
@@ -105,6 +112,7 @@ export default function BikeProfileScreen() {
           task_name: tpl.task_name,
           interval_km: tpl.interval_km,
           interval_days: tpl.interval_days,
+          cost: tpl.cost ?? null,
           last_done_odometer_km: bike.current_odometer_km,
           last_done_date: new Date().toISOString().slice(0, 10),
         });
@@ -137,10 +145,12 @@ export default function BikeProfileScreen() {
       ...editTask,
       interval_km: newKm,
       interval_days: newDays,
+      cost: editCost.trim() ? Number(editCost) : undefined,
     });
     setEditTask(null);
     setEditIntervalKm('');
     setEditIntervalMonths('');
+    setEditCost('');
     setToastMessage('✓ Interval updated');
     setTimeout(() => setToastMessage(null), 2500);
   };
@@ -160,10 +170,72 @@ export default function BikeProfileScreen() {
     <AppScrollScreen>
       <GlassCard style={{ padding: 20, gap: 10 }}>
         <AppText variant="eyebrow">Bike Profile</AppText>
-        <AppText variant="screenTitle" style={{ fontSize: 28 }}>{bike.make} {bike.model}</AppText>
-        <AppText variant="meta">{bike.year} · {bike.engine_cc} cc</AppText>
-        <AppText variant="body">Current odometer: {bike.current_odometer_km.toLocaleString()} km</AppText>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ flex: 1 }}>
+            {showNicknameEdit && bike ? (
+              <FloatingField
+                label="Nickname"
+                value={nicknameInput}
+                onChangeText={setNicknameInput}
+                placeholder={bike.make + ' ' + bike.model}
+                returnKeyType="done"
+                blurOnSubmit
+                onSubmitEditing={() => {
+                  saveBike.mutate({ ...bike, nickname: nicknameInput.trim() || null });
+                  setShowNicknameEdit(false);
+                }}
+              />
+            ) : (
+              <Pressable onPress={() => { setNicknameInput(bike?.nickname ?? ''); setShowNicknameEdit(true); }}>
+                <AppText variant="screenTitle" style={{ fontSize: 28 }}>{bike?.nickname || `${bike?.make} ${bike?.model}`}</AppText>
+              </Pressable>
+            )}
+          </View>
+          {!showNicknameEdit && (
+            <Pressable onPress={() => { setNicknameInput(bike?.nickname ?? ''); setShowNicknameEdit(true); }} hitSlop={12} style={{ padding: 4 }}>
+              <Ionicons name="pencil-outline" size={16} color={palette.textTertiary} />
+            </Pressable>
+          )}
+        </View>
+        <AppText variant="meta">{bike?.year} · {bike?.engine_cc} cc</AppText>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <AppText variant="body">Current odometer: {bike?.current_odometer_km.toLocaleString()} km</AppText>
+          <Pressable onPress={() => { setOdometerInput(bike?.current_odometer_km.toString() ?? ''); setShowOdometerEdit(true); }} hitSlop={12} style={{ padding: 4 }}>
+            <Ionicons name="pencil-outline" size={14} color={palette.textTertiary} />
+          </Pressable>
+        </View>
       </GlassCard>
+
+      {showOdometerEdit && bike ? (
+        <GlassCard style={{ padding: 18, gap: 10 }}>
+          <AppText variant="bodyBold">Edit Odometer</AppText>
+          <FloatingField
+            label="Current Odometer (km)"
+            value={odometerInput}
+            onChangeText={setOdometerInput}
+            placeholder={bike.current_odometer_km.toString()}
+            keyboardType="number-pad"
+          />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Button title="Cancel" variant="ghost" onPress={() => setShowOdometerEdit(false)} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button
+                title="Save"
+                onPress={() => {
+                  const value = Number(odometerInput);
+                  if (!isNaN(value) && value > 0) {
+                    saveBike.mutate({ ...bike, current_odometer_km: value });
+                  }
+                  setShowOdometerEdit(false);
+                }}
+                style={{ backgroundColor: Colors.red, borderRadius: 13, minHeight: 48 }}
+              />
+            </View>
+          </View>
+        </GlassCard>
+      ) : null}
 
       <SectionHeader title="Maintenance Tracker" />
       <GlassCard style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
@@ -201,6 +273,11 @@ export default function BikeProfileScreen() {
                       {hasDateInterval ? (
                         <AppText variant="meta" style={{ fontSize: 11, color: dateCloser ? '#F39C12' : palette.textTertiary }}>
                           Every {daysToMonthsLabel(task.interval_days!)}
+                        </AppText>
+                      ) : null}
+                      {task.cost != null && task.cost > 0 ? (
+                        <AppText variant="meta" style={{ fontSize: 11, color: palette.textTertiary }}>
+                          ~₱{task.cost.toLocaleString()} per service
                         </AppText>
                       ) : null}
                     </View>
@@ -249,9 +326,10 @@ export default function BikeProfileScreen() {
             <FloatingField label="Task Name" value={customTaskName} onChangeText={setCustomTaskName} placeholder="Brake Pads" />
             <FloatingField label="Interval (km)" value={customInterval} onChangeText={setCustomInterval} placeholder="8000" keyboardType="number-pad" />
             <FloatingField label="Interval (months)" value={customIntervalMonths} onChangeText={setCustomIntervalMonths} placeholder="6" keyboardType="number-pad" />
+            <FloatingField label="Cost (PHP)" value={customCost} onChangeText={setCustomCost} placeholder="500" keyboardType="number-pad" />
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <View style={{ flex: 1 }}>
-                <Button title="Cancel" variant="ghost" onPress={() => { setShowCustomForm(false); setCustomTaskName(''); setCustomInterval(''); setCustomIntervalMonths(''); }} />
+                <Button title="Cancel" variant="ghost" onPress={() => { setShowCustomForm(false); setCustomTaskName(''); setCustomInterval(''); setCustomIntervalMonths(''); setCustomCost(''); }} />
               </View>
               <View style={{ flex: 1 }}>
                 <Button
@@ -264,6 +342,7 @@ export default function BikeProfileScreen() {
                       task_name: customTaskName,
                       interval_km: Number(customInterval),
                       interval_days: customIntervalMonths.trim() ? months * 30 : null,
+                      cost: customCost.trim() ? Number(customCost) : undefined,
                       last_done_odometer_km: bike.current_odometer_km,
                       last_done_date: new Date().toISOString().slice(0, 10),
                     });
@@ -271,6 +350,7 @@ export default function BikeProfileScreen() {
                     setCustomTaskName('');
                     setCustomInterval('');
                     setCustomIntervalMonths('');
+                    setCustomCost('');
                   }}
                 />
               </View>
@@ -329,6 +409,13 @@ export default function BikeProfileScreen() {
           placeholder={editTask?.interval_days ? Math.round(editTask.interval_days / 30).toString() : ''}
           keyboardType="number-pad"
         />
+        <FloatingField
+          label="COST PER SERVICE (PHP)"
+          value={editCost}
+          onChangeText={setEditCost}
+          placeholder={editTask?.cost?.toString() ?? ''}
+          keyboardType="number-pad"
+        />
         <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 11 }}>
           Leave blank to track by km only.
         </AppText>
@@ -354,7 +441,7 @@ export default function BikeProfileScreen() {
                 onPress={() => {
                   const t = menuTask;
                   setMenuTask(null);
-                  if (t) { setEditTask(t); setEditIntervalKm(t.interval_km.toString()); setEditIntervalMonths(t.interval_days ? Math.round(t.interval_days / 30).toString() : ''); }
+                  if (t) { setEditTask(t); setEditIntervalKm(t.interval_km.toString()); setEditIntervalMonths(t.interval_days ? Math.round(t.interval_days / 30).toString() : ''); setEditCost(t.cost?.toString() ?? ''); }
                 }}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 8 }}>
                 <Ionicons name="pencil-outline" size={20} color={palette.textSecondary} />

@@ -26,6 +26,8 @@ const categories: GearCategory[] = [
   'other',
 ];
 
+const wearableCategories: GearCategory[] = ['helmet', 'jacket', 'gloves', 'boots', 'pants'];
+
 export default function AddGearScreen() {
   const { session } = useAuth();
   const params = useLocalSearchParams<{ gearId?: string }>();
@@ -109,7 +111,7 @@ export default function AddGearScreen() {
       <View style={{ gap: 8 }}>
         <AppText variant="eyebrow">{existing ? 'Edit' : 'Add'} Gear</AppText>
         <AppText variant="screenTitle" style={{ fontSize: 26 }}>
-          {existing ? existing.name : 'Track a new piece of gear'}
+          {existing ? existing.name : 'Add your gear'}
         </AppText>
         <AppText variant="body" style={{ color: palette.textSecondary }}>
           Category defaults reflect typical lifetimes — override if yours differ.
@@ -157,27 +159,30 @@ export default function AddGearScreen() {
           autoCapitalize="none"
         />
 
-        <FloatingField
-          label="Install odometer (km, optional)"
-          value={installOdo}
-          onChangeText={setInstallOdo}
-          placeholder="12840"
-          keyboardType="numeric"
-        />
+        {!wearableCategories.includes(category) ? (
+          <>
+            <FloatingField
+              label="Install odometer (km, optional)"
+              value={installOdo}
+              onChangeText={setInstallOdo}
+              placeholder="12840"
+              keyboardType="numeric"
+            />
+            <FloatingField
+              label="Expected lifetime (km, optional)"
+              value={lifetimeKm}
+              onChangeText={setLifetimeKm}
+              placeholder="10000"
+              keyboardType="numeric"
+            />
+          </>
+        ) : null}
 
         <FloatingField
           label="Expected lifetime (months, optional)"
           value={lifetimeMonths}
           onChangeText={setLifetimeMonths}
           placeholder="60"
-          keyboardType="numeric"
-        />
-
-        <FloatingField
-          label="Expected lifetime (km, optional)"
-          value={lifetimeKm}
-          onChangeText={setLifetimeKm}
-          placeholder="10000"
           keyboardType="numeric"
         />
 

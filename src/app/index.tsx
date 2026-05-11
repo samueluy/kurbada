@@ -1,4 +1,5 @@
 import { Redirect } from 'expo-router';
+import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
@@ -25,6 +26,29 @@ export default function IndexScreen() {
   const setDidSignOut = useAppStore((state) => state.setDidSignOut);
   const completeOnboarding = useAppStore((state) => state.completeOnboarding);
   const completeBikeSetup = useAppStore((state) => state.completeBikeSetup);
+  const hasRemoteBike = (remoteBikes.data?.length ?? 0) > 0;
+
+  useEffect(() => {
+    if (!bypassGate && session && !hasCompletedOnboarding && hasCompletedBikeSetup) {
+      completeOnboarding();
+    }
+  }, [bypassGate, session, hasCompletedOnboarding, hasCompletedBikeSetup, completeOnboarding]);
+
+  useEffect(() => {
+    if (!bypassGate && session && !hasCompletedOnboarding && !remoteBikes.isLoading && hasRemoteBike) {
+      completeOnboarding();
+      if (!hasCompletedBikeSetup) completeBikeSetup();
+    }
+  }, [
+    bypassGate,
+    session,
+    hasCompletedOnboarding,
+    remoteBikes.isLoading,
+    hasRemoteBike,
+    hasCompletedBikeSetup,
+    completeOnboarding,
+    completeBikeSetup,
+  ]);
 
   if (didSignOut) {
     setDidSignOut(false);
@@ -51,12 +75,12 @@ export default function IndexScreen() {
     return <Redirect href="/(public)/splash" />;
   }
 
-  // Returning user with existing bike data — skip onboarding (fast path, local)
   if (!bypassGate && session && !hasCompletedOnboarding && hasCompletedBikeSetup) {
     completeOnboarding();
+    if (!session) return <Redirect href="/(public)/auth/sign-in" />;
+    return <Redirect href="/(app)/(tabs)/ride" />;
   }
 
-  // Returning user on a fresh install — consult Supabase for existing bikes
   if (!bypassGate && session && !hasCompletedOnboarding) {
     if (remoteBikes.isLoading) {
       return (
@@ -70,9 +94,17 @@ export default function IndexScreen() {
         </AppScreen>
       );
     }
-    if ((remoteBikes.data?.length ?? 0) > 0) {
-      completeOnboarding();
-      if (!hasCompletedBikeSetup) completeBikeSetup();
+    if (hasRemoteBike) {
+      return (
+        <AppScreen style={{ justifyContent: 'center', alignItems: 'center' }} showWordmark={false}>
+          <View style={{ alignItems: 'center', gap: 12 }}>
+            <ActivityIndicator size="small" color={palette.textSecondary} />
+            <AppText variant="meta" style={{ color: palette.textSecondary }}>
+              Restoring your rider profile…
+            </AppText>
+          </View>
+        </AppScreen>
+      );
     }
   }
 
@@ -83,6 +115,19 @@ export default function IndexScreen() {
 
   if (!bypassGate && !session) {
     return <Redirect href="/(public)/auth/sign-in" />;
+  }
+
+  if (!bypassGate && session && access.isLoading) {
+    return (
+      <AppScreen style={{ justifyContent: 'center', alignItems: 'center' }} showWordmark={false}>
+        <View style={{ alignItems: 'center', gap: 12 }}>
+          <ActivityIndicator size="small" color={palette.textSecondary} />
+          <AppText variant="meta" style={{ color: palette.textSecondary }}>
+            Checking your access…
+          </AppText>
+        </View>
+      </AppScreen>
+    );
   }
 
   if (!bypassGate && !access.data?.hasAccess) {

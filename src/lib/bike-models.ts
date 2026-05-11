@@ -87,3 +87,29 @@ export const bikeBrands = Object.keys(brandModels);
 export function getModelsForBrand(brand: string): ModelEntry[] {
   return brandModels[brand] ?? [];
 }
+
+export function findModelEntry(brand: string, model: string) {
+  return getModelsForBrand(brand).find((entry) => entry.name.toLowerCase() === model.trim().toLowerCase());
+}
+
+const scooterHints = ['click', 'beat', 'pcx', 'mio', 'nmax', 'aerox', 'fazzio', 'soul', 'gear', 'burgman', 'skydrive'];
+const sportHints = ['ninja', 'cbr', 'panigale', 'rc ', 'rc-', '450 sr', 'gsx-r'];
+const adventureHints = ['versys', 'cb150x', 'gs', 'xrm', 'ct125'];
+
+export function inferBikeCategory({
+  model,
+  cc,
+}: {
+  model?: string;
+  cc?: number | string | null;
+}) {
+  const normalizedModel = model?.trim().toLowerCase() ?? '';
+  const numericCc = typeof cc === 'number' ? cc : Number(cc);
+
+  if (scooterHints.some((hint) => normalizedModel.includes(hint))) return 'scooter' as const;
+  if (adventureHints.some((hint) => normalizedModel.includes(hint))) return 'adventure' as const;
+  if (sportHints.some((hint) => normalizedModel.includes(hint))) return 'sport' as const;
+  if (Number.isFinite(numericCc) && numericCc > 0 && numericCc <= 200) return 'scooter' as const;
+
+  return 'naked' as const;
+}

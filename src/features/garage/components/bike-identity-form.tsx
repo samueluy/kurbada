@@ -9,6 +9,7 @@ import { bikeBrands, getModelsForBrand } from '@/lib/bike-models';
 import type { RideMode } from '@/types/domain';
 
 export type BikeIdentityDraft = {
+  nickname: string;
   brand: string;
   brandCustom: string;
   model: string;
@@ -23,9 +24,11 @@ export type BikeIdentityFormProps = {
   value: BikeIdentityDraft;
   onChange: (partial: Partial<BikeIdentityDraft>) => void;
   showRidingStyle?: boolean;
+  showNickname?: boolean;
 };
 
 export const BIKE_IDENTITY_EMPTY: BikeIdentityDraft = {
+  nickname: '',
   brand: '',
   brandCustom: '',
   model: '',
@@ -37,13 +40,14 @@ export const BIKE_IDENTITY_EMPTY: BikeIdentityDraft = {
 };
 
 export function resolveBikeIdentity(draft: BikeIdentityDraft) {
+  const finalNickname = draft.nickname.trim();
   const finalBrand = draft.brand === 'Other' ? draft.brandCustom.trim() : draft.brand.trim();
   const finalModel = draft.model === 'Other' ? draft.modelCustom.trim() : draft.model.trim();
   const finalYear = draft.year.trim();
   const finalCc = draft.engineCc.trim();
   const finalOdometer = draft.odometerKm.trim();
   const isValid = Boolean(finalBrand && finalModel && finalYear && finalCc && finalOdometer);
-  return { finalBrand, finalModel, finalYear, finalCc, finalOdometer, isValid };
+  return { finalNickname, finalBrand, finalModel, finalYear, finalCc, finalOdometer, isValid };
 }
 
 const inputStyle = {
@@ -83,7 +87,7 @@ function PickerTrigger({ label, value, placeholder, onPress }: { label: string; 
   );
 }
 
-export function BikeIdentityForm({ value, onChange, showRidingStyle = false }: BikeIdentityFormProps) {
+export function BikeIdentityForm({ value, onChange, showRidingStyle = false, showNickname = false }: BikeIdentityFormProps) {
   const brandSheetRef = useRef<PickerSheetRef>(null);
   const modelSheetRef = useRef<PickerSheetRef>(null);
 
@@ -119,6 +123,17 @@ export function BikeIdentityForm({ value, onChange, showRidingStyle = false }: B
 
   return (
     <>
+      {showNickname ? (
+        <TextInput
+          value={value.nickname}
+          onChangeText={(next) => onChange({ nickname: next })}
+          placeholder="Bike Nickname (optional)"
+          placeholderTextColor={palette.textTertiary}
+          selectionColor={palette.danger}
+          style={inputStyle}
+        />
+      ) : null}
+
       <PickerTrigger label="Brand" value={brandDisplay} placeholder="Select brand" onPress={() => brandSheetRef.current?.present()} />
 
       {value.brand === 'Other' ? (

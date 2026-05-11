@@ -47,6 +47,7 @@ export default function RideTabScreen() {
   const weather = useWeather();
   const weatherWindow = useWeatherWindow();
   const allBikes = useMemo(() => bikes.data ?? [], [bikes.data]);
+  const bikesById = useMemo(() => new Map(allBikes.map((bike) => [bike.id, bike])), [allBikes]);
   const primaryBike = useMemo(
     () => allBikes.find((b) => b.id === activeBikeId) ?? allBikes[0],
     [allBikes, activeBikeId],
@@ -318,8 +319,8 @@ export default function RideTabScreen() {
                       fontSize: 12,
                       color: active ? palette.background : palette.textSecondary,
                       maxWidth: 120,
-                    }}>
-                    {bike.make} {bike.model}
+                  }}>
+                    {bike.nickname?.trim() || `${bike.make} ${bike.model}`}
                   </AppText>
                 </Pressable>
               );
@@ -338,6 +339,10 @@ export default function RideTabScreen() {
               <RideFeedCard
                 key={ride.id}
                 ride={ride}
+                bikeLabel={bikesById.get(ride.bike_id)?.nickname?.trim() || (() => {
+                  const bike = bikesById.get(ride.bike_id);
+                  return bike ? `${bike.make} ${bike.model}` : '';
+                })()}
                 onPress={() => router.push({ pathname: '/(app)/ride/summary', params: { rideId: ride.id } })}
                 onShare={() => router.push({ pathname: '/(app)/ride/summary', params: { rideId: ride.id } })}
               />

@@ -41,14 +41,14 @@ export function useUserProfile(userId?: string) {
 
 export function useUserAccess(userId?: string) {
   const profileQuery = useUserProfile(userId);
-
-  return useQuery({
+  const accessQuery = useQuery({
     queryKey: ['access', userId ?? 'local', profileQuery.data?.access_override, profileQuery.data?.subscription_status],
+    enabled: Boolean(userId) && !profileQuery.isLoading,
     queryFn: () => getUserAccess(profileQuery.data),
-    initialData: {
-      hasAccess: true,
-      reason: 'disabled' as const,
-      accessOverride: profileQuery.data?.access_override ?? 'none',
-    },
   });
+
+  return {
+    ...accessQuery,
+    isLoading: Boolean(userId) && (profileQuery.isLoading || accessQuery.isLoading),
+  };
 }

@@ -64,6 +64,14 @@ export default function AppLayout() {
     return <Redirect href="/(public)/auth/sign-in" />;
   }
 
+  if (!bypassGate && access.isLoading) {
+    return (
+      <AppScreen style={{ justifyContent: 'center', alignItems: 'center' }} showWordmark={false}>
+        <ActivityIndicator size="large" color={palette.text} />
+      </AppScreen>
+    );
+  }
+
   if (!bypassGate && !access.data?.hasAccess && !isBillingRoute) {
     return <Redirect href="/(public)/paywall" />;
   }
@@ -83,9 +91,9 @@ export default function AppLayout() {
       }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="ride/active" options={{ presentation: 'modal', gestureEnabled: true }} />
-      <Stack.Screen name="ride/summary" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="ride/summary" options={{ presentation: 'card', gestureEnabled: true }} />
       <Stack.Screen name="garage/[bikeId]" />
-      <Stack.Screen name="board/create" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="board/create" options={{ presentation: 'card', gestureEnabled: true }} />
       <Stack.Screen name="board/community-guidelines" options={{ presentation: 'modal' }} />
       <Stack.Screen name="board/blocked-users" />
       <Stack.Screen name="board/leaderboard" />

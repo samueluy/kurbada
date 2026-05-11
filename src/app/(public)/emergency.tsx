@@ -20,7 +20,7 @@ const bloodTypes: (EmergencyBloodType)[] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'
 const emptyEmergencyInfo = {
   id: '',
   full_name: '',
-  blood_type: 'O+' as EmergencyBloodType,
+  blood_type: '' as EmergencyBloodType,
   allergies: '',
   conditions: '',
   contact1_name: '',
@@ -36,21 +36,32 @@ export default function OnboardingEmergencyScreen() {
   const setOnboardingStep = useAppStore((state) => state.setOnboardingStep);
   const setOnboardingData = useAppStore((state) => state.setOnboardingData);
   const onboardingData = useAppStore((state) => state.onboardingData);
-  const [form, setForm] = useState({
-    ...emptyEmergencyInfo,
-    full_name: onboardingData.fullName,
-    blood_type: onboardingData.bloodType,
-    allergies: onboardingData.allergies,
-    conditions: onboardingData.conditions,
-    contact1_name: onboardingData.emergencyContactName,
-    contact1_phone: onboardingData.emergencyContactPhone,
-  });
   const isOnboarding = params.flow === 'onboarding';
+  const hasEmergencyDraft = Boolean(
+    onboardingData.bloodType
+      || onboardingData.allergies
+      || onboardingData.conditions
+      || onboardingData.emergencyContactName
+      || onboardingData.emergencyContactPhone,
+  );
+  const [form, setForm] = useState(() =>
+    hasEmergencyDraft
+      ? {
+          ...emptyEmergencyInfo,
+          full_name: onboardingData.fullName,
+          blood_type: onboardingData.bloodType,
+          allergies: onboardingData.allergies,
+          conditions: onboardingData.conditions,
+          contact1_name: onboardingData.emergencyContactName,
+          contact1_phone: onboardingData.emergencyContactPhone,
+        }
+      : emptyEmergencyInfo,
+  );
   const onboardingScrollRef = useRef<ScrollView>(null);
   const phoneFieldYRef = useRef<number>(0);
 
   const qrValue = useMemo(
-    () => `EMERGENCY INFO\nName: ${form.full_name}\nBlood: ${form.blood_type}\nContact: ${form.contact1_name} (${form.contact1_phone})`,
+    () => `EMERGENCY INFO\nName: ${form.full_name}\nBlood: ${form.blood_type || 'Unknown'}\nContact: ${form.contact1_name} (${form.contact1_phone})`,
     [form],
   );
 
@@ -128,13 +139,24 @@ export default function OnboardingEmergencyScreen() {
       <View style={{ gap: 8 }}>
         <AppText variant="label" style={{ color: palette.textSecondary, fontSize: 12 }}>Blood Type</AppText>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          <Pressable
+            onPress={() => setForm({ ...form, blood_type: '' })}
+            style={{ borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: form.blood_type === '' ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.04)' }}>
+            <AppText variant="button" style={{ color: form.blood_type === '' ? palette.text : palette.textSecondary, fontSize: 13 }}>
+              Select blood type
+            </AppText>
+          </Pressable>
           {bloodTypes.map((bloodType) => (
             <Pressable key={bloodType} onPress={() => setForm({ ...form, blood_type: bloodType })} style={{ borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: form.blood_type === bloodType ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.04)' }}>
               <AppText variant="button" style={{ color: form.blood_type === bloodType ? palette.text : palette.textSecondary, fontSize: 13 }}>{bloodType}</AppText>
             </Pressable>
           ))}
-          <Pressable onPress={() => setForm({ ...form, blood_type: 'O+' as EmergencyBloodType })} style={{ borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: 'rgba(255,255,255,0.04)' }}>
-            <AppText variant="button" style={{ color: palette.textTertiary, fontSize: 12 }}>I don&apos;t know</AppText>
+          <Pressable
+            onPress={() => setForm({ ...form, blood_type: 'unknown' as EmergencyBloodType })}
+            style={{ borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: form.blood_type === 'unknown' ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.04)' }}>
+            <AppText variant="button" style={{ color: form.blood_type === 'unknown' ? palette.text : palette.textTertiary, fontSize: 12 }}>
+              I don&apos;t know
+            </AppText>
           </Pressable>
         </View>
       </View>

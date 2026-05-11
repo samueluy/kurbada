@@ -29,15 +29,17 @@ export default function FuelReportsScreen() {
       <SectionHeader title="Fuel Reports" />
       <GlassCard style={{ padding: 18 }}>
         {data.length ? (
-          <BarChart
-            data={data}
-            barWidth={32}
-            spacing={18}
-            hideRules
-            yAxisThickness={0}
-            xAxisThickness={0}
-            isAnimated
-          />
+            <BarChart
+              data={data}
+              barWidth={32}
+              spacing={18}
+              hideRules
+              yAxisThickness={0}
+              xAxisThickness={0}
+              isAnimated
+              xAxisLabelTextStyle={{ color: palette.textTertiary, fontSize: 10 }}
+              yAxisTextStyle={{ color: palette.textTertiary, fontSize: 10 }}
+            />
         ) : (
           <AppText variant="meta">Add fuel logs to populate the chart.</AppText>
         )}

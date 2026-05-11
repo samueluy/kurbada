@@ -3,7 +3,7 @@ import * as Linking from 'expo-linking';
 import * as Location from 'expo-location';
 import { Accelerometer } from 'expo-sensors';
 import { useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import { PermissionsAndroid, Platform } from 'react-native';
 
 import { createId } from '@/lib/id';
 import { buildRouteGeoJson, computeRouteBounds, haversineDistanceKm, simplifyRoute } from '@/lib/route';
@@ -25,30 +25,34 @@ export function useRideSession() {
   const locationSubscriptionRef = useRef<Location.LocationSubscription | null>(null);
   const accelSubscriptionRef = useRef<{ remove: () => void } | null>(null);
   const crashThresholdSinceRef = useRef<number | null>(null);
+  const recentGForcesRef = useRef<number[]>([]);
   const foregroundPointsRef = useRef<RidePoint[]>([]);
   const rideStartedAtRef = useRef<number | null>(null);
+  const getRideState = useRideStore.getState;
 
   useEffect(() => {
     const interval = setInterval(() => {
-      if (store.state === 'active' && store.startedAt) {
-        store.updateTelemetry({
-          durationSeconds: Math.max(0, Math.floor((Date.now() - store.startedAt) / 1000)),
+      const currentStore = getRideState();
+
+      if (currentStore.state === 'active' && currentStore.startedAt) {
+        currentStore.updateTelemetry({
+          durationSeconds: Math.max(0, Math.floor((Date.now() - currentStore.startedAt) / 1000)),
         });
       }
 
-      if (store.crashCountdown !== null) {
-        if (store.crashCountdown <= 1) {
+      if (currentStore.crashCountdown !== null) {
+        if (currentStore.crashCountdown <= 1) {
           requestHelp();
         } else {
-          store.setCrashCountdown(store.crashCountdown - 1);
+          currentStore.setCrashCountdown(currentStore.crashCountdown - 1);
         }
       }
 
       // Fatigue nudge: after 3h continuous ride, prompt a break once
-      if (store.state === 'active' && rideStartedAtRef.current) {
+      if (currentStore.state === 'active' && rideStartedAtRef.current) {
         const minutes = Math.floor((Date.now() - rideStartedAtRef.current) / 60000);
-        if (minutes >= 180 && !store.fatiguePromptShown) {
-          store.setFatiguePromptShown(true);
+        if (minutes >= 180 && !currentStore.fatiguePromptShown) {
+          currentStore.setFatiguePromptShown(true);
         }
       }
     }, 1000);
@@ -59,15 +63,17 @@ export function useRideSession() {
 
   useEffect(() => {
     if (store.state !== 'active') {
+      recentGForcesRef.current = [];
       cleanupSubscriptions();
       return;
     }
 
     // Keep accelerometer only for crash detection (g-force spike).
     accelSubscriptionRef.current = Accelerometer.addListener((reading) => {
-      const gForce = Math.sqrt(reading.x ** 2 + reading.y ** 2 + reading.z ** 2);
-      store.updateTelemetry({ gForce });
-      maybeTriggerCrashAlert(gForce);
+      const rawGForce = Math.sqrt(reading.x ** 2 + reading.y ** 2 + reading.z ** 2);
+      const currentStore = getRideState();
+      currentStore.updateTelemetry({ gForce: rawGForce });
+      maybeTriggerCrashAlert(getSmoothedGForce(rawGForce));
     });
 
     startLocationWatch().catch(() => undefined);
@@ -89,7 +95,6 @@ export function useRideSession() {
     // Android 13+: foreground service notification won't show without this
     if (Platform.OS === 'android') {
       try {
-        const { PermissionsAndroid } = require('react-native');
         await PermissionsAndroid.request('android.permission.POST_NOTIFICATIONS');
       } catch {
         // ignore — pre-Android 13 devices don't support this
@@ -99,6 +104,7 @@ export function useRideSession() {
     store.resetRide();
     foregroundPointsRef.current = [];
     crashThresholdSinceRef.current = null;
+    recentGForcesRef.current = [];
     store.setBikeId(bikeId);
     store.setFuelPricePerLiter(fuelPricePerLiter);
     store.setFuelRateKmPerLiter(fuelRateKmPerLiter);
@@ -109,8 +115,8 @@ export function useRideSession() {
 
     await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
       accuracy: Location.Accuracy.BestForNavigation,
-      timeInterval: 5000,
-      distanceInterval: 8,
+      timeInterval: 2000,
+      distanceInterval: 5,
       showsBackgroundLocationIndicator: true,
       foregroundService: {
         notificationTitle: 'Kurbada — Ride in progress',
@@ -169,8 +175,8 @@ export function useRideSession() {
       distance_km: Number(totalDistance.toFixed(1)),
       max_speed_kmh: Number(maxSpeed.toFixed(1)),
       avg_speed_kmh:
-        store.telemetry.durationSeconds > 0
-          ? Number((totalDistance / (store.telemetry.durationSeconds / 3600)).toFixed(1))
+        startedAt > 0
+          ? Number((totalDistance / ((Date.now() - startedAt) / 3_600_000)).toFixed(1))
           : 0,
       max_lean_angle_deg: null,
       fuel_used_liters: Number(store.telemetry.estimatedFuelLiters.toFixed(2)),
@@ -210,18 +216,26 @@ export function useRideSession() {
   };
 
   function maybeTriggerCrashAlert(gForce: number) {
+    const currentStore = getRideState();
+
     if (!crashAlertsEnabled) return;
     if (gForce > 4.5) {
       if (!crashThresholdSinceRef.current) {
         crashThresholdSinceRef.current = Date.now();
-      } else if (Date.now() - crashThresholdSinceRef.current > 150 && store.crashCountdown === null) {
+      } else if (Date.now() - crashThresholdSinceRef.current > 250 && currentStore.crashCountdown === null) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
         // 15-second cancellable countdown (rider can abort if false positive)
-        store.setCrashCountdown(15);
+        currentStore.setCrashCountdown(15);
       }
     } else {
       crashThresholdSinceRef.current = null;
     }
+  }
+
+  function getSmoothedGForce(nextReading: number) {
+    const nextWindow = [...recentGForcesRef.current.slice(-4), nextReading];
+    recentGForcesRef.current = nextWindow;
+    return nextWindow.reduce((sum, value) => sum + value, 0) / nextWindow.length;
   }
 
   async function startLocationWatch() {
@@ -230,8 +244,8 @@ export function useRideSession() {
     locationSubscriptionRef.current = await Location.watchPositionAsync(
       {
         accuracy: Location.Accuracy.BestForNavigation,
-        timeInterval: 5000,
-        distanceInterval: 8,
+        timeInterval: 1000,
+        distanceInterval: 5,
       },
       (location) => {
         const point: RidePoint = {
@@ -251,25 +265,26 @@ export function useRideSession() {
           if (rawDelta > 3) elevationDelta = rawDelta;
         }
         foregroundPointsRef.current = [...foregroundPointsRef.current, point];
-        store.appendForegroundPoint(point);
+        const currentStore = getRideState();
+        currentStore.appendForegroundPoint(point);
 
-        const newDistance = store.telemetry.distanceKm + distanceDelta;
-        const newElevationGain = store.telemetry.elevationGainM + elevationDelta;
-        const fuelRate = store.fuelRateKmPerLiter;
+        const newDistance = currentStore.telemetry.distanceKm + distanceDelta;
+        const newElevationGain = currentStore.telemetry.elevationGainM + elevationDelta;
+        const fuelRate = Math.max(currentStore.fuelRateKmPerLiter, 0.1);
         const fuelLiters = newDistance / fuelRate;
-        const fuelCost = fuelLiters * store.fuelPricePerLiter;
+        const fuelCost = fuelLiters * currentStore.fuelPricePerLiter;
 
-        const heading = location.coords.heading ?? store.telemetry.heading;
+        const heading = location.coords.heading ?? currentStore.telemetry.heading;
 
-        store.updateTelemetry({
+        currentStore.updateTelemetry({
           speedKmh: point.speedKmh,
           altitudeMeters: point.altitude ?? 0,
           distanceKm: newDistance,
           elevationGainM: newElevationGain,
-          maxSpeedKmh: Math.max(store.telemetry.maxSpeedKmh, point.speedKmh),
+          maxSpeedKmh: Math.max(currentStore.telemetry.maxSpeedKmh, point.speedKmh),
           estimatedFuelLiters: fuelLiters,
           estimatedFuelCost: fuelCost,
-          heading: heading || store.telemetry.heading,
+          heading: heading || currentStore.telemetry.heading,
         });
       },
     );

@@ -9,6 +9,7 @@ import { palette, radius } from '@/constants/theme';
 import type { Bike } from '@/types/domain';
 
 function BikeCardImpl({ bike, onPress, onLongPress }: { bike: Bike; onPress?: () => void; onLongPress?: () => void }) {
+  const bikeTitle = bike.nickname?.trim() || `${bike.make} ${bike.model}`;
   const iconName =
     bike.category === 'sport'
       ? 'motorbike'
@@ -26,7 +27,7 @@ function BikeCardImpl({ bike, onPress, onLongPress }: { bike: Bike; onPress?: ()
             <MaterialCommunityIcons name={iconName} size={26} color={palette.text} />
           </View>
           <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-            <AppText variant="h2" numberOfLines={1} ellipsizeMode="tail">{bike.make} {bike.model}</AppText>
+            <AppText variant="h2" numberOfLines={1} ellipsizeMode="tail">{bikeTitle}</AppText>
             <AppText variant="meta" numberOfLines={1} ellipsizeMode="tail">{bike.year} · {bike.engine_cc} cc · {bike.category}</AppText>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Route size={12} color={palette.textSecondary} />

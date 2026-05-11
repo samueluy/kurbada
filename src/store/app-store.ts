@@ -38,7 +38,7 @@ const defaultOnboardingData: OnboardingData = {
   ridingStyle: 'weekend',
   maintenancePresetKeys: [],
   fullName: '',
-  bloodType: 'O+',
+  bloodType: '',
   emergencyContactName: '',
   emergencyContactPhone: '',
   allergies: '',
@@ -170,7 +170,19 @@ export const useAppStore = create<AppStore>()(
             },
           };
         }),
-      resetForSignOut: () => set({ hasCompletedOnboarding: false, hasCompletedBikeSetup: false, didSignOut: true }),
+      resetForSignOut: () =>
+        set((state) => ({
+          hasCompletedOnboarding: false,
+          hasCompletedBikeSetup: state.hasCompletedBikeSetup,
+          onboardingStep: 1,
+          purchaseCompleted: false,
+          onboardingData: defaultOnboardingData,
+          onboardingSyncStatus: 'idle',
+          onboardingSyncedUserId: null,
+          onboardingSyncedBikeId: null,
+          onboardingSyncedEmergencyId: null,
+          didSignOut: true,
+        })),
       markOnboardingSyncing: () => set({ onboardingSyncStatus: 'syncing' }),
       markOnboardingSyncComplete: ({ userId, bikeId = null, emergencyId = null }) =>
         set({

@@ -21,6 +21,9 @@ type IgStoryCanvasProps = {
   fuelPricePerLiter?: number;
   width?: number;
   hidden?: boolean;
+  photoScale?: number;
+  photoOffsetX?: number;
+  photoOffsetY?: number;
 };
 
 const shadow: TextStyle = {
@@ -89,7 +92,7 @@ function BrandMark({ width, align = 'left' }: { width: number; align?: 'left' | 
           align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start',
       }}>
       <Image
-        source={require('@/assets/images/logo.png')}
+        source={require('@/assets/images/logo-white-transparent.png')}
         style={{ width: width * 0.045, height: width * 0.045, resizeMode: 'contain' }}
       />
       <AppText
@@ -110,7 +113,7 @@ function BrandMark({ width, align = 'left' }: { width: number; align?: 'left' | 
 }
 
 export const IgStoryCanvas = forwardRef<View, IgStoryCanvasProps>(function IgStoryCanvas(
-  { ride, photoUri, templateId, fuelPricePerLiter, width = 1080, hidden = false },
+  { ride, photoUri, templateId, fuelPricePerLiter, width = 1080, hidden = false, photoScale = 1.3, photoOffsetX = 0, photoOffsetY = -40 },
   ref,
 ) {
   const Mapbox = getMapboxModule();
@@ -492,7 +495,17 @@ export const IgStoryCanvas = forwardRef<View, IgStoryCanvasProps>(function IgSto
       {showPhoto ? (
         <Image
           source={{ uri: photoUri }}
-          style={{ position: 'absolute', inset: 0, width, height }}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width,
+            height,
+            transform: [
+              { scale: photoScale },
+              { translateX: photoOffsetX },
+              { translateY: photoOffsetY },
+            ],
+          }}
           resizeMode="cover"
         />
       ) : showMap && Mapbox && coordinates ? (

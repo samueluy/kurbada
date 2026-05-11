@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, KeyboardAvoidingView, Platform, RefreshControl, ScrollView, View, type ScrollViewProps, type ViewProps } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { layout, palette, spacing } from '@/constants/theme';
 import { AppText } from '@/components/ui/app-text';
@@ -36,23 +36,33 @@ function useMountFade() {
 
 export function AppScreen({ style, children, showWordmark = true, ...rest }: ViewProps & { showWordmark?: boolean }) {
   const { opacity, translateY } = useMountFade();
+  const insets = useSafeAreaInsets();
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
-      <Animated.View style={{ flex: 1, opacity, transform: [{ translateY }] }}>
-        <View {...rest} style={[{ flex: 1, paddingHorizontal: layout.screenPadding, paddingTop: spacing.md, backgroundColor: palette.background }, style]}>
-          {showWordmark ? <Wordmark /> : null}
-          {children}
-        </View>
-      </Animated.View>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 8 : 0}>
+        <Animated.View style={{ flex: 1, opacity, transform: [{ translateY }] }}>
+          <View {...rest} style={[{ flex: 1, paddingHorizontal: layout.screenPadding, paddingTop: spacing.md, backgroundColor: palette.background }, style]}>
+            {showWordmark ? <Wordmark /> : null}
+            {children}
+          </View>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 export function AppScrollScreen({ contentContainerStyle, style, children, showWordmark = true, refreshing, onRefresh, ...rest }: ScrollViewProps & { showWordmark?: boolean; refreshing?: boolean; onRefresh?: () => void }) {
   const { opacity, translateY } = useMountFade();
+  const insets = useSafeAreaInsets();
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 8 : 0}>
         <ScrollView
           {...rest}
           showsVerticalScrollIndicator={false}
@@ -63,7 +73,7 @@ export function AppScrollScreen({ contentContainerStyle, style, children, showWo
           contentInsetAdjustmentBehavior="always"
           refreshControl={onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} tintColor={palette.text} colors={[palette.danger]} progressBackgroundColor={palette.surfaceStrong} /> : undefined}
           style={[{ flex: 1, backgroundColor: palette.background }, style]}
-          contentContainerStyle={[{ paddingHorizontal: layout.screenPadding, paddingTop: spacing.md, paddingBottom: 160 }, contentContainerStyle]}>
+          contentContainerStyle={[{ paddingHorizontal: layout.screenPadding, paddingTop: spacing.md, paddingBottom: 120 + insets.bottom }, contentContainerStyle]}>
           <Animated.View style={{ opacity, transform: [{ translateY }], gap: spacing.section }}>
             {showWordmark ? <Wordmark /> : null}
             {children}

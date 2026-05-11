@@ -30,7 +30,7 @@ export function estimateMaintenanceCost(taskName: string): number {
  */
 export function maintenanceCostPerKm(task: MaintenanceTask): number {
   if (!task.interval_km || task.interval_km <= 0) return 0;
-  const cost = estimateMaintenanceCost(task.task_name);
+  const cost = task.cost ?? estimateMaintenanceCost(task.task_name);
   return cost / task.interval_km;
 }
 

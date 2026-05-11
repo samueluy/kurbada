@@ -82,7 +82,7 @@ export async function configureRevenueCat() {
     return;
   }
 
-  Purchases.setLogLevel(__DEV__ ? Purchases.LOG_LEVEL.DEBUG : Purchases.LOG_LEVEL.WARN);
+  Purchases.setLogLevel(Purchases.LOG_LEVEL.WARN);
   Purchases.configure({ apiKey });
   ensureCustomerInfoListener();
   configured = true;

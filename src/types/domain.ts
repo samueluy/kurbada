@@ -36,6 +36,7 @@ export type Bike = {
   user_id?: string;
   make: string;
   model: string;
+  nickname?: string | null;
   year: number;
   engine_cc: number;
   current_odometer_km: number;
@@ -48,6 +49,7 @@ export type MaintenanceTask = {
   id: string;
   bike_id: string;
   task_name: string;
+  cost?: number | null;
   interval_km: number;
   interval_days: number | null;
   last_done_odometer_km: number;
@@ -74,16 +76,19 @@ export type RouteBounds = {
 };
 
 export type RidePace = 'chill' | 'moderate' | 'sporty';
+export type LobbyPlatform = 'messenger' | 'telegram' | 'none';
 
 export type RideListing = {
   id: string;
   host_user_id: string;
+  title?: string | null;
   meetup_point: string;
   meetup_coordinates?: { lat: number; lng: number } | null;
   destination: string;
   ride_date: string;
   pace: RidePace;
-  lobby_link: string;
+  lobby_platform?: LobbyPlatform | null;
+  lobby_link?: string | null;
   is_reported: boolean;
   report_count?: number;
   is_hidden?: boolean;
@@ -145,7 +150,7 @@ export type GearItem = {
   created_at?: string;
 };
 
-export type EmergencyBloodType = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
+export type EmergencyBloodType = '' | 'unknown' | 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
 
 export type EmergencyInfo = {
   id: string;

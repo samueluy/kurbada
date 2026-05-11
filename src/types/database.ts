@@ -63,6 +63,7 @@ export type Database = {
           user_id: string;
           make: string;
           model: string;
+          nickname: string | null;
           year: number;
           engine_cc: number;
           current_odometer_km: number;
@@ -81,6 +82,7 @@ export type Database = {
           id: string;
           bike_id: string;
           task_name: string;
+          cost: number | null;
           interval_km: number;
           interval_days: number | null;
           last_done_odometer_km: number;
@@ -145,15 +147,21 @@ export type Database = {
         Row: {
           id: string;
           host_user_id: string;
+          title: string | null;
           meetup_point: string;
           meetup_coordinates: Json | null;
           destination: string;
           ride_date: string;
           pace: 'chill' | 'moderate' | 'sporty';
-          lobby_link: string;
+          lobby_platform: 'messenger' | 'telegram' | 'none';
+          lobby_link: string | null;
           is_reported: boolean;
           display_name: string;
           created_at: string;
+          city: string | null;
+          photo_urls: string[] | null;
+          report_count: number;
+          is_hidden: boolean;
         };
         Insert: Omit<Database['public']['Tables']['ride_listings']['Row'], 'id' | 'created_at' | 'is_reported'> & {
           id?: string;

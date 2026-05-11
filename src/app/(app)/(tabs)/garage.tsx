@@ -14,6 +14,7 @@ import { BikeCard } from '@/features/garage/components/bike-card';
 import { BikeIdentityForm, BIKE_IDENTITY_EMPTY, resolveBikeIdentity, type BikeIdentityDraft } from '@/features/garage/components/bike-identity-form';
 import { useAuth } from '@/hooks/use-auth';
 import { useBikeMutations, useBikes } from '@/hooks/use-kurbada-data';
+import { inferBikeCategory } from '@/lib/bike-models';
 
 export default function GarageTabScreen() {
   const { session } = useAuth();
@@ -23,7 +24,7 @@ export default function GarageTabScreen() {
   const [showForm, setShowForm] = useState(false);
   const [draft, setDraft] = useState<BikeIdentityDraft>(BIKE_IDENTITY_EMPTY);
 
-  const { isValid, finalBrand, finalModel, finalYear, finalCc, finalOdometer } = useMemo(() => resolveBikeIdentity(draft), [draft]);
+  const { isValid, finalNickname, finalBrand, finalModel, finalYear, finalCc, finalOdometer } = useMemo(() => resolveBikeIdentity(draft), [draft]);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const handleRefresh = useCallback(async () => {
@@ -55,10 +56,11 @@ export default function GarageTabScreen() {
         id: '',
         make: finalBrand,
         model: finalModel,
+        nickname: finalNickname || null,
         year: Number(finalYear),
         engine_cc: Number(finalCc),
         current_odometer_km: Number(finalOdometer),
-        category: 'naked',
+        category: inferBikeCategory({ model: finalModel, cc: finalCc }),
       });
       setShowForm(false);
       setDraft(BIKE_IDENTITY_EMPTY);
@@ -82,7 +84,7 @@ export default function GarageTabScreen() {
 
         {showForm ? (
           <GlassCard style={{ padding: 18, gap: 10 }}>
-            <BikeIdentityForm value={draft} onChange={handleChange} />
+            <BikeIdentityForm value={draft} onChange={handleChange} showNickname />
             <Button
               title="Save Bike"
               variant="secondary"
