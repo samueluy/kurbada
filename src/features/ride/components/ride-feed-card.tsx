@@ -23,7 +23,7 @@ function RideFeedCardImpl({
 }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [{ opacity: pressed ? 0.92 : 1, alignSelf: 'stretch' }]}>
-      <GlassCard style={{ padding: 14, gap: 12, alignSelf: 'stretch' }}>
+      <GlassCard style={{ width: '100%', padding: 14, gap: 12, alignSelf: 'stretch' }}>
         <RideMapThumbnail ride={ride} />
         <View style={{ gap: 6 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
@@ -31,7 +31,9 @@ function RideFeedCardImpl({
               <AppText variant="h3" numberOfLines={1} style={{ flexShrink: 0 }}>
                 {ride.distance_km.toFixed(1)} km
               </AppText>
-              <AppText variant="meta" numberOfLines={1} ellipsizeMode="tail" style={{ flex: 1, minWidth: 0 }}>{formatDateLabel(ride.started_at)}</AppText>
+              <AppText variant="meta" numberOfLines={1} ellipsizeMode="tail" style={{ flex: 1, minWidth: 0 }}>
+                {formatDateLabel(ride.started_at)}
+              </AppText>
             </View>
             {onShare ? (
               <Pressable
@@ -45,6 +47,11 @@ function RideFeedCardImpl({
               </Pressable>
             ) : null}
           </View>
+          {ride.sync_status === 'pending' ? (
+            <AppText variant="meta" style={{ color: palette.warning, fontSize: 11 }}>
+              Pending sync
+            </AppText>
+          ) : null}
           {bikeLabel ? (
             <AppText variant="meta" numberOfLines={1} ellipsizeMode="tail" style={{ color: palette.textTertiary }}>
               {bikeLabel}

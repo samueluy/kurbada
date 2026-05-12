@@ -2,9 +2,9 @@ import type { Bike, EmergencyInfo, FuelLog, MaintenanceTask, Profile, ReferralRe
 import { buildRouteGeoJson, computeRouteBounds } from '@/lib/route';
 
 const samplePoints = [
-  { latitude: 14.5995, longitude: 120.9842, timestamp: Date.now() - 500000, speedKmh: 42 },
-  { latitude: 14.601, longitude: 120.986, timestamp: Date.now() - 300000, speedKmh: 56 },
-  { latitude: 14.604, longitude: 120.992, timestamp: Date.now() - 100000, speedKmh: 48 },
+  { latitude: 14.5995, longitude: 120.9842, timestamp: Date.now() - 500000, speedKmh: 42, rawSpeedKmh: 43, locationAccuracyM: 5 },
+  { latitude: 14.601, longitude: 120.986, timestamp: Date.now() - 300000, speedKmh: 56, rawSpeedKmh: 58, locationAccuracyM: 4 },
+  { latitude: 14.604, longitude: 120.992, timestamp: Date.now() - 100000, speedKmh: 48, rawSpeedKmh: 49, locationAccuracyM: 6 },
 ];
 
 const sampleRoute = buildRouteGeoJson(samplePoints);
@@ -63,6 +63,7 @@ export const sampleRides: RideRecord[] = [
   {
     id: SAMPLE_RIDE_ID,
     bike_id: SAMPLE_BIKE_ID,
+    sync_status: 'synced',
     mode: 'weekend',
     started_at: new Date(Date.now() - 3_600_000).toISOString(),
     ended_at: new Date(Date.now() - 2_700_000).toISOString(),

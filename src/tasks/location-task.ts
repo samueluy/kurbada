@@ -17,6 +17,8 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
     longitude: loc.coords.longitude,
     timestamp: loc.timestamp,
     speedKmh: Math.max(0, (loc.coords.speed ?? 0) * 3.6),
+    rawSpeedKmh: Math.max(0, (loc.coords.speed ?? 0) * 3.6),
+    locationAccuracyM: loc.coords.accuracy ?? null,
     altitude: loc.coords.altitude ?? 0,
   }));
 

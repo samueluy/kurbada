@@ -1,5 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, Modal, Pressable, View } from 'react-native';
 
@@ -122,6 +122,8 @@ export default function BikeProfileScreen() {
   }, [bike, tasks.data]);
 
   if (!bike) return null;
+  const bikeTitle = bike.nickname?.trim() || `${bike.make} ${bike.model}`;
+  const trackedMaintenanceBudget = (tasks.data ?? []).reduce((sum, task) => sum + (task.cost ?? 0), 0);
 
   const handleLogService = (task: typeof confirmTask) => {
     if (!task || !bike) return;
@@ -161,7 +163,7 @@ export default function BikeProfileScreen() {
       'This will remove the task and its service history.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => deleteMaintenanceTask.mutate(taskId) },
+        { text: 'Delete', style: 'destructive', onPress: () => deleteMaintenanceTask.mutate({ taskId, bikeId: bike.id }) },
       ],
     );
   };
@@ -170,72 +172,41 @@ export default function BikeProfileScreen() {
     <AppScrollScreen>
       <GlassCard style={{ padding: 20, gap: 10 }}>
         <AppText variant="eyebrow">Bike Profile</AppText>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <View style={{ flex: 1 }}>
-            {showNicknameEdit && bike ? (
-              <FloatingField
-                label="Nickname"
-                value={nicknameInput}
-                onChangeText={setNicknameInput}
-                placeholder={bike.make + ' ' + bike.model}
-                returnKeyType="done"
-                blurOnSubmit
-                onSubmitEditing={() => {
-                  saveBike.mutate({ ...bike, nickname: nicknameInput.trim() || null });
-                  setShowNicknameEdit(false);
-                }}
-              />
-            ) : (
-              <Pressable onPress={() => { setNicknameInput(bike?.nickname ?? ''); setShowNicknameEdit(true); }}>
-                <AppText variant="screenTitle" style={{ fontSize: 28 }}>{bike?.nickname || `${bike?.make} ${bike?.model}`}</AppText>
-              </Pressable>
-            )}
-          </View>
-          {!showNicknameEdit && (
-            <Pressable onPress={() => { setNicknameInput(bike?.nickname ?? ''); setShowNicknameEdit(true); }} hitSlop={12} style={{ padding: 4 }}>
-              <Ionicons name="pencil-outline" size={16} color={palette.textTertiary} />
-            </Pressable>
-          )}
-        </View>
+        <AppText variant="screenTitle" style={{ fontSize: 28 }}>{bikeTitle}</AppText>
+        {bike.nickname?.trim() ? (
+          <AppText variant="meta" style={{ color: palette.textSecondary }}>
+            {bike.make} {bike.model}
+          </AppText>
+        ) : null}
         <AppText variant="meta">{bike?.year} · {bike?.engine_cc} cc</AppText>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <AppText variant="body">Current odometer: {bike?.current_odometer_km.toLocaleString()} km</AppText>
-          <Pressable onPress={() => { setOdometerInput(bike?.current_odometer_km.toString() ?? ''); setShowOdometerEdit(true); }} hitSlop={12} style={{ padding: 4 }}>
-            <Ionicons name="pencil-outline" size={14} color={palette.textTertiary} />
+        <AppText variant="body">Current odometer: {bike?.current_odometer_km.toLocaleString()} km</AppText>
+        <AppText variant="meta" style={{ color: palette.textSecondary }}>
+          Tracked maintenance budget: ~₱{trackedMaintenanceBudget.toLocaleString()}
+        </AppText>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          <Pressable
+            onPress={() => {
+              setNicknameInput(bike.nickname ?? '');
+              setShowNicknameEdit(true);
+            }}
+            style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: palette.surfaceStrong }}>
+            <AppText variant="button" style={{ fontSize: 12 }}>Edit Bike Name</AppText>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              setOdometerInput(bike.current_odometer_km.toString());
+              setShowOdometerEdit(true);
+            }}
+            style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: palette.surfaceStrong }}>
+            <AppText variant="button" style={{ fontSize: 12 }}>Edit Odometer</AppText>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push({ pathname: '/(app)/garage/achievements/[bikeId]' as any, params: { bikeId: bike.id } })}
+            style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: palette.surfaceStrong }}>
+            <AppText variant="button" style={{ fontSize: 12 }}>Achievements</AppText>
           </Pressable>
         </View>
       </GlassCard>
-
-      {showOdometerEdit && bike ? (
-        <GlassCard style={{ padding: 18, gap: 10 }}>
-          <AppText variant="bodyBold">Edit Odometer</AppText>
-          <FloatingField
-            label="Current Odometer (km)"
-            value={odometerInput}
-            onChangeText={setOdometerInput}
-            placeholder={bike.current_odometer_km.toString()}
-            keyboardType="number-pad"
-          />
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={{ flex: 1 }}>
-              <Button title="Cancel" variant="ghost" onPress={() => setShowOdometerEdit(false)} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Button
-                title="Save"
-                onPress={() => {
-                  const value = Number(odometerInput);
-                  if (!isNaN(value) && value > 0) {
-                    saveBike.mutate({ ...bike, current_odometer_km: value });
-                  }
-                  setShowOdometerEdit(false);
-                }}
-                style={{ backgroundColor: Colors.red, borderRadius: 13, minHeight: 48 }}
-              />
-            </View>
-          </View>
-        </GlassCard>
-      ) : null}
 
       <SectionHeader title="Maintenance Tracker" />
       <GlassCard style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
@@ -319,44 +290,7 @@ export default function BikeProfileScreen() {
       </GlassCard>
 
       <View style={{ paddingTop: 8 }}>
-        {!showCustomForm ? (
-          <Button title="+ Add Custom Task" variant="ghost" onPress={() => setShowCustomForm(true)} />
-        ) : (
-          <GlassCard style={{ padding: 18, gap: 10 }}>
-            <FloatingField label="Task Name" value={customTaskName} onChangeText={setCustomTaskName} placeholder="Brake Pads" />
-            <FloatingField label="Interval (km)" value={customInterval} onChangeText={setCustomInterval} placeholder="8000" keyboardType="number-pad" />
-            <FloatingField label="Interval (months)" value={customIntervalMonths} onChangeText={setCustomIntervalMonths} placeholder="6" keyboardType="number-pad" />
-            <FloatingField label="Cost (PHP)" value={customCost} onChangeText={setCustomCost} placeholder="500" keyboardType="number-pad" />
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <View style={{ flex: 1 }}>
-                <Button title="Cancel" variant="ghost" onPress={() => { setShowCustomForm(false); setCustomTaskName(''); setCustomInterval(''); setCustomIntervalMonths(''); setCustomCost(''); }} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Button
-                  title="Save Task"
-                  onPress={() => {
-                    if (!customTaskName || !customInterval || !bike) return;
-                    const months = Number(customIntervalMonths);
-                    addMaintenanceTask.mutate({
-                      bike_id: bike.id,
-                      task_name: customTaskName,
-                      interval_km: Number(customInterval),
-                      interval_days: customIntervalMonths.trim() ? months * 30 : null,
-                      cost: customCost.trim() ? Number(customCost) : undefined,
-                      last_done_odometer_km: bike.current_odometer_km,
-                      last_done_date: new Date().toISOString().slice(0, 10),
-                    });
-                    setShowCustomForm(false);
-                    setCustomTaskName('');
-                    setCustomInterval('');
-                    setCustomIntervalMonths('');
-                    setCustomCost('');
-                  }}
-                />
-              </View>
-            </View>
-          </GlassCard>
-        )}
+        <Button title="+ Add Custom Task" variant="ghost" onPress={() => setShowCustomForm(true)} />
       </View>
 
       {/* Log Service Confirmation Modal */}
@@ -425,6 +359,113 @@ export default function BikeProfileScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Button title="Save" onPress={handleEditSave} style={{ backgroundColor: Colors.red, borderRadius: 13, minHeight: 48 }} />
+          </View>
+        </View>
+      </KeyboardSheet>
+
+      <KeyboardSheet
+        visible={showNicknameEdit}
+        onClose={() => setShowNicknameEdit(false)}
+        title="Edit Bike Name">
+        <FloatingField
+          label="BIKE NAME"
+          value={nicknameInput}
+          onChangeText={setNicknameInput}
+          placeholder={`${bike.make} ${bike.model}`}
+        />
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ flex: 1 }}>
+            <Button title="Cancel" variant="ghost" onPress={() => setShowNicknameEdit(false)} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button
+              title="Save"
+              onPress={() => {
+                saveBike.mutate({ ...bike, nickname: nicknameInput.trim() || null });
+                setShowNicknameEdit(false);
+              }}
+              style={{ backgroundColor: Colors.red, borderRadius: 13, minHeight: 48 }}
+            />
+          </View>
+        </View>
+      </KeyboardSheet>
+
+      <KeyboardSheet
+        visible={showOdometerEdit}
+        onClose={() => setShowOdometerEdit(false)}
+        title="Edit Odometer">
+        <FloatingField
+          label="CURRENT ODOMETER (KM)"
+          value={odometerInput}
+          onChangeText={setOdometerInput}
+          placeholder={bike.current_odometer_km.toString()}
+          keyboardType="number-pad"
+        />
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ flex: 1 }}>
+            <Button title="Cancel" variant="ghost" onPress={() => setShowOdometerEdit(false)} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button
+              title="Save"
+              onPress={() => {
+                const value = Number(odometerInput);
+                if (!isNaN(value) && value > 0) {
+                  saveBike.mutate({ ...bike, current_odometer_km: value });
+                }
+                setShowOdometerEdit(false);
+              }}
+              style={{ backgroundColor: Colors.red, borderRadius: 13, minHeight: 48 }}
+            />
+          </View>
+        </View>
+      </KeyboardSheet>
+
+      <KeyboardSheet
+        visible={showCustomForm}
+        onClose={() => setShowCustomForm(false)}
+        title="Add Custom Task">
+        <FloatingField label="TASK NAME" value={customTaskName} onChangeText={setCustomTaskName} placeholder="Brake Pads" />
+        <FloatingField label="INTERVAL (KM)" value={customInterval} onChangeText={setCustomInterval} placeholder="8000" keyboardType="number-pad" />
+        <FloatingField label="INTERVAL (MONTHS)" value={customIntervalMonths} onChangeText={setCustomIntervalMonths} placeholder="6" keyboardType="number-pad" />
+        <FloatingField label="COST (PHP)" value={customCost} onChangeText={setCustomCost} placeholder="500" keyboardType="number-pad" />
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ flex: 1 }}>
+            <Button
+              title="Cancel"
+              variant="ghost"
+              onPress={() => {
+                setShowCustomForm(false);
+                setCustomTaskName('');
+                setCustomInterval('');
+                setCustomIntervalMonths('');
+                setCustomCost('');
+              }}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button
+              title="Save Task"
+              onPress={() => {
+                if (!customTaskName || !customInterval) return;
+                const months = Number(customIntervalMonths);
+                addMaintenanceTask.mutate({
+                  bike_id: bike.id,
+                  task_name: customTaskName,
+                  interval_km: Number(customInterval),
+                  interval_days: customIntervalMonths.trim() ? months * 30 : null,
+                  cost: customCost.trim() ? Number(customCost) : undefined,
+                  last_done_odometer_km: bike.current_odometer_km,
+                  last_done_date: new Date().toISOString().slice(0, 10),
+                });
+                setShowCustomForm(false);
+                setCustomTaskName('');
+                setCustomInterval('');
+                setCustomIntervalMonths('');
+                setCustomCost('');
+              }}
+              style={{ backgroundColor: Colors.red, borderRadius: 13, minHeight: 48 }}
+            />
           </View>
         </View>
       </KeyboardSheet>

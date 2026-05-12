@@ -42,7 +42,7 @@ export const BIKE_IDENTITY_EMPTY: BikeIdentityDraft = {
 export function resolveBikeIdentity(draft: BikeIdentityDraft) {
   const finalNickname = draft.nickname.trim();
   const finalBrand = draft.brand === 'Other' ? draft.brandCustom.trim() : draft.brand.trim();
-  const finalModel = draft.model === 'Other' ? draft.modelCustom.trim() : draft.model.trim();
+  const finalModel = draft.brand === 'Other' || draft.model === 'Other' ? draft.modelCustom.trim() : draft.model.trim();
   const finalYear = draft.year.trim();
   const finalCc = draft.engineCc.trim();
   const finalOdometer = draft.odometerKm.trim();
@@ -103,7 +103,7 @@ export function BikeIdentityForm({ value, onChange, showRidingStyle = false, sho
     onChange({
       brand: nextBrand,
       brandCustom: nextBrand === 'Other' ? value.brandCustom : '',
-      model: '',
+      model: nextBrand === 'Other' ? 'Other' : '',
       modelCustom: '',
       engineCc: '',
     });
@@ -140,7 +140,7 @@ export function BikeIdentityForm({ value, onChange, showRidingStyle = false, sho
         <TextInput
           value={value.brandCustom}
           onChangeText={(next) => onChange({ brandCustom: next })}
-          placeholder="Enter brand name"
+          placeholder="Custom brand"
           placeholderTextColor={palette.textTertiary}
           selectionColor={palette.danger}
           style={inputStyle}
@@ -153,9 +153,9 @@ export function BikeIdentityForm({ value, onChange, showRidingStyle = false, sho
 
       {(value.brand === 'Other' || value.model === 'Other') ? (
         <TextInput
-          value={value.brand === 'Other' ? value.modelCustom : value.modelCustom}
+          value={value.modelCustom}
           onChangeText={(next) => onChange({ modelCustom: next })}
-          placeholder="Model"
+          placeholder={value.brand === 'Other' ? 'Custom model' : 'Custom model name'}
           placeholderTextColor={palette.textTertiary}
           selectionColor={palette.danger}
           style={inputStyle}

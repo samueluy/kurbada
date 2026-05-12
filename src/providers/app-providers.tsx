@@ -27,6 +27,7 @@ import { queryClient } from '@/lib/query-client';
 import { supabase } from '@/lib/supabase';
 import { OnboardingSyncBridge } from '@/providers/onboarding-sync-bridge';
 import { DailySummaryBridge } from '@/providers/daily-summary-bridge';
+import { PendingRideSyncBridge } from '@/providers/pending-ride-sync-bridge';
 import { configureRevenueCat, subscribeToCustomerInfo, syncRevenueCatIdentity } from '@/services/revenuecat';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -125,6 +126,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
             <ErrorBoundary>
               <OnboardingSyncBridge />
               <DailySummaryBridge />
+              <PendingRideSyncBridge />
               {children}
             </ErrorBoundary>
           </BottomSheetModalProvider>

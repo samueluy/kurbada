@@ -105,6 +105,7 @@ export type RideRecord = {
   id: string;
   user_id?: string;
   bike_id: string;
+  sync_status?: 'synced' | 'pending';
   mode: RideMode;
   started_at: string;
   ended_at: string;
@@ -221,6 +222,8 @@ export type RidePoint = {
   longitude: number;
   timestamp: number;
   speedKmh: number;
+  rawSpeedKmh?: number | null;
+  locationAccuracyM?: number | null;
   altitude?: number | null;
 };
 

@@ -60,6 +60,7 @@ type AppStore = {
   onboardingSyncedEmergencyId: string | null;
   customFuelPricePerLiter: number | null;
   crashAlertsEnabled: boolean;
+  keepScreenAwakeDuringRide: boolean;
   maintenanceRemindersEnabled: boolean;
   maintenanceReminderThresholds: number[];
   maintenanceReminderLastNotified: Record<string, number>;
@@ -82,6 +83,7 @@ type AppStore = {
   setOnboardingData: (data: Partial<OnboardingData>) => void;
   setCustomFuelPricePerLiter: (price: number | null) => void;
   setCrashAlertsEnabled: (value: boolean) => void;
+  setKeepScreenAwakeDuringRide: (value: boolean) => void;
   setMaintenanceRemindersEnabled: (value: boolean) => void;
   setMaintenanceReminderThresholds: (thresholds: number[]) => void;
   setMaintenanceReminderLastNotified: (taskId: string, threshold: number) => void;
@@ -119,6 +121,7 @@ export const useAppStore = create<AppStore>()(
       onboardingSyncedEmergencyId: null,
       customFuelPricePerLiter: null,
       crashAlertsEnabled: true,
+      keepScreenAwakeDuringRide: false,
       maintenanceRemindersEnabled: true,
       maintenanceReminderThresholds: [50, 80, 90, 95, 100],
       maintenanceReminderLastNotified: {},
@@ -145,6 +148,7 @@ export const useAppStore = create<AppStore>()(
         })),
       setCustomFuelPricePerLiter: (customFuelPricePerLiter) => set({ customFuelPricePerLiter }),
       setCrashAlertsEnabled: (crashAlertsEnabled) => set({ crashAlertsEnabled }),
+      setKeepScreenAwakeDuringRide: (keepScreenAwakeDuringRide) => set({ keepScreenAwakeDuringRide }),
       setMaintenanceRemindersEnabled: (maintenanceRemindersEnabled) => set({ maintenanceRemindersEnabled }),
       setMaintenanceReminderThresholds: (maintenanceReminderThresholds) => set({ maintenanceReminderThresholds }),
       setMaintenanceReminderLastNotified: (taskId, threshold) =>
@@ -233,6 +237,7 @@ export const useAppStore = create<AppStore>()(
         onboardingSyncedEmergencyId: state.onboardingSyncedEmergencyId,
         customFuelPricePerLiter: state.customFuelPricePerLiter,
         crashAlertsEnabled: state.crashAlertsEnabled,
+        keepScreenAwakeDuringRide: state.keepScreenAwakeDuringRide,
         maintenanceRemindersEnabled: state.maintenanceRemindersEnabled,
         maintenanceReminderThresholds: state.maintenanceReminderThresholds,
         maintenanceReminderLastNotified: state.maintenanceReminderLastNotified,

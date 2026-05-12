@@ -1,7 +1,9 @@
+import * as Location from 'expo-location';
+import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Alert, Pressable, ScrollView, View } from 'react-native';
 
 import { TabTransition } from '@/components/navigation/tab-transition';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -22,7 +24,7 @@ import { WeatherWindowCard } from '@/features/ride/components/weather-window-car
 import { WeatherWidget } from '@/features/ride/components/weather-widget';
 import { formatCurrencyPhp, getGreeting } from '@/lib/format';
 import { useAuth } from '@/hooks/use-auth';
-import { useBikes, useEarnings, useFuelLogs, useMaintenanceTasksAllBikes, useRides } from '@/hooks/use-kurbada-data';
+import { useBikes, useEarnings, useFuelLogs, useMaintenanceTasksAllBikes, useRideMutations, useRides } from '@/hooks/use-kurbada-data';
 import { useWeather } from '@/hooks/use-weather';
 import { useWeatherWindow } from '@/hooks/use-weather-window';
 import { useAppStore } from '@/store/app-store';
@@ -40,6 +42,7 @@ export default function RideTabScreen() {
   const dailyEarningsGoal = useAppStore((state) => state.dailyEarningsGoal);
   const bikes = useBikes(session?.user.id);
   const rides = useRides(session?.user.id);
+  const { syncPendingRides } = useRideMutations(session?.user.id);
   const fuelLogs = useFuelLogs(session?.user.id);
   const earnings = useEarnings(session?.user.id);
   const maintenanceTasks = useMaintenanceTasksAllBikes(session?.user.id);
@@ -62,6 +65,7 @@ export default function RideTabScreen() {
     setIsRefreshing(true);
     try {
       const refetches = [
+        () => syncPendingRides.mutateAsync(),
         (bikes as { refetch?: () => Promise<unknown> }).refetch,
         (rides as { refetch?: () => Promise<unknown> }).refetch,
         (fuelLogs as { refetch?: () => Promise<unknown> }).refetch,
@@ -73,7 +77,7 @@ export default function RideTabScreen() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [bikes, rides, fuelLogs, earnings, weather, weatherWindow]);
+  }, [bikes, earnings, fuelLogs, rides, syncPendingRides, weather, weatherWindow]);
 
   const fuelPrice = useMemo(() => {
     if (customFuelPrice && customFuelPrice > 0) return customFuelPrice;
@@ -126,6 +130,32 @@ export default function RideTabScreen() {
       params: { bikeId: primaryBike.id, fuelPrice: fuelPrice, fuelRate: fuelRate },
     });
   };
+
+  const openNearbySearch = useCallback(async (category: 'gas station' | 'restaurant') => {
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Location needed', 'Allow location access so Kurbada can search near you.');
+        return;
+      }
+
+      const position = await Location.getCurrentPositionAsync({});
+      const latitude = position.coords.latitude.toFixed(5);
+      const longitude = position.coords.longitude.toFixed(5);
+      const query = encodeURIComponent(`${category} near ${latitude},${longitude}`);
+      const wazeUrl = `waze://?ll=${latitude},${longitude}&q=${query}`;
+      const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${query}`;
+
+      if (await Linking.canOpenURL(wazeUrl)) {
+        await Linking.openURL(wazeUrl);
+        return;
+      }
+
+      await Linking.openURL(googleMapsUrl);
+    } catch (error) {
+      Alert.alert('Could not open maps', error instanceof Error ? error.message : 'Please try again.');
+    }
+  }, []);
 
   // Tiles rendered in persona-driven order
   const heroTile = (() => {
@@ -222,6 +252,26 @@ export default function RideTabScreen() {
     </GlassCard>
   );
 
+  const proximityTile = (
+    <GlassCard style={{ padding: 18, borderRadius: 18, gap: 12 }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <AppText variant="eyebrow">NEARBY</AppText>
+        <MaterialCommunityIcons name="map-marker-radius-outline" size={18} color={palette.textSecondary} />
+      </View>
+      <AppText variant="body" style={{ color: palette.textSecondary }}>
+        Need a quick stop? Jump straight to gas stations or food nearby in your maps app.
+      </AppText>
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        <View style={{ flex: 1 }}>
+          <Button title="Gas Stations" variant="secondary" onPress={() => void openNearbySearch('gas station')} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Button title="Food Stops" variant="secondary" onPress={() => void openNearbySearch('restaurant')} />
+        </View>
+      </View>
+    </GlassCard>
+  );
+
   const heatmapTile = (
     <GlassCard style={{ paddingTop: 8, paddingBottom: 6, paddingHorizontal: 10, borderRadius: 18 }}>
       <CustomCalendarHeatmap rides={rides.data ?? []} numDays={90} />
@@ -238,6 +288,7 @@ export default function RideTabScreen() {
     if (workMode) {
       return [
         heroTile,
+        proximityTile,
         monthlyCostTile,
         efficiencyTile,
         <UpcomingMaintenanceCard key="maint" />,
@@ -247,6 +298,7 @@ export default function RideTabScreen() {
     if (ridingPersona === 'commute') {
       return [
         heroTile,
+        proximityTile,
         monthlyCostTile,
         efficiencyTile,
         <UpcomingMaintenanceCard key="maint" />,
@@ -258,6 +310,7 @@ export default function RideTabScreen() {
     return [
       heroTile,
       weatherWindowTile,
+      proximityTile,
       milestoneTile,
       personalRecordsTile,
       heatmapTile,
@@ -339,9 +392,10 @@ export default function RideTabScreen() {
               <RideFeedCard
                 key={ride.id}
                 ride={ride}
-                bikeLabel={bikesById.get(ride.bike_id)?.nickname?.trim() || (() => {
+                bikeLabel={(() => {
                   const bike = bikesById.get(ride.bike_id);
-                  return bike ? `${bike.make} ${bike.model}` : '';
+                  if (!bike) return '';
+                  return bike.nickname?.trim() || `${bike.make} ${bike.model}`;
                 })()}
                 onPress={() => router.push({ pathname: '/(app)/ride/summary', params: { rideId: ride.id } })}
                 onShare={() => router.push({ pathname: '/(app)/ride/summary', params: { rideId: ride.id } })}

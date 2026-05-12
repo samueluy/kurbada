@@ -13,7 +13,7 @@ import { AppScreen } from '@/components/ui/app-screen';
 import { EmptyState } from '@/components/ui/empty-state';
 import { GlassCard } from '@/components/ui/glass-card';
 import { SectionHeader } from '@/components/ui/section-header';
-import { palette, radius } from '@/constants/theme';
+import { Colors, palette, radius } from '@/constants/theme';
 import { RideListingCard } from '@/features/board/components/ride-listing-card';
 import { useAuth } from '@/hooks/use-auth';
 import { useBoardMutations, useRideListings, useRsvpMutations, useRideListingRsvps } from '@/hooks/use-kurbada-data';
@@ -383,5 +383,3 @@ export default function BoardTabScreen() {
     </TabTransition>
   );
 }
-
-import { Colors } from '@/constants/theme';

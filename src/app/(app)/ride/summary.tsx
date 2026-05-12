@@ -1,8 +1,10 @@
 import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
 import { useLocalSearchParams, router } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
-import { Alert, Image, InteractionManager, Modal, PanResponder, Pressable, ScrollView, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, InteractionManager, Modal, Pressable, ScrollView, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS, useAnimatedReaction, useSharedValue } from 'react-native-reanimated';
 import ViewShot from 'react-native-view-shot';
 
 import { RouteMapPreview } from '@/components/ride/route-map-preview';
@@ -44,12 +46,10 @@ export default function RideSummaryScreen() {
   }, [fuelLogs.data]);
   const workMode = useAppStore((s) => s.workMode);
 
-  if (!ride) return null;
-
-  const totalSeconds = ride.started_at && ride.ended_at
+  const totalSeconds = ride?.started_at && ride.ended_at
     ? Math.round((new Date(ride.ended_at).getTime() - new Date(ride.started_at).getTime()) / 1000)
     : 0;
-  const [mood, setMood] = useState<RideMood | null>(ride.mood ?? null);
+  const [mood, setMood] = useState<RideMood | null>(ride?.mood ?? null);
   const [moodSaved, setMoodSaved] = useState(false);
   const [earningsSaved, setEarningsSaved] = useState(false);
   const [amountInput, setAmountInput] = useState('');
@@ -59,15 +59,17 @@ export default function RideSummaryScreen() {
   const storyShotRef = useRef<any>(null);
 
   const handleSaveMood = async (next: RideMood) => {
+    if (!ride) return;
     setMood(next);
     try { await updateRideMood.mutateAsync({ rideId: ride.id, mood: next }); setMoodSaved(true); } catch { /* */ }
   };
 
   const handleSaveEarnings = async () => {
+    if (!ride || !session?.user.id) return;
     const amount = Number(amountInput);
     if (!Number.isFinite(amount) || amount <= 0) { Alert.alert('Invalid amount', 'Enter a valid amount.'); return; }
     try {
-      await saveEarnings.mutateAsync({ user_id: session!.user.id, ride_id: ride.id, bike_id: ride.bike_id, earned_at: ride.ended_at.slice(0, 10), amount, platform, notes: null });
+      await saveEarnings.mutateAsync({ user_id: session.user.id, ride_id: ride.id, bike_id: ride.bike_id, earned_at: ride.ended_at.slice(0, 10), amount, platform, notes: null });
       setEarningsSaved(true);
     } catch (error) { Alert.alert('Save failed', error instanceof Error ? error.message : 'Please try again.'); }
   };
@@ -78,6 +80,7 @@ export default function RideSummaryScreen() {
       if (pickerResult.canceled || !pickerResult.assets?.length) return;
       setStoryPhoto(pickerResult.assets[0].uri);
       setPhotoScale(1.3); setPhotoOffsetX(0); setPhotoOffsetY(-40);
+      setAdjustMode('photo');
       setShowPhotoAdjust(true);
     } catch (error) { Alert.alert('Photo picker failed', error instanceof Error ? error.message : 'Could not open photo library.'); }
   };
@@ -97,44 +100,126 @@ export default function RideSummaryScreen() {
   const [selectedTemplate, setSelectedTemplate] = useState<RideStoryTemplateId>('distance_hero');
   const [storyPhoto, setStoryPhoto] = useState<string | undefined>();
   const [showPhotoAdjust, setShowPhotoAdjust] = useState(false);
+  const [adjustMode, setAdjustMode] = useState<'photo' | 'template'>('photo');
   const [photoScale, setPhotoScale] = useState(1.3);
   const [photoOffsetX, setPhotoOffsetX] = useState(0);
   const [photoOffsetY, setPhotoOffsetY] = useState(-40);
-  const lastDistance = useRef(0);
-  const lastOffset = useRef({ x: 0, y: 0 });
-  const currentScale = useRef(1.3);
-  const currentOffset = useRef({ x: 0, y: -40 });
+  const [overlayScale, setOverlayScale] = useState(1);
+  const [overlayOffsetX, setOverlayOffsetX] = useState(0);
+  const [overlayOffsetY, setOverlayOffsetY] = useState(0);
+  const draftPhotoScale = useSharedValue(1.3);
+  const draftPhotoOffsetX = useSharedValue(0);
+  const draftPhotoOffsetY = useSharedValue(-40);
+  const draftOverlayScale = useSharedValue(1);
+  const draftOverlayOffsetX = useSharedValue(0);
+  const draftOverlayOffsetY = useSharedValue(0);
+  const gestureStartScale = useSharedValue(1);
+  const gestureStartX = useSharedValue(0);
+  const gestureStartY = useSharedValue(0);
+  const adjustModeValue = useSharedValue<0 | 1>(0);
 
-  const photoPanResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 2 || Math.abs(g.dy) > 2,
-    onPanResponderGrant: () => {
-      lastDistance.current = 0;
-      lastOffset.current = { x: currentOffset.current.x, y: currentOffset.current.y };
-    },
-    onPanResponderMove: (evt, gs) => {
-      if (evt.nativeEvent.touches?.length === 2) {
-        const dx = evt.nativeEvent.touches[1].pageX - evt.nativeEvent.touches[0].pageX;
-        const dy = evt.nativeEvent.touches[1].pageY - evt.nativeEvent.touches[0].pageY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (lastDistance.current > 0 && dist > 0) {
-          currentScale.current = Math.max(1, Math.min(3, currentScale.current * (dist / lastDistance.current)));
-          setPhotoScale(currentScale.current);
-        }
-        lastDistance.current = dist;
-      } else {
-        lastDistance.current = 0;
-        currentOffset.current = {
-          x: lastOffset.current.x + gs.dx,
-          y: lastOffset.current.y + gs.dy,
-        };
-        setPhotoOffsetX(currentOffset.current.x);
-        setPhotoOffsetY(currentOffset.current.y);
+  useEffect(() => {
+    adjustModeValue.value = adjustMode === 'photo' ? 0 : 1;
+  }, [adjustMode, adjustModeValue]);
+
+  useEffect(() => {
+    if (!showPhotoAdjust) return;
+    draftPhotoScale.value = photoScale;
+    draftPhotoOffsetX.value = photoOffsetX;
+    draftPhotoOffsetY.value = photoOffsetY;
+    draftOverlayScale.value = overlayScale;
+    draftOverlayOffsetX.value = overlayOffsetX;
+    draftOverlayOffsetY.value = overlayOffsetY;
+  }, [
+    adjustMode,
+    draftOverlayOffsetX,
+    draftOverlayOffsetY,
+    draftOverlayScale,
+    draftPhotoOffsetX,
+    draftPhotoOffsetY,
+    draftPhotoScale,
+    overlayOffsetX,
+    overlayOffsetY,
+    overlayScale,
+    photoOffsetX,
+    photoOffsetY,
+    photoScale,
+    showPhotoAdjust,
+  ]);
+
+  useAnimatedReaction(
+    () => ({
+      photoScale: draftPhotoScale.value,
+      photoOffsetX: draftPhotoOffsetX.value,
+      photoOffsetY: draftPhotoOffsetY.value,
+      overlayScale: draftOverlayScale.value,
+      overlayOffsetX: draftOverlayOffsetX.value,
+      overlayOffsetY: draftOverlayOffsetY.value,
+    }),
+    (next, previous) => {
+      if (
+        previous
+        && next.photoScale === previous.photoScale
+        && next.photoOffsetX === previous.photoOffsetX
+        && next.photoOffsetY === previous.photoOffsetY
+        && next.overlayScale === previous.overlayScale
+        && next.overlayOffsetX === previous.overlayOffsetX
+        && next.overlayOffsetY === previous.overlayOffsetY
+      ) {
+        return;
       }
+
+      runOnJS(setPhotoScale)(Number(next.photoScale.toFixed(3)));
+      runOnJS(setPhotoOffsetX)(Number(next.photoOffsetX.toFixed(1)));
+      runOnJS(setPhotoOffsetY)(Number(next.photoOffsetY.toFixed(1)));
+      runOnJS(setOverlayScale)(Number(next.overlayScale.toFixed(3)));
+      runOnJS(setOverlayOffsetX)(Number(next.overlayOffsetX.toFixed(1)));
+      runOnJS(setOverlayOffsetY)(Number(next.overlayOffsetY.toFixed(1)));
     },
-    onPanResponderRelease: () => { lastDistance.current = 0; },
-  }), []);
-  const estimatedFuelCost = (ride.fuel_used_liters ?? 0) * (latestFuelPrice ?? 65);
+  );
+
+  const editorGesture = useMemo(() => Gesture.Simultaneous(
+    Gesture.Pan()
+      .onBegin(() => {
+        gestureStartX.value = adjustModeValue.value === 0 ? draftPhotoOffsetX.value : draftOverlayOffsetX.value;
+        gestureStartY.value = adjustModeValue.value === 0 ? draftPhotoOffsetY.value : draftOverlayOffsetY.value;
+      })
+      .onUpdate((event) => {
+        if (adjustModeValue.value === 0) {
+          draftPhotoOffsetX.value = gestureStartX.value + event.translationX;
+          draftPhotoOffsetY.value = gestureStartY.value + event.translationY;
+          return;
+        }
+        draftOverlayOffsetX.value = gestureStartX.value + event.translationX;
+        draftOverlayOffsetY.value = gestureStartY.value + event.translationY;
+      }),
+    Gesture.Pinch()
+      .onBegin(() => {
+        gestureStartScale.value = adjustModeValue.value === 0 ? draftPhotoScale.value : draftOverlayScale.value;
+      })
+      .onUpdate((event) => {
+        const nextScale = Math.max(0.6, Math.min(3, gestureStartScale.value * event.scale));
+        if (adjustModeValue.value === 0) {
+          draftPhotoScale.value = nextScale;
+          return;
+        }
+        draftOverlayScale.value = nextScale;
+      }),
+  ), [
+    adjustModeValue,
+    draftOverlayOffsetX,
+    draftOverlayOffsetY,
+    draftOverlayScale,
+    draftPhotoOffsetX,
+    draftPhotoOffsetY,
+    draftPhotoScale,
+    gestureStartScale,
+    gestureStartX,
+    gestureStartY,
+  ]);
+  const estimatedFuelCost = (ride?.fuel_used_liters ?? 0) * (latestFuelPrice ?? 65);
+
+  if (!ride) return null;
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.background }}>
@@ -231,7 +316,6 @@ export default function RideSummaryScreen() {
 
         <GlassCard style={{ gap: 16, padding: 16 }}>
           <View style={{ gap: 6 }}>
-            <AppText variant="sectionTitle">Instagram Story Overlays</AppText>
             <AppText variant="meta" style={{ color: palette.textSecondary }}>
               Pick a gallery photo, switch between templates, then export straight from your phone. Nothing gets uploaded.
             </AppText>
@@ -264,6 +348,12 @@ export default function RideSummaryScreen() {
               templateId={selectedTemplate}
               fuelPricePerLiter={latestFuelPrice}
               width={240}
+              photoScale={photoScale}
+              photoOffsetX={photoOffsetX}
+              photoOffsetY={photoOffsetY}
+              overlayScale={overlayScale}
+              overlayOffsetX={overlayOffsetX}
+              overlayOffsetY={overlayOffsetY}
             />
           </View>
 
@@ -273,11 +363,38 @@ export default function RideSummaryScreen() {
               variant="secondary"
               onPress={pickStoryPhoto}
             />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Button
+                  title="Adjust Photo"
+                  variant="secondary"
+                  onPress={() => {
+                    setAdjustMode('photo');
+                    setShowPhotoAdjust(true);
+                  }}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  title="Adjust Template"
+                  variant="secondary"
+                  onPress={() => {
+                    setAdjustMode('template');
+                    setShowPhotoAdjust(true);
+                  }}
+                />
+              </View>
+            </View>
             {storyPhoto ? (
               <Button
                 title="Use Route Background Instead"
                 variant="ghost"
-                onPress={() => setStoryPhoto(undefined)}
+                onPress={() => {
+                  setStoryPhoto(undefined);
+                  setPhotoScale(1.3);
+                  setPhotoOffsetX(0);
+                  setPhotoOffsetY(-40);
+                }}
               />
             ) : null}
             <Button
@@ -301,42 +418,85 @@ export default function RideSummaryScreen() {
       </AppScrollScreen>
 
       <Modal visible={showPhotoAdjust} transparent animationType="fade">
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
-          <View style={{ flex: 1, overflow: 'hidden' }} {...photoPanResponder.panHandlers}>
-            <Image
-              source={{ uri: storyPhoto }}
+        <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', paddingHorizontal: 20, gap: 16 }}>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Pressable
+              onPress={() => setAdjustMode('photo')}
               style={{
                 flex: 1,
-                transform: [
-                  { scale: photoScale },
-                  { translateX: photoOffsetX },
-                  { translateY: photoOffsetY },
-                ],
-              }}
-              resizeMode="cover"
-            />
-            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingBottom: 40, gap: 8 }}>
-              <AppText variant="meta" style={{ color: palette.textSecondary, textAlign: 'center', fontSize: 12 }}>
-                Pinch to zoom · Drag to position
+                borderRadius: radius.pill,
+                paddingVertical: 10,
+                alignItems: 'center',
+                backgroundColor: adjustMode === 'photo' ? palette.text : 'rgba(255,255,255,0.06)',
+              }}>
+              <AppText variant="button" style={{ fontSize: 12, color: adjustMode === 'photo' ? palette.background : palette.textSecondary }}>
+                Photo
               </AppText>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={{ flex: 1 }}>
-                  <Button
-                    title="Change Photo"
-                    variant="secondary"
-                    onPress={() => { setShowPhotoAdjust(false); pickStoryPhoto(); }}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Button
-                    title="Continue"
-                    onPress={() => {
-                      setShowPhotoAdjust(false);
-                      setTimeout(() => void captureAndShare(), 150);
-                    }}
-                    style={{ backgroundColor: palette.danger }}
-                  />
-                </View>
+            </Pressable>
+            <Pressable
+              onPress={() => setAdjustMode('template')}
+              style={{
+                flex: 1,
+                borderRadius: radius.pill,
+                paddingVertical: 10,
+                alignItems: 'center',
+                backgroundColor: adjustMode === 'template' ? palette.text : 'rgba(255,255,255,0.06)',
+              }}>
+              <AppText variant="button" style={{ fontSize: 12, color: adjustMode === 'template' ? palette.background : palette.textSecondary }}>
+                Template
+              </AppText>
+            </Pressable>
+          </View>
+
+          <GestureDetector gesture={editorGesture}>
+            <View style={{ alignItems: 'center' }}>
+              <IgStoryCanvas
+                ride={ride}
+                photoUri={storyPhoto}
+                templateId={selectedTemplate}
+                fuelPricePerLiter={latestFuelPrice}
+                photoScale={photoScale}
+                photoOffsetX={photoOffsetX}
+                photoOffsetY={photoOffsetY}
+                overlayScale={overlayScale}
+                overlayOffsetX={overlayOffsetX}
+                overlayOffsetY={overlayOffsetY}
+                width={300}
+              />
+            </View>
+          </GestureDetector>
+
+          <View style={{ gap: 8 }}>
+            <AppText variant="meta" style={{ color: palette.textSecondary, textAlign: 'center', fontSize: 12 }}>
+              {adjustMode === 'photo'
+                ? 'Pinch to zoom the photo and drag to position it.'
+                : 'Pinch to scale the template and drag it into place.'}
+            </AppText>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Button
+                  title="Reset"
+                  variant="secondary"
+                  onPress={() => {
+                    if (adjustMode === 'photo') {
+                      draftPhotoScale.value = 1.3;
+                      draftPhotoOffsetX.value = 0;
+                      draftPhotoOffsetY.value = -40;
+                      return;
+                    }
+
+                    draftOverlayScale.value = 1;
+                    draftOverlayOffsetX.value = 0;
+                    draftOverlayOffsetY.value = 0;
+                  }}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  title="Done"
+                  onPress={() => setShowPhotoAdjust(false)}
+                  style={{ backgroundColor: palette.danger }}
+                />
               </View>
             </View>
           </View>
@@ -365,6 +525,9 @@ export default function RideSummaryScreen() {
             photoScale={photoScale}
             photoOffsetX={photoOffsetX}
             photoOffsetY={photoOffsetY}
+            overlayScale={overlayScale}
+            overlayOffsetX={overlayOffsetX}
+            overlayOffsetY={overlayOffsetY}
             width={1080}
           />
         </ViewShot>

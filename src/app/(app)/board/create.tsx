@@ -1,8 +1,7 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { router, useLocalSearchParams } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, TextInput, View } from "react-native";
+import { Alert, Platform, Pressable, View } from "react-native";
 
 import { AppScrollScreen } from "@/components/ui/app-screen";
 import { AppText } from "@/components/ui/app-text";
@@ -63,6 +62,7 @@ export default function CreateRideScreen() {
   const [mapSearch, setMapSearch] = useState("");
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
   const [showMapPin, setShowMapPin] = useState(false);
+  const [mapSearchBusy, setMapSearchBusy] = useState(false);
   const [destination, setDestination] = useState("");
   const [city, setCity] = useState("");
   const [rideDate, setRideDate] = useState(
@@ -73,6 +73,7 @@ export default function CreateRideScreen() {
     useState<LobbyPlatform>("messenger");
   const [lobbyLink, setLobbyLink] = useState("");
   const [showDateTimePicker, setShowDateTimePicker] = useState(false);
+  const [androidPickerMode, setAndroidPickerMode] = useState<"date" | "time" | null>(null);
 
   useEffect(() => {
     if (!existingListing) return;
@@ -82,10 +83,82 @@ export default function CreateRideScreen() {
     setDestination(existingListing.destination);
     setCity(existingListing.city ?? "");
     setRideDate(new Date(existingListing.ride_date));
+    setMapCenter(
+      existingListing.meetup_coordinates
+        ? [existingListing.meetup_coordinates.lng, existingListing.meetup_coordinates.lat]
+        : null,
+    );
     setPace(existingListing.pace);
     setLobbyPlatform(existingListing.lobby_platform ?? "messenger");
     setLobbyLink(existingListing.lobby_link ?? "");
   }, [existingListing]);
+
+  const handleMapSearch = async () => {
+    const query = mapSearch.trim();
+    if (!query || !env.mapboxToken) return;
+
+    setMapSearchBusy(true);
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${encodeURIComponent(env.mapboxToken)}&limit=1&country=PH`,
+      );
+      const payload = await response.json();
+      const feature = payload?.features?.[0];
+
+      if (!feature?.center?.length) {
+        Alert.alert("No results", "Try a more specific place or landmark.");
+        return;
+      }
+
+      setMapCenter([feature.center[0], feature.center[1]]);
+    } catch (error) {
+      Alert.alert(
+        "Search failed",
+        error instanceof Error ? error.message : "Could not look up that place.",
+      );
+    } finally {
+      setMapSearchBusy(false);
+    }
+  };
+
+  const handleMapPress = (event: any) => {
+    const coordinates = event?.geometry?.coordinates;
+    if (!Array.isArray(coordinates) || coordinates.length < 2) return;
+    setMeetupCoords({ lng: coordinates[0], lat: coordinates[1] });
+    setMapCenter([coordinates[0], coordinates[1]]);
+  };
+
+  const handleOpenDatePicker = () => {
+    if (Platform.OS === "android") {
+      setAndroidPickerMode("date");
+      return;
+    }
+    setShowDateTimePicker(true);
+  };
+
+  const handleAndroidDateChange = (event: any, selectedDate?: Date) => {
+    if (event?.type === "dismissed" || !selectedDate) {
+      setAndroidPickerMode(null);
+      return;
+    }
+
+    if (androidPickerMode === "date") {
+      const nextDate = new Date(rideDate);
+      nextDate.setFullYear(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate(),
+      );
+      setRideDate(nextDate);
+      setAndroidPickerMode("time");
+      return;
+    }
+
+    const nextDate = new Date(rideDate);
+    nextDate.setHours(selectedDate.getHours(), selectedDate.getMinutes(), 0, 0);
+    setRideDate(nextDate);
+    setAndroidPickerMode(null);
+  };
 
   const handlePost = async () => {
     if (!title.trim() || !meetupPoint.trim() || !destination.trim()) {
@@ -161,9 +234,102 @@ export default function CreateRideScreen() {
           <Button
             title={showMapPin ? "Remove Map Pin" : "+ Pin Location on Map"}
             variant="ghost"
-            onPress={() => setShowMapPin(!showMapPin)}
+            onPress={() => {
+              setShowMapPin(!showMapPin);
+              if (!showMapPin && !mapCenter) {
+                setMapCenter(
+                  meetupCoords
+                    ? [meetupCoords.lng, meetupCoords.lat]
+                    : [121.0437, 14.5995],
+                );
+              }
+            }}
             />
           )}
+
+        {Mapbox && showMapPin ? (
+          <View style={{ gap: 10 }}>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={{ flex: 1 }}>
+                <FloatingField
+                  label="Search Landmark or Area"
+                  value={mapSearch}
+                  onChangeText={setMapSearch}
+                  placeholder="Marcos Highway, Antipolo"
+                />
+              </View>
+              <Pressable
+                onPress={() => {
+                  void handleMapSearch();
+                }}
+                style={{
+                  paddingHorizontal: 14,
+                  borderRadius: radius.sm,
+                  backgroundColor: palette.surfaceStrong,
+                  borderWidth: 0.5,
+                  borderColor: palette.border,
+                  justifyContent: "center",
+                }}
+              >
+                <AppText variant="button" style={{ color: palette.textSecondary, fontSize: 12 }}>
+                  {mapSearchBusy ? "..." : "Find"}
+                </AppText>
+              </Pressable>
+            </View>
+
+            <View style={{ height: 220, borderRadius: radius.md, overflow: "hidden", borderWidth: 0.5, borderColor: palette.border }}>
+              <Mapbox.MapView
+                style={{ flex: 1 }}
+                styleURL="mapbox://styles/mapbox/dark-v11"
+                onPress={handleMapPress}
+                onLongPress={handleMapPress}
+                attributionEnabled={false}
+                logoEnabled={false}
+                compassEnabled
+              >
+                <Mapbox.Camera
+                  centerCoordinate={meetupCoords ? [meetupCoords.lng, meetupCoords.lat] : mapCenter ?? [121.0437, 14.5995]}
+                  zoomLevel={meetupCoords || mapCenter ? 13 : 10}
+                  animationMode="easeTo"
+                />
+                {meetupCoords ? (
+                  <Mapbox.ShapeSource
+                    id="ride-create-pin"
+                    shape={{
+                      type: "Feature",
+                      geometry: {
+                        type: "Point",
+                        coordinates: [meetupCoords.lng, meetupCoords.lat],
+                      },
+                      properties: {},
+                    }}
+                  >
+                    <Mapbox.CircleLayer
+                      id="ride-create-pin-circle"
+                      style={{ circleColor: palette.danger, circleRadius: 8, circleStrokeColor: "#FFFFFF", circleStrokeWidth: 2 }}
+                    />
+                  </Mapbox.ShapeSource>
+                ) : null}
+              </Mapbox.MapView>
+            </View>
+
+            <AppText variant="meta" style={{ color: palette.textSecondary }}>
+              Tap or long-press on the map to drop the meetup pin.
+            </AppText>
+            {meetupCoords ? (
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                <AppText variant="meta" style={{ color: palette.textSecondary, flex: 1 }}>
+                  Pin set at {meetupCoords.lat.toFixed(5)}, {meetupCoords.lng.toFixed(5)}
+                </AppText>
+                <Pressable onPress={() => setMeetupCoords(null)}>
+                  <AppText variant="button" style={{ color: palette.danger, fontSize: 12 }}>
+                    Clear Pin
+                  </AppText>
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
         <FloatingField
           label="Destination / Route"
@@ -182,7 +348,7 @@ export default function CreateRideScreen() {
         <View style={{ gap: 6 }}>
           <AppText variant="label" style={{ color: palette.textSecondary, fontSize: 12 }}>Date & Time</AppText>
           <Pressable
-            onPress={() => setShowDateTimePicker(true)}
+            onPress={handleOpenDatePicker}
             style={{ paddingVertical: 14, paddingHorizontal: 16, borderRadius: radius.sm, backgroundColor: palette.surfaceMuted, borderWidth: 0.5, borderColor: palette.border }}>
             <AppText variant="body">
               {rideDate.toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' })} · {rideDate.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })}
@@ -195,7 +361,7 @@ export default function CreateRideScreen() {
           ) : null}
         </View>
 
-        {showDateTimePicker && (
+        {Platform.OS !== "android" && showDateTimePicker ? (
           <DateTimePicker
             value={rideDate}
             mode="datetime"
@@ -205,7 +371,16 @@ export default function CreateRideScreen() {
               if (selectedDate) setRideDate(selectedDate);
             }}
           />
-        )}
+        ) : null}
+
+        {Platform.OS === "android" && androidPickerMode ? (
+          <DateTimePicker
+            value={rideDate}
+            mode={androidPickerMode}
+            display="default"
+            onChange={handleAndroidDateChange}
+          />
+        ) : null}
 
         <View style={{ gap: 6 }}>
           <AppText
@@ -309,7 +484,7 @@ export default function CreateRideScreen() {
           />
         ) : (
           <AppText variant="meta" style={{ color: palette.textSecondary }}>
-            Bahala na kayo maghanapan jan haha - Sam
+            Meetup-only ride. Riders will just follow the meetup details and date.
           </AppText>
         )}
       </GlassCard>

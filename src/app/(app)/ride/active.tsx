@@ -1,4 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { useKeepAwake } from 'expo-keep-awake';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useEffect } from 'react';
 import { Alert, Pressable, StatusBar, View } from 'react-native';
@@ -11,11 +12,18 @@ import { HUDStatCard } from '@/components/ui/hud-stat-card';
 import { palette, radius } from '@/constants/theme';
 import { formatCurrencyPhp, formatDuration } from '@/lib/format';
 import { useRideSession } from '@/hooks/use-ride-session';
+import { useAppStore } from '@/store/app-store';
+
+function RideKeepAwake() {
+  useKeepAwake();
+  return null;
+}
 
 export default function ActiveRideScreen() {
   const params = useLocalSearchParams<{ bikeId?: string; fuelPrice?: string; fuelRate?: string }>();
   const ride = useRideSession();
   const insets = useSafeAreaInsets();
+  const keepScreenAwakeDuringRide = useAppStore((state) => state.keepScreenAwakeDuringRide);
   const requestedBikeId = Array.isArray(params.bikeId) ? params.bikeId[0] : params.bikeId;
   const requestedFuelPrice = Array.isArray(params.fuelPrice) ? params.fuelPrice[0] : params.fuelPrice;
   const requestedFuelRate = Array.isArray(params.fuelRate) ? params.fuelRate[0] : params.fuelRate;
@@ -46,6 +54,7 @@ export default function ActiveRideScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000000' }}>
+      {keepScreenAwakeDuringRide && (ride.state === 'active' || ride.state === 'starting' || ride.state === 'saving') ? <RideKeepAwake /> : null}
       <StatusBar barStyle="light-content" />
 
       <View

@@ -24,6 +24,9 @@ type IgStoryCanvasProps = {
   photoScale?: number;
   photoOffsetX?: number;
   photoOffsetY?: number;
+  overlayScale?: number;
+  overlayOffsetX?: number;
+  overlayOffsetY?: number;
 };
 
 const shadow: TextStyle = {
@@ -113,7 +116,20 @@ function BrandMark({ width, align = 'left' }: { width: number; align?: 'left' | 
 }
 
 export const IgStoryCanvas = forwardRef<View, IgStoryCanvasProps>(function IgStoryCanvas(
-  { ride, photoUri, templateId, fuelPricePerLiter, width = 1080, hidden = false, photoScale = 1.3, photoOffsetX = 0, photoOffsetY = -40 },
+  {
+    ride,
+    photoUri,
+    templateId,
+    fuelPricePerLiter,
+    width = 1080,
+    hidden = false,
+    photoScale = 1.3,
+    photoOffsetX = 0,
+    photoOffsetY = -40,
+    overlayScale = 1,
+    overlayOffsetX = 0,
+    overlayOffsetY = 0,
+  },
   ref,
 ) {
   const Mapbox = getMapboxModule();
@@ -527,7 +543,18 @@ export const IgStoryCanvas = forwardRef<View, IgStoryCanvasProps>(function IgSto
           </Mapbox.ShapeSource>
         </Mapbox.MapView>
       ) : null}
-      {overlay}
+      <View
+        style={{
+          position: 'absolute',
+          inset: 0,
+          transform: [
+            { translateX: overlayOffsetX },
+            { translateY: overlayOffsetY },
+            { scale: overlayScale },
+          ],
+        }}>
+        {overlay}
+      </View>
     </View>
   );
 });

@@ -15,6 +15,8 @@ export default function NotificationsScreen() {
   const setCrashAlertsEnabled = useAppStore((state) => state.setCrashAlertsEnabled);
   const maintenanceRemindersEnabled = useAppStore((state) => state.maintenanceRemindersEnabled);
   const setMaintenanceRemindersEnabled = useAppStore((state) => state.setMaintenanceRemindersEnabled);
+  const keepScreenAwakeDuringRide = useAppStore((state) => state.keepScreenAwakeDuringRide);
+  const setKeepScreenAwakeDuringRide = useAppStore((state) => state.setKeepScreenAwakeDuringRide);
   const thresholds = useAppStore((state) => state.maintenanceReminderThresholds);
   const setThresholds = useAppStore((state) => state.setMaintenanceReminderThresholds);
   const dailySummaryEnabled = useAppStore((state) => state.dailySummaryEnabled);
@@ -55,6 +57,21 @@ export default function NotificationsScreen() {
             onValueChange={setCrashAlertsEnabled}
             trackColor={{ false: palette.surfaceMuted, true: palette.danger }}
             thumbColor={crashAlertsEnabled ? '#FFFFFF' : palette.textTertiary}
+          />
+        </View>
+        <View style={{ height: 0.5, backgroundColor: palette.border }} />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <AppText variant="bodyBold">Keep screen awake during rides</AppText>
+            <AppText variant="meta" style={{ color: palette.textSecondary }}>
+              Prevents the screen from sleeping only while an active ride is running.
+            </AppText>
+          </View>
+          <Switch
+            value={keepScreenAwakeDuringRide}
+            onValueChange={setKeepScreenAwakeDuringRide}
+            trackColor={{ false: palette.surfaceMuted, true: palette.lime }}
+            thumbColor={keepScreenAwakeDuringRide ? '#FFFFFF' : palette.textTertiary}
           />
         </View>
       </GlassCard>

@@ -26,6 +26,7 @@ export function useRideSession() {
   const accelSubscriptionRef = useRef<{ remove: () => void } | null>(null);
   const crashThresholdSinceRef = useRef<number | null>(null);
   const recentGForcesRef = useRef<number[]>([]);
+  const recentSpeedsRef = useRef<number[]>([]);
   const foregroundPointsRef = useRef<RidePoint[]>([]);
   const rideStartedAtRef = useRef<number | null>(null);
   const getRideState = useRideStore.getState;
@@ -64,6 +65,7 @@ export function useRideSession() {
   useEffect(() => {
     if (store.state !== 'active') {
       recentGForcesRef.current = [];
+      recentSpeedsRef.current = [];
       cleanupSubscriptions();
       return;
     }
@@ -105,6 +107,7 @@ export function useRideSession() {
     foregroundPointsRef.current = [];
     crashThresholdSinceRef.current = null;
     recentGForcesRef.current = [];
+    recentSpeedsRef.current = [];
     store.setBikeId(bikeId);
     store.setFuelPricePerLiter(fuelPricePerLiter);
     store.setFuelRateKmPerLiter(fuelRateKmPerLiter);
@@ -155,9 +158,10 @@ export function useRideSession() {
     const fgPoints = [...foregroundPointsRef.current];
     const allPoints = [...bgPoints, ...fgPoints].sort((a, b) => a.timestamp - b.timestamp);
 
-    const simplified = simplifyRoute(allPoints);
+    const normalizedPoints = normalizeRidePoints(allPoints);
+    const simplified = simplifyRoute(normalizedPoints);
     const routeGeoJson = buildRouteGeoJson(simplified);
-    const bounds = computeRouteBounds(simplified.length ? simplified : allPoints);
+    const bounds = computeRouteBounds(simplified.length ? simplified : normalizedPoints);
 
     const totalDistance = simplified.reduce((sum, p, i) => {
       if (i === 0) return 0;
@@ -183,18 +187,18 @@ export function useRideSession() {
       elevation_gain_m: Number(store.telemetry.elevationGainM.toFixed(1)),
       mood: null,
       route_geojson: routeGeoJson,
-      route_point_count_raw: allPoints.length,
+      route_point_count_raw: normalizedPoints.length,
       route_point_count_simplified: simplified.length,
       route_bounds: bounds,
     };
 
     store.setState('saving');
     try {
-      await saveRide.mutateAsync(ride);
+      const savedRide = await saveRide.mutateAsync(ride);
       await clearStoredCoords();
       rideStartedAtRef.current = null;
       store.resetRide();
-      return ride;
+      return savedRide;
     } catch {
       store.setState('active');
       throw new Error('Failed to save ride. Please try again.');
@@ -252,12 +256,21 @@ export function useRideSession() {
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
           timestamp: location.timestamp,
-          speedKmh: Math.max(0, (location.coords.speed ?? 0) * 3.6),
+          speedKmh: 0,
+          rawSpeedKmh: Math.max(0, (location.coords.speed ?? 0) * 3.6),
+          locationAccuracyM: location.coords.accuracy ?? null,
           altitude: location.coords.altitude ?? 0,
         };
 
         const previous = foregroundPointsRef.current[foregroundPointsRef.current.length - 1];
         const distanceDelta = previous ? haversineDistanceKm(previous, point) : 0;
+        const filteredSpeedKmh = filterRideSpeedKmh({
+          nextPoint: point,
+          previousPoint: previous,
+          previousFilteredSpeedKmh: getRideState().telemetry.speedKmh,
+          distanceDeltaKm: distanceDelta,
+        });
+        point.speedKmh = filteredSpeedKmh;
         // Positive altitude deltas only; ignore small GPS jitter (<3m) to keep the total clean.
         let elevationDelta = 0;
         if (previous && previous.altitude != null && point.altitude != null) {
@@ -277,11 +290,11 @@ export function useRideSession() {
         const heading = location.coords.heading ?? currentStore.telemetry.heading;
 
         currentStore.updateTelemetry({
-          speedKmh: point.speedKmh,
+          speedKmh: filteredSpeedKmh,
           altitudeMeters: point.altitude ?? 0,
           distanceKm: newDistance,
           elevationGainM: newElevationGain,
-          maxSpeedKmh: Math.max(currentStore.telemetry.maxSpeedKmh, point.speedKmh),
+          maxSpeedKmh: Math.max(currentStore.telemetry.maxSpeedKmh, filteredSpeedKmh),
           estimatedFuelLiters: fuelLiters,
           estimatedFuelCost: fuelCost,
           heading: heading || currentStore.telemetry.heading,
@@ -301,6 +314,106 @@ export function useRideSession() {
 
   const previewPoints = simplifyRoute(foregroundPointsRef.current);
   const routePreview = previewPoints.length ? buildRouteGeoJson(previewPoints) : undefined;
+
+  function normalizeRidePoints(points: RidePoint[]) {
+    const speedWindow: number[] = [];
+
+    return points.map((point, index) => {
+      const previousPoint = index > 0 ? points[index - 1] : undefined;
+      const previousFilteredSpeedKmh = speedWindow[speedWindow.length - 1] ?? 0;
+      const distanceDeltaKm = previousPoint ? haversineDistanceKm(previousPoint, point) : 0;
+
+      const filteredSpeedKmh = resolveFilteredSpeedKmh({
+        nextPoint: point,
+        previousPoint,
+        previousFilteredSpeedKmh,
+        distanceDeltaKm,
+        speedWindow,
+      });
+      speedWindow.push(filteredSpeedKmh);
+
+      return { ...point, speedKmh: filteredSpeedKmh };
+    });
+  }
+
+  function filterRideSpeedKmh({
+    nextPoint,
+    previousPoint,
+    previousFilteredSpeedKmh,
+    distanceDeltaKm,
+  }: {
+    nextPoint: RidePoint;
+    previousPoint?: RidePoint;
+    previousFilteredSpeedKmh: number;
+    distanceDeltaKm: number;
+  }) {
+    const averagedSpeedKmh = resolveFilteredSpeedKmh({
+      nextPoint,
+      previousPoint,
+      previousFilteredSpeedKmh,
+      distanceDeltaKm,
+      speedWindow: recentSpeedsRef.current,
+    });
+    recentSpeedsRef.current = [...recentSpeedsRef.current.slice(-3), averagedSpeedKmh];
+    return averagedSpeedKmh;
+  }
+
+  function resolveFilteredSpeedKmh({
+    nextPoint,
+    previousPoint,
+    previousFilteredSpeedKmh,
+    distanceDeltaKm,
+    speedWindow,
+  }: {
+    nextPoint: RidePoint;
+    previousPoint?: RidePoint;
+    previousFilteredSpeedKmh: number;
+    distanceDeltaKm: number;
+    speedWindow: number[];
+  }) {
+    const rawGpsSpeedKmh = Math.max(0, nextPoint.rawSpeedKmh ?? nextPoint.speedKmh ?? 0);
+    const accuracyM = nextPoint.locationAccuracyM ?? 999;
+    const secondsDelta = previousPoint ? Math.max(0, (nextPoint.timestamp - previousPoint.timestamp) / 1000) : 0;
+    const deltaSpeedKmh = secondsDelta >= 0.8 && secondsDelta <= 12
+      ? (distanceDeltaKm / secondsDelta) * 3600
+      : null;
+
+    let candidateSpeedKmh = rawGpsSpeedKmh;
+
+    if (deltaSpeedKmh != null && Number.isFinite(deltaSpeedKmh)) {
+      if (accuracyM > 35) {
+        candidateSpeedKmh = deltaSpeedKmh;
+      } else {
+        const closeEnough = Math.abs(rawGpsSpeedKmh - deltaSpeedKmh) <= 18;
+        candidateSpeedKmh = closeEnough
+          ? rawGpsSpeedKmh * 0.55 + deltaSpeedKmh * 0.45
+          : rawGpsSpeedKmh < 12
+            ? deltaSpeedKmh * 0.65 + rawGpsSpeedKmh * 0.35
+            : rawGpsSpeedKmh * 0.35 + deltaSpeedKmh * 0.65;
+      }
+    }
+
+    if (accuracyM > 70) {
+      candidateSpeedKmh = previousFilteredSpeedKmh * 0.8;
+    }
+
+    if (previousFilteredSpeedKmh > 0 && Math.abs(candidateSpeedKmh - previousFilteredSpeedKmh) > 55 && accuracyM > 18) {
+      candidateSpeedKmh = previousFilteredSpeedKmh + Math.sign(candidateSpeedKmh - previousFilteredSpeedKmh) * 18;
+    }
+
+    const alpha = candidateSpeedKmh > previousFilteredSpeedKmh
+      ? (candidateSpeedKmh < 15 || accuracyM > 25 ? 0.28 : 0.58)
+      : (candidateSpeedKmh < 15 || accuracyM > 25 ? 0.22 : 0.4);
+
+    const smoothedSpeedKmh = Math.max(
+      0,
+      previousFilteredSpeedKmh + (candidateSpeedKmh - previousFilteredSpeedKmh) * alpha,
+    );
+    const nextWindow = [...speedWindow.slice(-3), smoothedSpeedKmh];
+    const averagedSpeedKmh = nextWindow.reduce((sum, value) => sum + value, 0) / nextWindow.length;
+
+    return averagedSpeedKmh < 2 && accuracyM > 20 ? 0 : Number(averagedSpeedKmh.toFixed(1));
+  }
 
   return {
     ...store,

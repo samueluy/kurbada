@@ -26,7 +26,7 @@ export default function FuelTabScreen() {
   const [showForm, setShowForm] = useState(false);
   const [liters, setLiters] = useState('7');
   const [price, setPrice] = useState('66');
-  const [station, setStation] = useState('Shell Katipunan');
+  const [station, setStation] = useState('');
   const [octane, setOctane] = useState<'91' | '95' | '97' | '100'>('95');
   const formProgress = useRef(new Animated.Value(0)).current;
   const currentBike = bikes.data?.[0];

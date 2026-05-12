@@ -10,6 +10,7 @@ type LocalAppState = {
   bikes: Bike[];
   maintenanceTasks: MaintenanceTask[];
   rides: RideRecord[];
+  pendingRides: RideRecord[];
   fuelLogs: FuelLog[];
   emergencyInfo: EmergencyInfo;
   referrals: ReferralRecord[];
@@ -19,6 +20,8 @@ type LocalAppState = {
   deleteBike: (bikeId: string) => void;
   saveRide: (ride: RideRecord) => void;
   deleteRide: (rideId: string) => void;
+  addPendingRide: (ride: RideRecord) => void;
+  removePendingRide: (rideId: string) => void;
   saveFuelLog: (fuelLog: FuelLog) => void;
   deleteFuelLog: (fuelLogId: string) => void;
   updateEmergencyInfo: (info: EmergencyInfo) => void;
@@ -42,6 +45,7 @@ export const useLocalAppStore = create<LocalAppState>()(
       bikes: sampleBikes,
       maintenanceTasks: sampleMaintenanceTasks,
       rides: sampleRides,
+      pendingRides: [],
       fuelLogs: sampleFuelLogs,
       emergencyInfo: sampleEmergencyInfo,
       referrals: sampleReferrals,
@@ -62,8 +66,35 @@ export const useLocalAppStore = create<LocalAppState>()(
           rides: state.rides.filter((item) => item.bike_id !== bikeId),
           fuelLogs: state.fuelLogs.filter((item) => item.bike_id !== bikeId),
         })),
-      saveRide: (ride) => set((state) => ({ rides: [ride, ...state.rides] })),
-      deleteRide: (rideId) => set((state) => ({ rides: state.rides.filter((r) => r.id !== rideId) })),
+      saveRide: (ride) =>
+        set((state) => ({
+          rides: state.rides.some((item) => item.id === ride.id)
+            ? state.rides.map((item) => (item.id === ride.id ? ride : item))
+            : [ride, ...state.rides],
+        })),
+      deleteRide: (rideId) =>
+        set((state) => ({
+          rides: state.rides.filter((r) => r.id !== rideId),
+          pendingRides: state.pendingRides.filter((ride) => ride.id !== rideId),
+        })),
+      addPendingRide: (ride) =>
+        set((state) => ({
+          pendingRides: state.pendingRides.some((item) => item.id === ride.id)
+            ? state.pendingRides.map((item) => (item.id === ride.id ? { ...ride, sync_status: 'pending' } : item))
+            : [{ ...ride, sync_status: 'pending' }, ...state.pendingRides],
+          rides: state.rides.some((item) => item.id === ride.id)
+            ? state.rides.map((item) => (item.id === ride.id ? { ...ride, sync_status: 'pending' } : item))
+            : [{ ...ride, sync_status: 'pending' }, ...state.rides],
+        })),
+      removePendingRide: (rideId) =>
+        set((state) => ({
+          pendingRides: state.pendingRides.filter((ride) => ride.id !== rideId),
+          rides: state.rides.map((ride) => (
+            ride.id === rideId
+              ? { ...ride, sync_status: 'synced' }
+              : ride
+          )),
+        })),
       saveFuelLog: (fuelLog) =>
         set((state) => ({
           fuelLogs: state.fuelLogs.some((item) => item.id === fuelLog.id)

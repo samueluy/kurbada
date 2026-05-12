@@ -190,21 +190,38 @@ export function useMaintenanceTasks(bikeId?: string) {
 
 export function useRides(userId?: string) {
   const localRides = useLocalAppStore((state) => state.rides);
+  const pendingRides = useLocalAppStore((state) => state.pendingRides);
   const useRemote = useRemoteMode(userId);
+
+  const mergeRides = (rides: RideRecord[]) => {
+    const merged = new Map<string, RideRecord>();
+
+    rides.forEach((ride) => {
+      merged.set(ride.id, { ...ride, sync_status: ride.sync_status ?? 'synced' });
+    });
+
+    pendingRides.forEach((ride) => {
+      merged.set(ride.id, { ...ride, sync_status: 'pending' });
+    });
+
+    return Array.from(merged.values()).sort(
+      (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime(),
+    );
+  };
 
   const query = useQuery({
     queryKey: ['rides', userId ?? 'local'],
     enabled: useRemote,
     queryFn: async () => {
-      if (!supabase || !userId) return localRides;
+      if (!supabase || !userId) return mergeRides(localRides);
       const { data, error } = await supabase.from('rides').select('*').eq('user_id', userId).order('started_at', { ascending: false });
       if (error) throw error;
-      return data as unknown as RideRecord[];
+      return mergeRides((data as unknown as RideRecord[]).map((ride) => ({ ...ride, sync_status: 'synced' })));
     },
   });
 
   if (!useRemote) {
-    return { data: localRides, isLoading: false, error: null, isFetching: false };
+    return { data: mergeRides(localRides), isLoading: false, error: null, isFetching: false };
   }
 
   return query;
@@ -490,11 +507,28 @@ export function useRideMutations(userId?: string) {
   const queryClient = useQueryClient();
   const saveRideLocal = useLocalAppStore((state) => state.saveRide);
   const deleteRideLocal = useLocalAppStore((state) => state.deleteRide);
+  const addPendingRideLocal = useLocalAppStore((state) => state.addPendingRide);
+  const removePendingRideLocal = useLocalAppStore((state) => state.removePendingRide);
+
+  const mergeRideIntoCache = (ride: RideRecord) => {
+    queryClient.setQueryData<RideRecord[]>(['rides', userId ?? 'local'], (current = []) => {
+      const next = new Map(current.map((item) => [item.id, item]));
+      next.set(ride.id, ride);
+      return Array.from(next.values()).sort(
+        (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime(),
+      );
+    });
+  };
 
   const saveRide = useMutation({
     mutationFn: async (ride: RideRecord) => {
+      const localRide = { ...ride, sync_status: 'synced' as const };
+      saveRideLocal(localRide);
+      mergeRideIntoCache(localRide);
+
       if (supabase && userId) {
         const payload = {
+          id: ride.id,
           bike_id: ride.bike_id,
           user_id: userId,
           mode: ride.mode,
@@ -513,16 +547,24 @@ export function useRideMutations(userId?: string) {
           route_bounds: ride.route_bounds,
         };
 
-        const { data, error } = await supabase.from('rides').insert(payload as any).select().single();
-        if (error) throw error;
+        try {
+          const { data, error } = await supabase.from('rides').upsert(payload as any, { onConflict: 'id' }).select().single();
+          if (error) throw error;
 
-        const savedRide = data as unknown as RideRecord;
-        saveRideLocal(savedRide);
-        return savedRide;
+          const savedRide = { ...(data as unknown as RideRecord), sync_status: 'synced' as const };
+          saveRideLocal(savedRide);
+          removePendingRideLocal(savedRide.id);
+          mergeRideIntoCache(savedRide);
+          return savedRide;
+        } catch {
+          const pendingRide = { ...ride, sync_status: 'pending' as const };
+          addPendingRideLocal(pendingRide);
+          mergeRideIntoCache(pendingRide);
+          return pendingRide;
+        }
       }
 
-      saveRideLocal(ride);
-      return ride;
+      return localRide;
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['rides', userId ?? 'local'] });
@@ -571,7 +613,49 @@ export function useRideMutations(userId?: string) {
     },
   });
 
-  return { saveRide, updateRideMood, deleteRide };
+  const syncPendingRides = useMutation({
+    mutationFn: async () => {
+      if (!supabase || !userId) return [];
+
+      const { pendingRides: queuedRides } = useLocalAppStore.getState();
+      const syncedIds: string[] = [];
+
+      for (const ride of queuedRides) {
+        const payload = {
+          id: ride.id,
+          bike_id: ride.bike_id,
+          user_id: userId,
+          mode: ride.mode,
+          started_at: ride.started_at,
+          ended_at: ride.ended_at,
+          distance_km: ride.distance_km,
+          max_speed_kmh: ride.max_speed_kmh,
+          avg_speed_kmh: ride.avg_speed_kmh,
+          max_lean_angle_deg: ride.max_lean_angle_deg ?? null,
+          fuel_used_liters: ride.fuel_used_liters ?? null,
+          elevation_gain_m: ride.elevation_gain_m ?? null,
+          mood: ride.mood ?? null,
+          route_geojson: ride.route_geojson,
+          route_point_count_raw: ride.route_point_count_raw,
+          route_point_count_simplified: ride.route_point_count_simplified,
+          route_bounds: ride.route_bounds,
+        };
+
+        const { error } = await supabase.from('rides').upsert(payload as any, { onConflict: 'id' });
+        if (!error) {
+          removePendingRideLocal(ride.id);
+          syncedIds.push(ride.id);
+        }
+      }
+
+      return syncedIds;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['rides', userId ?? 'local'] });
+    },
+  });
+
+  return { saveRide, updateRideMood, deleteRide, syncPendingRides };
 }
 
 export function useFuelMutations(userId?: string) {
@@ -635,30 +719,43 @@ export function useMaintenanceMutations(userId?: string) {
   const updateMaintenanceTaskLocal = useLocalAppStore((state) => state.updateMaintenanceTask);
   const deleteMaintenanceTaskLocal = useLocalAppStore((state) => state.deleteMaintenanceTask);
 
+  const upsertMaintenanceCache = (bikeId: string, updater: (current: MaintenanceTask[]) => MaintenanceTask[]) => {
+    queryClient.setQueryData<MaintenanceTask[]>(['maintenance', bikeId], (current = []) => updater(current));
+  };
+
   const addMaintenanceTask = useMutation<MaintenanceTask, Error, Omit<MaintenanceTask, 'id'> & { id?: string }>({
     mutationFn: async (task: Omit<MaintenanceTask, 'id'> & { id?: string }) => {
       const newTask = { ...task, id: task.id || createId() } as MaintenanceTask;
+      addMaintenanceTaskLocal(newTask);
+      upsertMaintenanceCache(newTask.bike_id, (current) => (
+        current.some((item) => item.id === newTask.id)
+          ? current.map((item) => (item.id === newTask.id ? newTask : item))
+          : [newTask, ...current]
+      ));
 
       if (supabase && userId) {
         const { data, error } = await supabase
           .from('maintenance_tasks')
           .insert({
+            id: newTask.id,
             bike_id: newTask.bike_id,
             task_name: newTask.task_name,
             cost: newTask.cost ?? null,
             interval_km: newTask.interval_km,
             interval_days: newTask.interval_days ?? null,
             last_done_odometer_km: newTask.last_done_odometer_km,
-              last_done_date: newTask.last_done_date,
+            last_done_date: newTask.last_done_date,
             } as any)
           .select()
           .single();
         if (error) throw error;
         addMaintenanceTaskLocal(data as MaintenanceTask);
+        upsertMaintenanceCache(newTask.bike_id, (current) => (
+          current.map((item) => (item.id === newTask.id ? (data as MaintenanceTask) : item))
+        ));
         return data as MaintenanceTask;
       }
 
-      addMaintenanceTaskLocal(newTask);
       return newTask;
     },
     onSuccess: async (task) => {
@@ -669,6 +766,7 @@ export function useMaintenanceMutations(userId?: string) {
   const updateMaintenanceTask = useMutation({
     mutationFn: async (task: MaintenanceTask) => {
       updateMaintenanceTaskLocal(task);
+      upsertMaintenanceCache(task.bike_id, (current) => current.map((item) => (item.id === task.id ? task : item)));
 
       if (supabase) {
         const client = supabase as any;
@@ -689,15 +787,16 @@ export function useMaintenanceMutations(userId?: string) {
   });
 
   const deleteMaintenanceTask = useMutation({
-    mutationFn: async (taskId: string) => {
+    mutationFn: async ({ taskId, bikeId }: { taskId: string; bikeId: string }) => {
       deleteMaintenanceTaskLocal(taskId);
+      upsertMaintenanceCache(bikeId, (current) => current.filter((item) => item.id !== taskId));
       if (supabase) {
         await supabase.from('maintenance_tasks').delete().eq('id', taskId);
       }
-      return taskId;
+      return { taskId, bikeId };
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['maintenance', userId ?? 'local'] });
+    onSuccess: async ({ bikeId }) => {
+      await queryClient.invalidateQueries({ queryKey: ['maintenance', bikeId] });
     },
   });
 
