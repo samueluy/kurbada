@@ -48,14 +48,22 @@ export default function OnboardingMaintenanceScreen() {
           contentContainerStyle={{ gap: 18, paddingBottom: 24 }}
           showsVerticalScrollIndicator={false}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <Pressable onPress={() => { setOnboardingStep(2); router.replace(getOnboardingRoute(2) as any); }}>
+            <Pressable
+              onPress={() => {
+                setOnboardingStep(1);
+                if (router.canGoBack()) {
+                  router.back();
+                  return;
+                }
+                router.replace(getOnboardingRoute(1) as any);
+              }}>
               <Ionicons name="arrow-back" size={20} color={palette.textSecondary} />
             </Pressable>
             <AppText variant="label" style={{ color: palette.textSecondary }}>
-              Step 3 of {ONBOARDING_TOTAL_STEPS}
+              Step 2 of {ONBOARDING_TOTAL_STEPS}
             </AppText>
           </View>
-          <ProgressDots total={ONBOARDING_TOTAL_STEPS} current={3} />
+          <ProgressDots total={ONBOARDING_TOTAL_STEPS} current={2} />
 
           <View style={{ gap: 8 }}>
             <AppText variant="screenTitle" style={{ fontSize: 30 }}>
@@ -111,8 +119,8 @@ export default function OnboardingMaintenanceScreen() {
         <Button
           title="Next →"
           onPress={() => {
-            setOnboardingStep(4);
-            router.push(getOnboardingRoute(4) as any);
+            setOnboardingStep(3);
+            router.push(getOnboardingRoute(3) as any);
           }}
         />
       </GlassCard>

@@ -83,9 +83,41 @@ export async function configureRevenueCat() {
   }
 
   Purchases.setLogLevel(Purchases.LOG_LEVEL.WARN);
+  Purchases.setLogHandler((level, message) => {
+    if (message.includes('BILLING_UNAVAILABLE') || message.includes('Billing service unavailable on device')) {
+      console.warn(`[RevenueCat] ${message}`);
+      return;
+    }
+
+    switch (level) {
+      case Purchases.LOG_LEVEL.ERROR:
+        console.error(`[RevenueCat] ${message}`);
+        break;
+      case Purchases.LOG_LEVEL.WARN:
+        console.warn(`[RevenueCat] ${message}`);
+        break;
+      case Purchases.LOG_LEVEL.INFO:
+        console.info(`[RevenueCat] ${message}`);
+        break;
+      case Purchases.LOG_LEVEL.DEBUG:
+        console.debug(`[RevenueCat] ${message}`);
+        break;
+      default:
+        console.log(`[RevenueCat] ${message}`);
+    }
+  });
   Purchases.configure({ apiKey });
   ensureCustomerInfoListener();
   configured = true;
+}
+
+export async function canMakeRevenueCatPurchases() {
+  if (!isRevenueCatSupported()) {
+    return false;
+  }
+
+  await configureRevenueCat();
+  return Purchases.canMakePayments();
 }
 
 export async function syncRevenueCatIdentity(userId: string | null) {
@@ -230,6 +262,14 @@ export async function purchasePremium() {
     return { success: false as const, reason: 'RevenueCat disabled for this build.' };
   }
 
+  const canMakePurchases = await canMakeRevenueCatPurchases();
+  if (!canMakePurchases) {
+    return {
+      success: false as const,
+      reason: 'Purchases are unavailable on this device. Use a Play-enabled Android device or App Store-capable iPhone to subscribe.',
+    };
+  }
+
   const selectedPackage = await getCurrentOfferingPackage(true);
   if (!selectedPackage) {
     return { success: false as const, reason: 'No monthly purchase package is currently available.' };
@@ -254,6 +294,15 @@ export async function purchasePremium() {
 export async function restorePremiumPurchases() {
   if (!isRevenueCatSupported()) {
     return { success: false as const, hasPremium: false, reason: 'RevenueCat disabled for this build.' };
+  }
+
+  const canMakePurchases = await canMakeRevenueCatPurchases();
+  if (!canMakePurchases) {
+    return {
+      success: false as const,
+      hasPremium: false,
+      reason: 'Purchases are unavailable on this device, so restore is not available here.',
+    };
   }
 
   try {

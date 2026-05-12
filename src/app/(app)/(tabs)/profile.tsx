@@ -35,7 +35,6 @@ export default function ProfileTabScreen() {
   const rcStatus = useRevenueCatStatus();
   const customFuelPrice = useAppStore((state) => state.customFuelPricePerLiter);
   const setCustomFuelPrice = useAppStore((state) => state.setCustomFuelPricePerLiter);
-  const resetForSignOut = useAppStore((state) => state.resetForSignOut);
   const workModeEnabled = useAppStore((state) => state.workMode);
 
   const [showFuelPrice, setShowFuelPrice] = useState(false);
@@ -305,8 +304,6 @@ export default function ProfileTabScreen() {
                 style: 'destructive',
                 onPress: async () => {
                   await signOut();
-                  resetForSignOut();
-                  router.replace('/');
                 },
               },
             ]);

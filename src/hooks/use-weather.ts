@@ -4,6 +4,10 @@ import { weatherFromCode } from '@/lib/format';
 import { useCachedLocation } from '@/hooks/use-cached-location';
 import type { WeatherData } from '@/types/domain';
 
+type WeatherQueryOptions = {
+  enabled?: boolean;
+};
+
 async function fetchWeather(lat: number, lng: number): Promise<WeatherData> {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code,wind_speed_10m&daily=sunrise,sunset,weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=${encodeURIComponent('Asia/Manila')}&forecast_days=1`;
 
@@ -34,12 +38,13 @@ async function fetchWeather(lat: number, lng: number): Promise<WeatherData> {
   };
 }
 
-export function useWeather() {
-  const location = useCachedLocation();
+export function useWeather(options?: WeatherQueryOptions) {
+  const enabled = options?.enabled ?? true;
+  const location = useCachedLocation({ enabled });
 
   return useQuery({
     queryKey: ['weather', location.data?.lat, location.data?.lng],
-    enabled: Boolean(location.data),
+    enabled: enabled && Boolean(location.data),
     queryFn: async () => fetchWeather(location.data!.lat, location.data!.lng),
     staleTime: 15 * 60 * 1000,
     refetchInterval: 30 * 60 * 1000,

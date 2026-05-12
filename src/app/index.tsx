@@ -1,5 +1,5 @@
 import { Redirect } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
@@ -13,7 +13,7 @@ import { getOnboardingRoute } from '@/lib/onboarding-flow';
 import { useAppStore } from '@/store/app-store';
 
 export default function IndexScreen() {
-  const { session, loading } = useAuth();
+  const { session, loading, signingOut, bootstrapPhase } = useAuth();
   const hasSeenSplash = useAppStore((state) => state.hasSeenSplash);
   const hasCompletedOnboarding = useAppStore((state) => state.hasCompletedOnboarding);
   const hasCompletedBikeSetup = useAppStore((state) => state.hasCompletedBikeSetup);
@@ -23,39 +23,76 @@ export default function IndexScreen() {
   const remoteBikes = useBikes(session?.user.id);
   const bypassGate = env.devBypassAppGate;
   const didSignOut = useAppStore((state) => state.didSignOut);
-  const setDidSignOut = useAppStore((state) => state.setDidSignOut);
   const completeOnboarding = useAppStore((state) => state.completeOnboarding);
   const completeBikeSetup = useAppStore((state) => state.completeBikeSetup);
   const hasRemoteBike = (remoteBikes.data?.length ?? 0) > 0;
+  const bikesResolved = !remoteBikes.isLoading;
+  const bikesFailed = Boolean(remoteBikes.error);
+  const bootstrapStartedAtRef = useRef(Date.now());
+  const [bootstrapTimedOut, setBootstrapTimedOut] = useState(false);
+  const hasLoggedInteractiveRef = useRef(false);
 
   useEffect(() => {
-    if (!bypassGate && session && !hasCompletedOnboarding && hasCompletedBikeSetup) {
-      completeOnboarding();
+    if (!session?.user.id) {
+      setBootstrapTimedOut(false);
+      hasLoggedInteractiveRef.current = false;
+      return;
     }
-  }, [bypassGate, session, hasCompletedOnboarding, hasCompletedBikeSetup, completeOnboarding]);
+
+    const timeout = setTimeout(() => {
+      setBootstrapTimedOut(true);
+    }, 2500);
+
+    return () => clearTimeout(timeout);
+  }, [session?.user.id]);
 
   useEffect(() => {
-    if (!bypassGate && session && !hasCompletedOnboarding && !remoteBikes.isLoading && hasRemoteBike) {
+    if (!bypassGate && session && hasRemoteBike && (!hasCompletedOnboarding || !hasCompletedBikeSetup)) {
       completeOnboarding();
-      if (!hasCompletedBikeSetup) completeBikeSetup();
+      completeBikeSetup();
     }
   }, [
     bypassGate,
     session,
-    hasCompletedOnboarding,
-    remoteBikes.isLoading,
     hasRemoteBike,
     hasCompletedBikeSetup,
+    hasCompletedOnboarding,
     completeOnboarding,
     completeBikeSetup,
   ]);
 
-  if (didSignOut) {
-    setDidSignOut(false);
+  useEffect(() => {
+    if (session?.user.id && !hasLoggedInteractiveRef.current && (bikesResolved || bootstrapTimedOut)) {
+      hasLoggedInteractiveRef.current = true;
+      console.info(`[bootstrap] authenticated_shell_ms=${Date.now() - bootstrapStartedAtRef.current}`);
+    }
+  }, [bikesResolved, bootstrapTimedOut, session?.user.id]);
+
+  useEffect(() => {
+    if (bikesResolved) {
+      console.info(
+        `[bootstrap] bikes_${bikesFailed ? 'error' : 'ready'}_ms=${Date.now() - bootstrapStartedAtRef.current}`,
+      );
+    }
+  }, [bikesFailed, bikesResolved]);
+
+  useEffect(() => {
+    if (access.hasResolvedAccess) {
+      console.info(`[bootstrap] access_ready_ms=${Date.now() - bootstrapStartedAtRef.current}`);
+    }
+  }, [access.hasResolvedAccess]);
+
+  const shouldShowBootstrapLoader = useMemo(() => (
+    Boolean(session?.user.id)
+    && !bootstrapTimedOut
+    && (bootstrapPhase === 'booting' || remoteBikes.isLoading)
+  ), [bootstrapPhase, bootstrapTimedOut, remoteBikes.isLoading, session?.user.id]);
+
+  if (signingOut) {
     return <Redirect href="/(public)/auth/sign-in" />;
   }
 
-  if (loading && !bypassGate) {
+  if ((loading || bootstrapPhase === 'booting') && !bypassGate) {
     if (!hasSeenSplash) {
       return <Redirect href="/(public)/splash" />;
     }
@@ -75,14 +112,20 @@ export default function IndexScreen() {
     return <Redirect href="/(public)/splash" />;
   }
 
-  if (!bypassGate && session && !hasCompletedOnboarding && hasCompletedBikeSetup) {
-    completeOnboarding();
-    if (!session) return <Redirect href="/(public)/auth/sign-in" />;
-    return <Redirect href="/(app)/(tabs)/ride" />;
+  if (!bypassGate && !session && didSignOut) {
+    return <Redirect href="/(public)/auth/sign-in" />;
   }
 
-  if (!bypassGate && session && !hasCompletedOnboarding) {
-    if (remoteBikes.isLoading) {
+  if (!bypassGate && session) {
+    if (access.shouldRequirePaywall) {
+      return <Redirect href="/(public)/paywall" />;
+    }
+
+    if (bikesResolved && !bikesFailed && !hasRemoteBike) {
+      return <Redirect href="/(public)/bike-setup" />;
+    }
+
+    if (shouldShowBootstrapLoader) {
       return (
         <AppScreen style={{ justifyContent: 'center', alignItems: 'center' }} showWordmark={false}>
           <View style={{ alignItems: 'center', gap: 12 }}>
@@ -94,48 +137,17 @@ export default function IndexScreen() {
         </AppScreen>
       );
     }
-    if (hasRemoteBike) {
-      return (
-        <AppScreen style={{ justifyContent: 'center', alignItems: 'center' }} showWordmark={false}>
-          <View style={{ alignItems: 'center', gap: 12 }}>
-            <ActivityIndicator size="small" color={palette.textSecondary} />
-            <AppText variant="meta" style={{ color: palette.textSecondary }}>
-              Restoring your rider profile…
-            </AppText>
-          </View>
-        </AppScreen>
-      );
-    }
+
+    return <Redirect href="/(app)/(tabs)/ride" />;
   }
 
   if (!bypassGate && !hasCompletedOnboarding) {
-    if (onboardingStep === 8 && purchaseCompleted) return <Redirect href={'/(public)/success' as any} />;
+    if (onboardingStep === 7 && purchaseCompleted) return <Redirect href={'/(public)/success' as any} />;
     return <Redirect href={getOnboardingRoute(onboardingStep) as any} />;
   }
 
   if (!bypassGate && !session) {
     return <Redirect href="/(public)/auth/sign-in" />;
-  }
-
-  if (!bypassGate && session && access.isLoading) {
-    return (
-      <AppScreen style={{ justifyContent: 'center', alignItems: 'center' }} showWordmark={false}>
-        <View style={{ alignItems: 'center', gap: 12 }}>
-          <ActivityIndicator size="small" color={palette.textSecondary} />
-          <AppText variant="meta" style={{ color: palette.textSecondary }}>
-            Checking your access…
-          </AppText>
-        </View>
-      </AppScreen>
-    );
-  }
-
-  if (!bypassGate && !access.data?.hasAccess) {
-    return <Redirect href="/(public)/paywall" />;
-  }
-
-  if (!hasCompletedBikeSetup) {
-    return <Redirect href="/(public)/bike-setup" />;
   }
 
   return <Redirect href="/(app)/(tabs)/ride" />;

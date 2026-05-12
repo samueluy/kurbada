@@ -11,8 +11,8 @@ import { useAppStore } from '@/store/app-store';
 
 export default function OnboardingSuccessScreen() {
   const completeOnboarding = useAppStore((state) => state.completeOnboarding);
-  const onboardingData = useAppStore((state) => state.onboardingData);
-  const isWeekend = onboardingData.ridingStyle === 'weekend';
+  const preferredMode = useAppStore((state) => state.preferredMode);
+  const isWeekend = preferredMode === 'weekend';
 
   const handleDropIn = () => {
     completeOnboarding();

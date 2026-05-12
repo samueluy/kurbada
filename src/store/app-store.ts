@@ -3,9 +3,12 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { appStorage } from '@/lib/storage';
 import type { Bike, EmergencyBloodType, MaintenancePresetKey, RideMode } from '@/types/domain';
+import { useLocalAppStore } from '@/store/local-app-store';
 
-export type OnboardingStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+export type OnboardingStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export type OnboardingSyncStatus = 'idle' | 'pending' | 'syncing' | 'completed' | 'failed';
+export type OnboardingDraftScope = 'anonymous-signup' | null;
+export type OnboardingDraftTargetMode = 'new-account-only' | null;
 
 export type RidingPersona = 'leisure' | 'commute' | 'work' | 'mix';
 
@@ -54,6 +57,9 @@ type AppStore = {
   purchaseCompleted: boolean;
   pendingReferralCode: string;
   onboardingData: OnboardingData;
+  onboardingDraftScope: OnboardingDraftScope;
+  onboardingDraftTargetMode: OnboardingDraftTargetMode;
+  onboardingDraftTargetEmail: string | null;
   onboardingSyncStatus: OnboardingSyncStatus;
   onboardingSyncedUserId: string | null;
   onboardingSyncedBikeId: string | null;
@@ -65,6 +71,7 @@ type AppStore = {
   maintenanceReminderThresholds: number[];
   maintenanceReminderLastNotified: Record<string, number>;
   didSignOut: boolean;
+  authSigningOut: boolean;
   activeBikeId: string | null;
   ridingPersona: RidingPersona;
   workMode: boolean;
@@ -81,6 +88,9 @@ type AppStore = {
   setPurchaseCompleted: (value: boolean) => void;
   setPendingReferralCode: (code: string) => void;
   setOnboardingData: (data: Partial<OnboardingData>) => void;
+  markAnonymousOnboardingDraftActive: () => void;
+  markOnboardingDraftForNewAccount: (email: string) => void;
+  clearAnonymousOnboardingDraft: () => void;
   setCustomFuelPricePerLiter: (price: number | null) => void;
   setCrashAlertsEnabled: (value: boolean) => void;
   setKeepScreenAwakeDuringRide: (value: boolean) => void;
@@ -88,6 +98,7 @@ type AppStore = {
   setMaintenanceReminderThresholds: (thresholds: number[]) => void;
   setMaintenanceReminderLastNotified: (taskId: string, threshold: number) => void;
   setDidSignOut: (value: boolean) => void;
+  setAuthSigningOut: (value: boolean) => void;
   setActiveBikeId: (bikeId: string | null) => void;
   setRidingPersona: (persona: RidingPersona) => void;
   setWorkMode: (value: boolean) => void;
@@ -104,6 +115,30 @@ type AppStore = {
   resetOnboardingData: () => void;
 };
 
+const APP_STORE_VERSION = 2;
+
+function migrateOnboardingStep(step: number | undefined): OnboardingStep {
+  switch (step) {
+    case 2:
+      return 1;
+    case 3:
+      return 2;
+    case 4:
+      return 3;
+    case 5:
+      return 4;
+    case 6:
+      return 5;
+    case 7:
+      return 6;
+    case 8:
+      return 7;
+    case 1:
+    default:
+      return 1;
+  }
+}
+
 export const useAppStore = create<AppStore>()(
   persist(
     (set) => ({
@@ -115,6 +150,9 @@ export const useAppStore = create<AppStore>()(
       purchaseCompleted: false,
       pendingReferralCode: '',
       onboardingData: defaultOnboardingData,
+      onboardingDraftScope: null,
+      onboardingDraftTargetMode: null,
+      onboardingDraftTargetEmail: null,
       onboardingSyncStatus: 'idle',
       onboardingSyncedUserId: null,
       onboardingSyncedBikeId: null,
@@ -126,6 +164,7 @@ export const useAppStore = create<AppStore>()(
       maintenanceReminderThresholds: [50, 80, 90, 95, 100],
       maintenanceReminderLastNotified: {},
       didSignOut: false,
+      authSigningOut: false,
       activeBikeId: null,
       ridingPersona: 'leisure',
       workMode: false,
@@ -144,8 +183,31 @@ export const useAppStore = create<AppStore>()(
       setOnboardingData: (data) =>
         set((state) => ({
           onboardingData: { ...state.onboardingData, ...data },
+          onboardingDraftScope: 'anonymous-signup',
           onboardingSyncStatus: 'pending',
         })),
+      markAnonymousOnboardingDraftActive: () =>
+        set((state) => ({
+          onboardingDraftScope: state.onboardingDraftScope ?? 'anonymous-signup',
+        })),
+      markOnboardingDraftForNewAccount: (email) =>
+        set({
+          onboardingDraftScope: 'anonymous-signup',
+          onboardingDraftTargetMode: 'new-account-only',
+          onboardingDraftTargetEmail: email.trim().toLowerCase() || null,
+          onboardingSyncStatus: 'pending',
+        }),
+      clearAnonymousOnboardingDraft: () =>
+        set({
+          onboardingData: defaultOnboardingData,
+          onboardingDraftScope: null,
+          onboardingDraftTargetMode: null,
+          onboardingDraftTargetEmail: null,
+          onboardingSyncStatus: 'idle',
+          onboardingSyncedUserId: null,
+          onboardingSyncedBikeId: null,
+          onboardingSyncedEmergencyId: null,
+        }),
       setCustomFuelPricePerLiter: (customFuelPricePerLiter) => set({ customFuelPricePerLiter }),
       setCrashAlertsEnabled: (crashAlertsEnabled) => set({ crashAlertsEnabled }),
       setKeepScreenAwakeDuringRide: (keepScreenAwakeDuringRide) => set({ keepScreenAwakeDuringRide }),
@@ -156,6 +218,7 @@ export const useAppStore = create<AppStore>()(
           maintenanceReminderLastNotified: { ...state.maintenanceReminderLastNotified, [taskId]: threshold },
         })),
       setDidSignOut: (didSignOut) => set({ didSignOut }),
+      setAuthSigningOut: (authSigningOut) => set({ authSigningOut }),
       setActiveBikeId: (activeBikeId) => set({ activeBikeId }),
       setRidingPersona: (ridingPersona) => set({ ridingPersona }),
       setWorkMode: (workMode) => set({ workMode }),
@@ -174,23 +237,33 @@ export const useAppStore = create<AppStore>()(
             },
           };
         }),
-      resetForSignOut: () =>
-        set((state) => ({
+      resetForSignOut: () => {
+        useLocalAppStore.getState().resetLocalStore();
+        return set({
           hasCompletedOnboarding: false,
-          hasCompletedBikeSetup: state.hasCompletedBikeSetup,
+          hasCompletedBikeSetup: false,
           onboardingStep: 1,
           purchaseCompleted: false,
+          pendingReferralCode: '',
           onboardingData: defaultOnboardingData,
+          onboardingDraftScope: null,
+          onboardingDraftTargetMode: null,
+          onboardingDraftTargetEmail: null,
           onboardingSyncStatus: 'idle',
           onboardingSyncedUserId: null,
           onboardingSyncedBikeId: null,
           onboardingSyncedEmergencyId: null,
           didSignOut: true,
-        })),
+          activeBikeId: null,
+        });
+      },
       markOnboardingSyncing: () => set({ onboardingSyncStatus: 'syncing' }),
       markOnboardingSyncComplete: ({ userId, bikeId = null, emergencyId = null }) =>
         set({
           onboardingData: defaultOnboardingData,
+          onboardingDraftScope: null,
+          onboardingDraftTargetMode: null,
+          onboardingDraftTargetEmail: null,
           onboardingSyncStatus: 'completed',
           onboardingSyncedUserId: userId,
           onboardingSyncedBikeId: bikeId,
@@ -201,6 +274,9 @@ export const useAppStore = create<AppStore>()(
       resetOnboardingData: () =>
         set({
           onboardingData: defaultOnboardingData,
+          onboardingDraftScope: null,
+          onboardingDraftTargetMode: null,
+          onboardingDraftTargetEmail: null,
           onboardingSyncStatus: 'idle',
           onboardingSyncedUserId: null,
           onboardingSyncedBikeId: null,
@@ -209,7 +285,36 @@ export const useAppStore = create<AppStore>()(
     }),
     {
       name: 'kurbada-app',
+      version: APP_STORE_VERSION,
       storage: createJSONStorage(() => appStorage),
+      migrate: (persistedState, version) => {
+        const persisted = (persistedState ?? {}) as Partial<AppStore>;
+
+        if (version < APP_STORE_VERSION) {
+          return {
+            ...persisted,
+            onboardingStep: migrateOnboardingStep(
+              typeof persisted.onboardingStep === 'number' ? persisted.onboardingStep : 1,
+            ),
+            didSignOut: false,
+            authSigningOut: false,
+            onboardingDraftScope:
+              persisted.onboardingDraftTargetMode === 'new-account-only'
+                ? persisted.onboardingDraftScope ?? null
+                : null,
+            onboardingDraftTargetMode:
+              persisted.onboardingDraftTargetMode === 'new-account-only'
+                ? persisted.onboardingDraftTargetMode
+                : null,
+            onboardingDraftTargetEmail:
+              persisted.onboardingDraftTargetMode === 'new-account-only'
+                ? persisted.onboardingDraftTargetEmail ?? null
+                : null,
+          };
+        }
+
+        return persistedState as AppStore;
+      },
       merge: (persistedState, currentState) => {
         const persisted = (persistedState ?? {}) as Partial<AppStore>;
 
@@ -220,6 +325,14 @@ export const useAppStore = create<AppStore>()(
             ...defaultOnboardingData,
             ...(persisted.onboardingData ?? {}),
           },
+          onboardingStep: migrateOnboardingStep(
+            typeof persisted.onboardingStep === 'number' ? persisted.onboardingStep : currentState.onboardingStep,
+          ),
+          onboardingDraftScope: persisted.onboardingDraftScope ?? null,
+          onboardingDraftTargetMode: persisted.onboardingDraftTargetMode ?? null,
+          onboardingDraftTargetEmail: persisted.onboardingDraftTargetEmail ?? null,
+          didSignOut: false,
+          authSigningOut: false,
         };
       },
       partialize: (state) => ({
@@ -231,10 +344,14 @@ export const useAppStore = create<AppStore>()(
         purchaseCompleted: state.purchaseCompleted,
         pendingReferralCode: state.pendingReferralCode,
         onboardingData: state.onboardingData,
+        onboardingDraftScope: state.onboardingDraftScope,
+        onboardingDraftTargetMode: state.onboardingDraftTargetMode,
+        onboardingDraftTargetEmail: state.onboardingDraftTargetEmail,
         onboardingSyncStatus: state.onboardingSyncStatus,
         onboardingSyncedUserId: state.onboardingSyncedUserId,
         onboardingSyncedBikeId: state.onboardingSyncedBikeId,
         onboardingSyncedEmergencyId: state.onboardingSyncedEmergencyId,
+        didSignOut: state.didSignOut,
         customFuelPricePerLiter: state.customFuelPricePerLiter,
         crashAlertsEnabled: state.crashAlertsEnabled,
         keepScreenAwakeDuringRide: state.keepScreenAwakeDuringRide,

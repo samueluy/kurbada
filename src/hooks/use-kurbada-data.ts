@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Alert } from 'react-native';
 
 import { createId } from '@/lib/id';
@@ -29,6 +29,10 @@ import type {
   RideListingFeedRow,
   RideRecord,
 } from '@/types/domain';
+
+type QueryToggleOptions = {
+  enabled?: boolean;
+};
 
 const EMPTY_ROUTE_GEOJSON: GeoJSON.Feature<GeoJSON.LineString> = {
   type: 'Feature',
@@ -197,6 +201,92 @@ function toRideFeedRecord(record: RideRecord): RideFeedRecord {
   };
 }
 
+function mergeRideRecords(rides: RideRecord[], pendingRides: RideRecord[]) {
+  const merged = new Map<string, RideRecord>();
+
+  rides.forEach((ride) => {
+    merged.set(ride.id, { ...ride, sync_status: ride.sync_status ?? 'synced' });
+  });
+
+  pendingRides.forEach((ride) => {
+    merged.set(ride.id, { ...ride, sync_status: 'pending' });
+  });
+
+  return Array.from(merged.values()).sort(
+    (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime(),
+  );
+}
+
+function mergeRideFeedRecords(rides: RideRecord[], pendingRides: RideRecord[], limit: number) {
+  const merged = new Map<string, RideFeedRecord>();
+
+  rides.forEach((ride) => {
+    merged.set(ride.id, toRideFeedRecord({ ...ride, sync_status: ride.sync_status ?? 'synced' }));
+  });
+
+  pendingRides.forEach((ride) => {
+    merged.set(ride.id, toRideFeedRecord({ ...ride, sync_status: 'pending' }));
+  });
+
+  return Array.from(merged.values())
+    .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())
+    .slice(0, limit);
+}
+
+function mergeRecentRideFeed(remoteRides: RideFeedRecord[], pendingRides: RideRecord[], limit: number) {
+  const merged = new Map<string, RideFeedRecord>(remoteRides.map((ride) => [ride.id, ride]));
+
+  pendingRides.forEach((ride) => {
+    merged.set(ride.id, toRideFeedRecord({ ...ride, sync_status: 'pending' }));
+  });
+
+  return Array.from(merged.values())
+    .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())
+    .slice(0, limit);
+}
+
+function buildLocalRideDashboardMetrics(
+  rides: RideRecord[],
+  fuelLogs: FuelLog[],
+  tasks: MaintenanceTask[],
+): RideDashboardMetrics {
+  const latestRide = [...rides].sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())[0];
+  const latestFuelPrice = fuelLogs[0]?.price_per_liter ?? 65;
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const todayRides = rides.filter((ride) => ride.started_at.slice(0, 10) === today);
+  const monthRides = rides.filter((ride) => new Date(ride.started_at).getTime() >= monthStart);
+  const monthDistance = monthRides.reduce((sum, ride) => sum + ride.distance_km, 0);
+  const todayFuelCost = todayRides.reduce((sum, ride) => sum + (ride.fuel_used_liters ?? 0) * latestFuelPrice, 0);
+  const monthFuelLogs = fuelLogs.filter((log) => new Date(log.logged_at).getTime() >= monthStart);
+  const monthFuelCost = monthFuelLogs.length
+    ? monthFuelLogs.reduce((sum, log) => sum + log.total_cost, 0)
+    : monthRides.reduce((sum, ride) => sum + (ride.fuel_used_liters ?? 0) * latestFuelPrice, 0);
+  const maintenancePerKm = tasks.reduce((sum, task) => (
+    task.interval_km > 0 ? sum + ((task.cost ?? 500) / task.interval_km) : sum
+  ), 0);
+  const monthMaintenanceAccrual = monthDistance * maintenancePerKm;
+  const monthTotalCost = monthFuelCost + monthMaintenanceAccrual;
+
+  return {
+    latest_ride_id: latestRide?.id ?? null,
+    latest_ride_distance_km: latestRide?.distance_km ?? 0,
+    latest_ride_max_speed_kmh: latestRide?.max_speed_kmh ?? 0,
+    latest_ride_fuel_used_liters: latestRide?.fuel_used_liters ?? 0,
+    latest_ride_started_at: latestRide?.started_at ?? null,
+    latest_fuel_price: latestFuelPrice,
+    today_earnings: 0,
+    today_fuel_cost: todayFuelCost,
+    today_trip_count: todayRides.length,
+    month_distance_km: monthDistance,
+    month_fuel_cost: monthFuelCost,
+    month_maintenance_accrual: monthMaintenanceAccrual,
+    month_total_cost: monthTotalCost,
+    month_cost_per_km: monthDistance > 0 ? monthTotalCost / monthDistance : 0,
+  };
+}
+
 export function useBikes(userId?: string) {
   const localBikes = useLocalAppStore((state) => state.bikes);
   const useRemote = useRemoteMode(userId);
@@ -210,6 +300,8 @@ export function useBikes(userId?: string) {
       if (error) throw error;
       return data as Bike[];
     },
+    staleTime: 5 * 60_000,
+    gcTime: 15 * 60_000,
   });
 
   if (!useRemote) {
@@ -242,71 +334,54 @@ export function useMaintenanceTasks(bikeId?: string) {
   return query;
 }
 
-export function useRides(userId?: string) {
+export function useRides(userId?: string, options?: QueryToggleOptions) {
   const localRides = useLocalAppStore((state) => state.rides);
   const pendingRides = useLocalAppStore((state) => state.pendingRides);
   const useRemote = useRemoteMode(userId);
-
-  const mergeRides = (rides: RideRecord[]) => {
-    const merged = new Map<string, RideRecord>();
-
-    rides.forEach((ride) => {
-      merged.set(ride.id, { ...ride, sync_status: ride.sync_status ?? 'synced' });
-    });
-
-    pendingRides.forEach((ride) => {
-      merged.set(ride.id, { ...ride, sync_status: 'pending' });
-    });
-
-    return Array.from(merged.values()).sort(
-      (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime(),
-    );
-  };
+  const isEnabled = options?.enabled ?? true;
+  const localMergedRides = useMemo(
+    () => mergeRideRecords(localRides, pendingRides),
+    [localRides, pendingRides],
+  );
 
   const query = useQuery({
     queryKey: ['rides', userId ?? 'local'],
-    enabled: useRemote,
+    enabled: useRemote && isEnabled,
     queryFn: async () => {
-      if (!supabase || !userId) return mergeRides(localRides);
+      if (!supabase || !userId) return localMergedRides;
       const { data, error } = await supabase.from('rides').select('*').eq('user_id', userId).order('started_at', { ascending: false });
       if (error) throw error;
-      return mergeRides((data as unknown as RideRecord[]).map((ride) => ({ ...ride, sync_status: 'synced' })));
+      return mergeRideRecords(
+        (data as unknown as RideRecord[]).map((ride) => ({ ...ride, sync_status: 'synced' })),
+        pendingRides,
+      );
     },
+    staleTime: 2 * 60_000,
+    gcTime: 10 * 60_000,
   });
 
   if (!useRemote) {
-    return { data: mergeRides(localRides), isLoading: false, error: null, isFetching: false };
+    return { data: localMergedRides, isLoading: false, error: null, isFetching: false };
   }
 
   return query;
 }
 
-export function useRecentRideFeed(userId?: string, limit = 12) {
+export function useRecentRideFeed(userId?: string, limit = 12, options?: QueryToggleOptions) {
   const localRides = useLocalAppStore((state) => state.rides);
   const pendingRides = useLocalAppStore((state) => state.pendingRides);
   const useRemote = useRemoteMode(userId);
-
-  const mergeFeed = (rides: RideRecord[]) => {
-    const merged = new Map<string, RideFeedRecord>();
-
-    rides.forEach((ride) => {
-      merged.set(ride.id, toRideFeedRecord({ ...ride, sync_status: ride.sync_status ?? 'synced' }));
-    });
-
-    pendingRides.forEach((ride) => {
-      merged.set(ride.id, toRideFeedRecord({ ...ride, sync_status: 'pending' }));
-    });
-
-    return Array.from(merged.values())
-      .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())
-      .slice(0, limit);
-  };
+  const isEnabled = options?.enabled ?? true;
+  const localFeed = useMemo(
+    () => mergeRideFeedRecords(localRides, pendingRides, limit),
+    [limit, localRides, pendingRides],
+  );
 
   const query = useQuery({
     queryKey: ['rides-feed', userId ?? 'local', limit],
-    enabled: useRemote,
+    enabled: useRemote && isEnabled,
     queryFn: async () => {
-      if (!supabase || !userId) return mergeFeed(localRides);
+      if (!supabase || !userId) return localFeed;
       const { data, error } = await supabase
         .from('rides')
         .select('id, bike_id, mode, started_at, ended_at, distance_km, max_speed_kmh, avg_speed_kmh, fuel_used_liters, elevation_gain_m, mood, route_preview_geojson, route_bounds')
@@ -322,19 +397,14 @@ export function useRecentRideFeed(userId?: string, limit = 12) {
         sync_status: 'synced' as const,
       })) as RideFeedRecord[];
 
-      const merged = new Map<string, RideFeedRecord>(remote.map((ride) => [ride.id, ride]));
-      pendingRides.forEach((ride) => {
-        merged.set(ride.id, toRideFeedRecord({ ...ride, sync_status: 'pending' }));
-      });
-
-      return Array.from(merged.values())
-        .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())
-        .slice(0, limit);
+      return mergeRecentRideFeed(remote, pendingRides, limit);
     },
+    staleTime: 60_000,
+    gcTime: 10 * 60_000,
   });
 
   if (!useRemote) {
-    return { data: mergeFeed(localRides), isLoading: false, error: null, isFetching: false };
+    return { data: localFeed, isLoading: false, error: null, isFetching: false };
   }
 
   return query;
@@ -344,7 +414,32 @@ export function useRideDetails(rideId?: string, userId?: string) {
   const localRides = useLocalAppStore((state) => state.rides);
   const pendingRides = useLocalAppStore((state) => state.pendingRides);
   const useRemote = useRemoteMode(userId) && Boolean(rideId);
-  const localRide = [...pendingRides, ...localRides].find((ride) => ride.id === rideId) ?? null;
+  const cachedDetailRide = rideId
+    ? queryClient.getQueryData<RideRecord>(['ride-details', userId ?? 'local', rideId]) ?? null
+    : null;
+  const cachedRemoteRide = rideId
+    ? queryClient.getQueryData<RideRecord[]>(['rides', userId ?? 'local'])?.find((ride) => ride.id === rideId) ?? null
+    : null;
+  const cachedFeedRide = rideId
+    ? queryClient.getQueriesData<RideFeedRecord[]>({ queryKey: ['rides-feed', userId ?? 'local'] })
+      .flatMap(([, rides]) => rides ?? [])
+      .find((ride) => ride.id === rideId) ?? null
+    : null;
+  const localRide = cachedDetailRide
+    ?? cachedRemoteRide
+    ?? (
+      rideId && cachedFeedRide
+        ? {
+            ...cachedFeedRide,
+            route_geojson: cachedFeedRide.route_preview_geojson,
+            route_preview_geojson: cachedFeedRide.route_preview_geojson,
+            route_point_count_raw: 0,
+            route_point_count_simplified: 0,
+          }
+        : null
+    )
+    ?? [...pendingRides, ...localRides].find((ride) => ride.id === rideId)
+    ?? null;
 
   const query = useQuery({
     queryKey: ['ride-details', userId ?? 'local', rideId ?? 'none'],
@@ -684,6 +779,26 @@ export function useRideMutations(userId?: string) {
     queryClient.setQueryData(['ride-details', userId ?? 'local', ride.id], ride);
   };
 
+  const markRideSyncedInCache = (rideId: string) => {
+    queryClient.setQueryData<RideRecord[]>(['rides', userId ?? 'local'], (current = []) => (
+      current.map((ride) => (
+        ride.id === rideId
+          ? { ...ride, sync_status: 'synced' }
+          : ride
+      ))
+    ));
+    queryClient.setQueryData<RideFeedRecord[]>(['rides-feed', userId ?? 'local', 12], (current = []) => (
+      current.map((ride) => (
+        ride.id === rideId
+          ? { ...ride, sync_status: 'synced' }
+          : ride
+      ))
+    ));
+    queryClient.setQueryData<RideRecord | null>(['ride-details', userId ?? 'local', rideId], (current) => (
+      current ? { ...current, sync_status: 'synced' } : current
+    ));
+  };
+
   const saveRide = useMutation({
     mutationFn: async (ride: RideRecord) => {
       const localRide = { ...ride, sync_status: 'synced' as const };
@@ -841,9 +956,12 @@ export function useRideMutations(userId?: string) {
 
       return syncedIds;
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['rides', userId ?? 'local'] });
-      await queryClient.invalidateQueries({ queryKey: ['ride-dashboard-metrics', userId ?? 'local'] });
+    onSuccess: async (syncedIds) => {
+      if (!syncedIds.length) {
+        return;
+      }
+
+      syncedIds.forEach(markRideSyncedInCache);
     },
   });
 
@@ -1045,14 +1163,17 @@ export function useEmergencyMutations(userId?: string) {
   return { saveEmergencyInfo };
 }
 
-export function useOnboardingSync(userId?: string) {
+export function useOnboardingSync(userId?: string, userEmail?: string | null) {
   const onboardingData = useAppStore((state) => state.onboardingData);
+  const onboardingDraftScope = useAppStore((state) => state.onboardingDraftScope);
+  const onboardingDraftTargetMode = useAppStore((state) => state.onboardingDraftTargetMode);
+  const onboardingDraftTargetEmail = useAppStore((state) => state.onboardingDraftTargetEmail);
   const onboardingSyncStatus = useAppStore((state) => state.onboardingSyncStatus);
   const onboardingSyncedUserId = useAppStore((state) => state.onboardingSyncedUserId);
   const markOnboardingSyncing = useAppStore((state) => state.markOnboardingSyncing);
   const markOnboardingSyncComplete = useAppStore((state) => state.markOnboardingSyncComplete);
   const markOnboardingSyncFailed = useAppStore((state) => state.markOnboardingSyncFailed);
-  const resetOnboardingSyncStatus = useAppStore((state) => state.resetOnboardingSyncStatus);
+  const clearAnonymousOnboardingDraft = useAppStore((state) => state.clearAnonymousOnboardingDraft);
   const completeBikeSetup = useAppStore((state) => state.completeBikeSetup);
   const bikes = useBikes(userId);
   const emergency = useEmergencyInfo(userId);
@@ -1069,33 +1190,55 @@ export function useOnboardingSync(userId?: string) {
   const allergies = cleanDraftValue(onboardingData.allergies);
   const conditions = cleanDraftValue(onboardingData.conditions);
 
-  const localKey = userId ?? 'local';
+  const normalizedUserEmail = userEmail?.trim().toLowerCase() ?? null;
   const hasBikeDraft = Boolean(bikeBrand && bikeModel);
   const hasEmergencyMinimum = Boolean(
     fullName
       && emergencyContactName
       && emergencyContactPhone,
   );
+  const canSyncDraftToUser = Boolean(
+    userId
+      && onboardingDraftScope === 'anonymous-signup'
+      && onboardingDraftTargetMode === 'new-account-only'
+      && onboardingDraftTargetEmail
+      && normalizedUserEmail
+      && onboardingDraftTargetEmail === normalizedUserEmail,
+  );
 
   const needsSync =
     onboardingSyncStatus !== 'completed'
-    || onboardingSyncedUserId !== localKey;
+    || onboardingSyncedUserId !== userId;
 
-  // Reset stale sync status when the user context changes (e.g., after fresh sign-up)
   useEffect(() => {
-    if (
-      onboardingSyncStatus === 'failed'
-      || (onboardingSyncStatus === 'completed' && onboardingSyncedUserId !== localKey)
-    ) {
-      resetOnboardingSyncStatus();
+    if (!userId || onboardingDraftScope !== 'anonymous-signup') {
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localKey]);
+
+    if (
+      onboardingDraftTargetMode !== 'new-account-only'
+      || (
+        onboardingDraftTargetEmail
+        && normalizedUserEmail
+        && onboardingDraftTargetEmail !== normalizedUserEmail
+      )
+    ) {
+      clearAnonymousOnboardingDraft();
+    }
+  }, [
+    clearAnonymousOnboardingDraft,
+    normalizedUserEmail,
+    onboardingDraftScope,
+    onboardingDraftTargetEmail,
+    onboardingDraftTargetMode,
+    userId,
+  ]);
 
   useQuery({
-    queryKey: ['onboarding-sync', localKey, onboardingSyncStatus, onboardingSyncedUserId, onboardingData],
+    queryKey: ['onboarding-sync', userId ?? 'none', normalizedUserEmail ?? 'none', onboardingSyncStatus, onboardingSyncedUserId, onboardingData],
     enabled:
-      needsSync
+      canSyncDraftToUser
+      && needsSync
       && onboardingSyncStatus !== 'syncing'
       && (hasBikeDraft || hasEmergencyMinimum)
       && !bikes.isLoading
@@ -1152,7 +1295,7 @@ export function useOnboardingSync(userId?: string) {
         }
 
         markOnboardingSyncComplete({
-          userId: localKey,
+          userId: userId!,
           bikeId: syncedBikeId,
           emergencyId: syncedEmergencyId,
         });
@@ -1179,7 +1322,7 @@ export function useOnboardingSync(userId?: string) {
 
   return {
     isSyncing: onboardingSyncStatus === 'pending' || onboardingSyncStatus === 'syncing',
-    hasPendingDraft: hasBikeDraft || hasEmergencyMinimum,
+    hasPendingDraft: canSyncDraftToUser && (hasBikeDraft || hasEmergencyMinimum),
   };
 }
 
@@ -1423,49 +1566,16 @@ export function useEarningsMutations(userId?: string) {
   return { saveEarnings };
 }
 
-export function useRideDashboardMetrics(userId?: string) {
+export function useRideDashboardMetrics(userId?: string, options?: QueryToggleOptions) {
   const localRides = useLocalAppStore((state) => state.rides);
   const localFuelLogs = useLocalAppStore((state) => state.fuelLogs);
   const localTasks = useLocalAppStore((state) => state.maintenanceTasks);
   const useRemote = useRemoteMode(userId);
-
-  const buildLocalMetrics = (): RideDashboardMetrics => {
-    const latestRide = [...localRides].sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())[0];
-    const latestFuelPrice = localFuelLogs[0]?.price_per_liter ?? 65;
-    const now = new Date();
-    const today = now.toISOString().slice(0, 10);
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-    const todayRides = localRides.filter((ride) => ride.started_at.slice(0, 10) === today);
-    const monthRides = localRides.filter((ride) => new Date(ride.started_at).getTime() >= monthStart);
-    const monthDistance = monthRides.reduce((sum, ride) => sum + ride.distance_km, 0);
-    const todayFuelCost = todayRides.reduce((sum, ride) => sum + (ride.fuel_used_liters ?? 0) * latestFuelPrice, 0);
-    const monthFuelLogs = localFuelLogs.filter((log) => new Date(log.logged_at).getTime() >= monthStart);
-    const monthFuelCost = monthFuelLogs.length
-      ? monthFuelLogs.reduce((sum, log) => sum + log.total_cost, 0)
-      : monthRides.reduce((sum, ride) => sum + (ride.fuel_used_liters ?? 0) * latestFuelPrice, 0);
-    const maintenancePerKm = localTasks.reduce((sum, task) => (
-      task.interval_km > 0 ? sum + ((task.cost ?? 500) / task.interval_km) : sum
-    ), 0);
-    const monthMaintenanceAccrual = monthDistance * maintenancePerKm;
-    const monthTotalCost = monthFuelCost + monthMaintenanceAccrual;
-
-    return {
-      latest_ride_id: latestRide?.id ?? null,
-      latest_ride_distance_km: latestRide?.distance_km ?? 0,
-      latest_ride_max_speed_kmh: latestRide?.max_speed_kmh ?? 0,
-      latest_ride_fuel_used_liters: latestRide?.fuel_used_liters ?? 0,
-      latest_ride_started_at: latestRide?.started_at ?? null,
-      latest_fuel_price: latestFuelPrice,
-      today_earnings: 0,
-      today_fuel_cost: todayFuelCost,
-      today_trip_count: todayRides.length,
-      month_distance_km: monthDistance,
-      month_fuel_cost: monthFuelCost,
-      month_maintenance_accrual: monthMaintenanceAccrual,
-      month_total_cost: monthTotalCost,
-      month_cost_per_km: monthDistance > 0 ? monthTotalCost / monthDistance : 0,
-    };
-  };
+  const isEnabled = options?.enabled ?? true;
+  const localMetrics = useMemo(
+    () => buildLocalRideDashboardMetrics(localRides, localFuelLogs, localTasks),
+    [localFuelLogs, localRides, localTasks],
+  );
 
   const normalizeMetrics = (metrics: Partial<RideDashboardMetrics> | null | undefined): RideDashboardMetrics => ({
     latest_ride_id: metrics?.latest_ride_id ?? null,
@@ -1486,21 +1596,23 @@ export function useRideDashboardMetrics(userId?: string) {
 
   const query = useQuery({
     queryKey: ['ride-dashboard-metrics', userId ?? 'local'],
-    enabled: useRemote,
+    enabled: useRemote && isEnabled,
     queryFn: async () => {
       if (!supabase || !userId) {
-        return buildLocalMetrics();
+        return localMetrics;
       }
 
       const { data, error } = await (supabase as any).rpc('ride_dashboard_metrics', { p_user_id: userId });
       if (error) throw error;
       const row = (data?.[0] ?? null) as RideDashboardMetrics | null;
-      return row ? normalizeMetrics(row) : buildLocalMetrics();
+      return row ? normalizeMetrics(row) : localMetrics;
     },
+    staleTime: 90_000,
+    gcTime: 10 * 60_000,
   });
 
   if (!useRemote) {
-    return { data: buildLocalMetrics(), isLoading: false, error: null, isFetching: false };
+    return { data: localMetrics, isLoading: false, error: null, isFetching: false };
   }
 
   return query;

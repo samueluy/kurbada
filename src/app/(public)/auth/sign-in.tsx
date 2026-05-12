@@ -1,5 +1,5 @@
 import { Link, Redirect, router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, TextInput, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
@@ -9,6 +9,7 @@ import { GlassCard } from '@/components/ui/glass-card';
 import { palette, radius, typography } from '@/constants/theme';
 import { isSupabaseConfigured } from '@/lib/env';
 import { useAuth } from '@/hooks/use-auth';
+import { useAppStore } from '@/store/app-store';
 
 function Field({ value, onChangeText, placeholder, secureTextEntry = false, keyboardType = 'default', autoCapitalize = 'sentences' }: { value: string; onChangeText: (value: string) => void; placeholder: string; secureTextEntry?: boolean; keyboardType?: TextInput['props']['keyboardType']; autoCapitalize?: TextInput['props']['autoCapitalize'] }) {
   return (
@@ -40,9 +41,17 @@ function Field({ value, onChangeText, placeholder, secureTextEntry = false, keyb
 
 export default function SignInScreen() {
   const { session, signIn } = useAuth();
+  const onboardingDraftTargetMode = useAppStore((state) => state.onboardingDraftTargetMode);
+  const clearAnonymousOnboardingDraft = useAppStore((state) => state.clearAnonymousOnboardingDraft);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (onboardingDraftTargetMode !== 'new-account-only') {
+      clearAnonymousOnboardingDraft();
+    }
+  }, [clearAnonymousOnboardingDraft, onboardingDraftTargetMode]);
 
   if (session) {
     return <Redirect href="/" />;

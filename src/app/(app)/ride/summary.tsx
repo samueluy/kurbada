@@ -58,6 +58,10 @@ export default function RideSummaryScreen() {
   const { updateRideMood, deleteRide } = useRideMutations(session?.user.id);
   const storyShotRef = useRef<any>(null);
 
+  useEffect(() => {
+    setMood(ride?.mood ?? null);
+  }, [ride?.mood]);
+
   const handleSaveMood = async (next: RideMood) => {
     if (!ride) return;
     setMood(next);
@@ -219,7 +223,55 @@ export default function RideSummaryScreen() {
   ]);
   const estimatedFuelCost = (ride?.fuel_used_liters ?? 0) * (latestFuelPrice ?? 65);
 
-  if (!ride) return null;
+  if (rideQuery.isLoading && !ride) {
+    return (
+      <View style={{ flex: 1, backgroundColor: palette.background }}>
+        <AppScrollScreen>
+          <GlassCard style={{ gap: 12, padding: 20 }}>
+            <AppText variant="label">Loading ride</AppText>
+            <AppText variant="title">Pulling up your ride summary…</AppText>
+            <AppText variant="meta" style={{ color: palette.textSecondary }}>
+              We&apos;re loading the route, stats, and share card for this ride.
+            </AppText>
+          </GlassCard>
+        </AppScrollScreen>
+      </View>
+    );
+  }
+
+  if (rideQuery.error) {
+    return (
+      <View style={{ flex: 1, backgroundColor: palette.background }}>
+        <AppScrollScreen>
+          <GlassCard style={{ gap: 12, padding: 20 }}>
+            <AppText variant="label">Ride unavailable</AppText>
+            <AppText variant="title">We couldn&apos;t load that ride.</AppText>
+            <AppText variant="meta" style={{ color: palette.textSecondary }}>
+              {rideQuery.error instanceof Error ? rideQuery.error.message : 'Please try again from your ride feed.'}
+            </AppText>
+            <Button title="Back to rides" variant="secondary" onPress={() => router.replace('/(app)/(tabs)/ride')} />
+          </GlassCard>
+        </AppScrollScreen>
+      </View>
+    );
+  }
+
+  if (!ride) {
+    return (
+      <View style={{ flex: 1, backgroundColor: palette.background }}>
+        <AppScrollScreen>
+          <GlassCard style={{ gap: 12, padding: 20 }}>
+            <AppText variant="label">Ride not found</AppText>
+            <AppText variant="title">This ride is no longer available.</AppText>
+            <AppText variant="meta" style={{ color: palette.textSecondary }}>
+              The summary could not find a saved ride for that link.
+            </AppText>
+            <Button title="Back to rides" variant="secondary" onPress={() => router.replace('/(app)/(tabs)/ride')} />
+          </GlassCard>
+        </AppScrollScreen>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.background }}>

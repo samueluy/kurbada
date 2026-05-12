@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
+import { Stack, router } from 'expo-router';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import { Accelerometer } from 'expo-sensors';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, BackHandler, Pressable, ScrollView, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScreen } from '@/components/ui/app-screen';
@@ -25,6 +26,7 @@ export default function PermissionsScreen() {
   const setOnboardingStep = useAppStore((state) => state.setOnboardingStep);
   const [permissionsDone, setPermissionsDone] = useState(false);
   const [loadIndex, setLoadIndex] = useState(0);
+  const completionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleEnableTelemetry = async () => {
     await Location.requestForegroundPermissionsAsync();
@@ -39,76 +41,127 @@ export default function PermissionsScreen() {
     if (!permissionsDone) return;
 
     const interval = setInterval(() => {
-          setLoadIndex((prev) => {
-            const next = prev + 1;
-            if (next >= loadingTexts.length) {
-              clearInterval(interval);
-              setTimeout(() => {
-            setOnboardingStep(7);
-            router.replace(getOnboardingRoute(7) as any);
+      setLoadIndex((prev) => {
+        const next = prev + 1;
+        if (next >= loadingTexts.length) {
+          clearInterval(interval);
+          completionTimeoutRef.current = setTimeout(() => {
+            setOnboardingStep(6);
+            router.push(getOnboardingRoute(6) as any);
           }, 500);
         }
         return next;
       });
     }, 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      if (completionTimeoutRef.current) {
+        clearTimeout(completionTimeoutRef.current);
+        completionTimeoutRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [permissionsDone]);
 
+  useEffect(() => {
+    if (!permissionsDone) {
+      return;
+    }
+
+    const backSubscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+
+    return () => {
+      backSubscription.remove();
+    };
+  }, [permissionsDone]);
+
+  useFocusEffect(
+    useCallback(() => (
+      () => {
+        if (completionTimeoutRef.current) {
+          clearTimeout(completionTimeoutRef.current);
+          completionTimeoutRef.current = null;
+        }
+
+        if (permissionsDone || loadIndex > 0) {
+          setPermissionsDone(false);
+          setLoadIndex(0);
+        }
+      }
+    ), [loadIndex, permissionsDone]),
+  );
+
   if (!permissionsDone) {
     return (
-      <AppScreen style={{ justifyContent: 'center' }}>
-        <GlassCard style={{ minHeight: '78%', justifyContent: 'space-between', paddingVertical: 40, paddingHorizontal: 24 }}>
-          <View style={{ alignSelf: 'flex-start' }}>
-            <Pressable onPress={() => { setOnboardingStep(5); router.replace(getOnboardingRoute(5) as any); }}>
-              <Ionicons name="arrow-back" size={20} color={palette.textSecondary} />
-            </Pressable>
-          </View>
-          <View style={{ alignItems: 'center', gap: 32 }}>
-            <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: 'rgba(217,255,63,0.08)', alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="hardware-chip-outline" size={52} color={palette.lime} />
-            </View>
-            <View style={{ alignItems: 'center', gap: 14 }}>
-              <AppText variant="label" style={{ color: palette.textSecondary }}>
-                Step 6 of {ONBOARDING_TOTAL_STEPS}
-              </AppText>
-              <AppText variant="screenTitle" style={{ textAlign: 'center', fontSize: 32, lineHeight: 38 }}>
-                We need to connect{'\n'}to your sensors.
-              </AppText>
-              <AppText variant="meta" style={{ textAlign: 'center', color: palette.textSecondary, lineHeight: 22 }}>
-                To track your max lean angle, route, and detect sudden stops, Kurbada requires GPS and Motion access.
-              </AppText>
-            </View>
-          </View>
+      <AppScreen style={{ justifyContent: 'center', paddingHorizontal: 0, paddingTop: 0 }} showWordmark={false}>
+        <GlassCard style={{ flex: 1, borderRadius: 0, padding: 22, gap: 18 }}>
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between', gap: 18, paddingBottom: 24 }}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={{ gap: 18 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Pressable
+                onPress={() => {
+                  setOnboardingStep(4);
+                  if (router.canGoBack()) {
+                    router.back();
+                    return;
+                  }
+                  router.replace(getOnboardingRoute(4) as any);
+                }}>
+                <Ionicons name="arrow-back" size={20} color={palette.textSecondary} />
+              </Pressable>
+                <AppText variant="label" style={{ color: palette.textSecondary }}>
+                  Step 5 of {ONBOARDING_TOTAL_STEPS}
+                </AppText>
+              </View>
 
-          <View style={{ gap: 14 }}>
-            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="location-outline" size={16} color={palette.textSecondary} />
-              <AppText variant="meta" style={{ color: palette.textTertiary }}>GPS for route tracking</AppText>
+              <View style={{ alignItems: 'center', gap: 32, paddingTop: 16 }}>
+                <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: 'rgba(217,255,63,0.08)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="hardware-chip-outline" size={52} color={palette.lime} />
+                </View>
+                <View style={{ alignItems: 'center', gap: 14 }}>
+                  <AppText variant="screenTitle" style={{ textAlign: 'center', fontSize: 30, lineHeight: 36 }}>
+                    We need to connect{'\n'}to your sensors.
+                  </AppText>
+                  <AppText variant="meta" style={{ textAlign: 'center', color: palette.textSecondary, lineHeight: 22 }}>
+                    To track your max lean angle, route, and detect sudden stops, Kurbada requires GPS and Motion access.
+                  </AppText>
+                </View>
+              </View>
             </View>
-            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="phone-portrait-outline" size={16} color={palette.textSecondary} />
-              <AppText variant="meta" style={{ color: palette.textTertiary }}>Motion sensors for lean angle</AppText>
+
+            <View style={{ gap: 14 }}>
+              <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="location-outline" size={16} color={palette.textSecondary} />
+                <AppText variant="meta" style={{ color: palette.textTertiary }}>GPS for route tracking</AppText>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="phone-portrait-outline" size={16} color={palette.textSecondary} />
+                <AppText variant="meta" style={{ color: palette.textTertiary }}>Motion sensors for lean angle</AppText>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="notifications-outline" size={16} color={palette.textSecondary} />
+                <AppText variant="meta" style={{ color: palette.textTertiary }}>Notifications for maintenance + crash alerts</AppText>
+              </View>
+              <Button title="Enable Telemetry" onPress={handleEnableTelemetry} />
             </View>
-            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="notifications-outline" size={16} color={palette.textSecondary} />
-              <AppText variant="meta" style={{ color: palette.textTertiary }}>Notifications for maintenance + crash alerts</AppText>
-            </View>
-            <Button title="Enable Telemetry" onPress={handleEnableTelemetry} />
-          </View>
+          </ScrollView>
         </GlassCard>
       </AppScreen>
     );
   }
 
   return (
-    <AppScreen style={{ justifyContent: 'center' }}>
-      <GlassCard style={{ minHeight: '70%', justifyContent: 'center', paddingVertical: 40, paddingHorizontal: 24 }}>
-        <View style={{ alignItems: 'center', gap: 32 }}>
+    <AppScreen style={{ flex: 1, paddingHorizontal: 0, paddingTop: 0 }} showWordmark={false}>
+      <Stack.Screen options={{ gestureEnabled: false, fullScreenGestureEnabled: false }} />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, backgroundColor: palette.background }}>
+        <View style={{ alignItems: 'center', gap: 32, width: '100%' }}>
           <ActivityIndicator size="large" color={palette.text} />
 
-          <AppText variant="screenTitle" style={{ textAlign: 'center', fontSize: 28 }}>
+          <AppText variant="screenTitle" style={{ textAlign: 'center', fontSize: 30, lineHeight: 36 }}>
             {loadingTexts[loadIndex] || 'Profile Ready.'}
           </AppText>
 
@@ -126,7 +179,7 @@ export default function PermissionsScreen() {
             ))}
           </View>
         </View>
-      </GlassCard>
+      </View>
     </AppScreen>
   );
 }

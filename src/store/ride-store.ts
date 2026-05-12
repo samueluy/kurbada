@@ -21,7 +21,16 @@ type RideStore = {
   state: RideSessionState;
   bikeId?: string;
   startedAt?: number;
-  telemetry: TelemetrySnapshot;
+  speedKmh: number;
+  distanceKm: number;
+  durationSeconds: number;
+  maxSpeedKmh: number;
+  altitudeMeters: number;
+  elevationGainM: number;
+  estimatedFuelLiters: number;
+  estimatedFuelCost: number;
+  gForce: number;
+  heading: number;
   crashCountdown: number | null;
   fatiguePromptShown: boolean;
   fuelPricePerLiter: number;
@@ -54,7 +63,7 @@ export const useRideStore = create<RideStore>((set) => ({
   state: 'idle',
   bikeId: undefined,
   startedAt: undefined,
-  telemetry: initialTelemetry,
+  ...initialTelemetry,
   crashCountdown: null,
   fatiguePromptShown: false,
   fuelPricePerLiter: 65,
@@ -65,9 +74,21 @@ export const useRideStore = create<RideStore>((set) => ({
   setCrashCountdown: (crashCountdown) => set({ crashCountdown }),
   setFatiguePromptShown: (fatiguePromptShown) => set({ fatiguePromptShown }),
   updateTelemetry: (patch) =>
-    set((store) => ({
-      telemetry: { ...store.telemetry, ...patch },
-    })),
+    set((store) => {
+      const nextPatch: Partial<RideStore> = {};
+      let changed = false;
+
+      (Object.entries(patch) as [keyof TelemetrySnapshot, number][]).forEach(([key, value]) => {
+        if (value === undefined || store[key] === value) {
+          return;
+        }
+
+        nextPatch[key] = value as never;
+        changed = true;
+      });
+
+      return changed ? nextPatch : store;
+    }),
   setFuelPricePerLiter: (fuelPricePerLiter) => set({ fuelPricePerLiter }),
   setFuelRateKmPerLiter: (fuelRateKmPerLiter) => set({ fuelRateKmPerLiter }),
   resetRide: () =>
@@ -75,7 +96,7 @@ export const useRideStore = create<RideStore>((set) => ({
       state: 'idle',
       bikeId: undefined,
       startedAt: undefined,
-      telemetry: initialTelemetry,
+      ...initialTelemetry,
       crashCountdown: null,
       fatiguePromptShown: false,
       fuelPricePerLiter: 65,

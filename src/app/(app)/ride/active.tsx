@@ -2,7 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useEffect } from 'react';
-import { Alert, Pressable, StatusBar, View } from 'react-native';
+import { Alert, InteractionManager, Pressable, StatusBar, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CrashAlertModal } from '@/components/ride/crash-alert-modal';
@@ -32,7 +32,11 @@ export default function ActiveRideScreen() {
     if (ride.state === 'idle' && requestedBikeId) {
       const fuelPrice = Number(requestedFuelPrice) || 65;
       const fuelRate = Number(requestedFuelRate) || 28;
-      ride.startRide(requestedBikeId, fuelPrice, fuelRate).catch(() => undefined);
+      const task = InteractionManager.runAfterInteractions(() => {
+        ride.startRide(requestedBikeId, fuelPrice, fuelRate).catch(() => undefined);
+      });
+
+      return () => task.cancel();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestedBikeId, requestedFuelPrice, requestedFuelRate]);

@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
 import * as Location from 'expo-location';
 import { Accelerometer } from 'expo-sensors';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { PermissionsAndroid, Platform } from 'react-native';
 
 import { createId } from '@/lib/id';
@@ -30,7 +30,13 @@ export function useRideSession() {
   const rideSessionState = useRideStore((state) => state.state);
   const rideBikeId = useRideStore((state) => state.bikeId);
   const rideStartedAt = useRideStore((state) => state.startedAt);
-  const rideTelemetry = useRideStore((state) => state.telemetry);
+  const rideSpeedKmh = useRideStore((state) => state.speedKmh);
+  const rideDistanceKm = useRideStore((state) => state.distanceKm);
+  const rideDurationSeconds = useRideStore((state) => state.durationSeconds);
+  const rideAltitudeMeters = useRideStore((state) => state.altitudeMeters);
+  const rideElevationGainM = useRideStore((state) => state.elevationGainM);
+  const rideEstimatedFuelLiters = useRideStore((state) => state.estimatedFuelLiters);
+  const rideEstimatedFuelCost = useRideStore((state) => state.estimatedFuelCost);
   const rideCrashCountdown = useRideStore((state) => state.crashCountdown);
   const rideFatiguePromptShown = useRideStore((state) => state.fatiguePromptShown);
   const rideActions = {
@@ -43,11 +49,31 @@ export function useRideSession() {
     setCrashCountdown: useRideStore((state) => state.setCrashCountdown),
     setFatiguePromptShown: useRideStore((state) => state.setFatiguePromptShown),
   };
+  const telemetry = useMemo(() => ({
+    speedKmh: rideSpeedKmh,
+    distanceKm: rideDistanceKm,
+    durationSeconds: rideDurationSeconds,
+    maxSpeedKmh: useRideStore.getState().maxSpeedKmh,
+    altitudeMeters: rideAltitudeMeters,
+    elevationGainM: rideElevationGainM,
+    estimatedFuelLiters: rideEstimatedFuelLiters,
+    estimatedFuelCost: rideEstimatedFuelCost,
+    gForce: useRideStore.getState().gForce,
+    heading: useRideStore.getState().heading,
+  }), [
+    rideAltitudeMeters,
+    rideDistanceKm,
+    rideDurationSeconds,
+    rideElevationGainM,
+    rideEstimatedFuelCost,
+    rideEstimatedFuelLiters,
+    rideSpeedKmh,
+  ]);
   const rideState = {
     state: rideSessionState,
     bikeId: rideBikeId,
     startedAt: rideStartedAt,
-    telemetry: rideTelemetry,
+    telemetry,
     crashCountdown: rideCrashCountdown,
     fatiguePromptShown: rideFatiguePromptShown,
   };
@@ -62,6 +88,7 @@ export function useRideSession() {
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rideStartedAtRef = useRef<number | null>(null);
   const rideIdRef = useRef<string | null>(null);
+  const lastGForcePublishAtRef = useRef(0);
   const getRideState = useRideStore.getState;
 
   useEffect(() => {
@@ -111,7 +138,10 @@ export function useRideSession() {
     accelSubscriptionRef.current = Accelerometer.addListener((reading) => {
       const rawGForce = Math.sqrt(reading.x ** 2 + reading.y ** 2 + reading.z ** 2);
       const currentStore = getRideState();
-      currentStore.updateTelemetry({ gForce: rawGForce });
+      if (Date.now() - lastGForcePublishAtRef.current >= 500) {
+        lastGForcePublishAtRef.current = Date.now();
+        currentStore.updateTelemetry({ gForce: rawGForce });
+      }
       maybeTriggerCrashAlert(getSmoothedGForce(rawGForce));
     });
 
@@ -122,8 +152,23 @@ export function useRideSession() {
   }, [rideState.state]);
 
   const startRide = async (bikeId: string, fuelPricePerLiter: number, fuelRateKmPerLiter: number) => {
+    rideActions.resetRide();
+    foregroundPointsRef.current = [];
+    pendingPersistPointsRef.current = [];
+    crashThresholdSinceRef.current = null;
+    recentGForcesRef.current = [];
+    recentSpeedsRef.current = [];
+    rideIdRef.current = createId();
+    rideActions.setBikeId(bikeId);
+    rideActions.setFuelPricePerLiter(fuelPricePerLiter);
+    rideActions.setFuelRateKmPerLiter(fuelRateKmPerLiter);
+    rideActions.setStartedAt(Date.now());
+    rideActions.setState('starting');
+    rideStartedAtRef.current = Date.now();
+
     const fgPerm = await Location.requestForegroundPermissionsAsync();
     if (!fgPerm.granted) {
+      rideActions.resetRide();
       throw new Error('Location permission is required to start a ride.');
     }
 
@@ -137,19 +182,6 @@ export function useRideSession() {
         // ignore — pre-Android 13 devices don't support this
       }
     }
-
-    rideActions.resetRide();
-    foregroundPointsRef.current = [];
-    pendingPersistPointsRef.current = [];
-    crashThresholdSinceRef.current = null;
-    recentGForcesRef.current = [];
-    recentSpeedsRef.current = [];
-    rideIdRef.current = createId();
-    rideActions.setBikeId(bikeId);
-    rideActions.setFuelPricePerLiter(fuelPricePerLiter);
-    rideActions.setFuelRateKmPerLiter(fuelRateKmPerLiter);
-    rideActions.setStartedAt(Date.now());
-    rideStartedAtRef.current = Date.now();
 
     await clearRidePoints(rideIdRef.current);
     await setActiveRidePointSession(rideIdRef.current);
@@ -166,7 +198,6 @@ export function useRideSession() {
       },
     }).catch(() => undefined);
 
-    rideActions.setState('starting');
     await sleep(400);
     rideActions.setState('active');
   };
@@ -312,7 +343,7 @@ export function useRideSession() {
         const filteredSpeedKmh = filterRideSpeedKmh({
           nextPoint: point,
           previousPoint: previous,
-          previousFilteredSpeedKmh: getRideState().telemetry.speedKmh,
+          previousFilteredSpeedKmh: getRideState().speedKmh,
           distanceDeltaKm: distanceDelta,
         });
         point.speedKmh = filteredSpeedKmh;
@@ -327,23 +358,23 @@ export function useRideSession() {
         schedulePendingPointFlush();
         const currentStore = getRideState();
 
-        const newDistance = currentStore.telemetry.distanceKm + distanceDelta;
-        const newElevationGain = currentStore.telemetry.elevationGainM + elevationDelta;
+        const newDistance = currentStore.distanceKm + distanceDelta;
+        const newElevationGain = currentStore.elevationGainM + elevationDelta;
         const fuelRate = Math.max(currentStore.fuelRateKmPerLiter, 0.1);
         const fuelLiters = newDistance / fuelRate;
         const fuelCost = fuelLiters * currentStore.fuelPricePerLiter;
 
-        const heading = location.coords.heading ?? currentStore.telemetry.heading;
+        const heading = location.coords.heading ?? currentStore.heading;
 
         currentStore.updateTelemetry({
           speedKmh: filteredSpeedKmh,
           altitudeMeters: point.altitude ?? 0,
           distanceKm: newDistance,
           elevationGainM: newElevationGain,
-          maxSpeedKmh: Math.max(currentStore.telemetry.maxSpeedKmh, filteredSpeedKmh),
+          maxSpeedKmh: Math.max(currentStore.maxSpeedKmh, filteredSpeedKmh),
           estimatedFuelLiters: fuelLiters,
           estimatedFuelCost: fuelCost,
-          heading: heading || currentStore.telemetry.heading,
+          heading: heading || currentStore.heading,
         });
       },
     );

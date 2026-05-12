@@ -1,7 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Modal, Pressable, View } from 'react-native';
+import { Alert, Animated, Modal, Pressable, ScrollView, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScrollScreen } from '@/components/ui/app-screen';
@@ -13,6 +13,7 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { Colors, palette, radius } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useBikeMutations, useBikes, useMaintenanceMutations, useMaintenanceTasks } from '@/hooks/use-kurbada-data';
+import { useAppStore } from '@/store/app-store';
 import type { MaintenanceTask } from '@/types/domain';
 
 const defaultIntervals: Record<string, { km: number; days: number | null }> = {
@@ -76,6 +77,9 @@ export default function BikeProfileScreen() {
   const tasks = useMaintenanceTasks(bike?.id);
   const { addMaintenanceTask, updateMaintenanceTask, deleteMaintenanceTask } = useMaintenanceMutations(session?.user.id);
   const { saveBike } = useBikeMutations(session?.user.id);
+  const activeBikeId = useAppStore((state) => state.activeBikeId);
+  const setActiveBikeId = useAppStore((state) => state.setActiveBikeId);
+  const isPrimary = bike?.id === activeBikeId;
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [customTaskName, setCustomTaskName] = useState('');
   const [customInterval, setCustomInterval] = useState('');
@@ -183,29 +187,93 @@ export default function BikeProfileScreen() {
         <AppText variant="meta" style={{ color: palette.textSecondary }}>
           Tracked maintenance budget: ~₱{trackedMaintenanceBudget.toLocaleString()}
         </AppText>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: 0,
+            gap: 8,
+            flexDirection: 'row',
+            alignItems: 'center',
+          }}>
           <Pressable
             onPress={() => {
               setNicknameInput(bike.nickname ?? '');
               setShowNicknameEdit(true);
             }}
-            style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: palette.surfaceStrong }}>
-            <AppText variant="button" style={{ fontSize: 12 }}>Edit Bike Name</AppText>
+            style={{
+              paddingHorizontal: 16,
+              paddingVertical: 9,
+              borderRadius: radius.pill,
+              backgroundColor: Colors.s3,
+              borderWidth: 0.5,
+              borderColor: Colors.border,
+              flexShrink: 0,
+            }}>
+            <AppText variant="button" style={{ fontSize: 13, color: Colors.t1 }}>Edit Name</AppText>
           </Pressable>
           <Pressable
             onPress={() => {
               setOdometerInput(bike.current_odometer_km.toString());
               setShowOdometerEdit(true);
             }}
-            style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: palette.surfaceStrong }}>
-            <AppText variant="button" style={{ fontSize: 12 }}>Edit Odometer</AppText>
+            style={{
+              paddingHorizontal: 16,
+              paddingVertical: 9,
+              borderRadius: radius.pill,
+              backgroundColor: Colors.s3,
+              borderWidth: 0.5,
+              borderColor: Colors.border,
+              flexShrink: 0,
+            }}>
+            <AppText variant="button" style={{ fontSize: 13, color: Colors.t1 }}>Edit Odometer</AppText>
           </Pressable>
           <Pressable
             onPress={() => router.push({ pathname: '/(app)/garage/achievements/[bikeId]' as any, params: { bikeId: bike.id } })}
-            style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: palette.surfaceStrong }}>
-            <AppText variant="button" style={{ fontSize: 12 }}>Achievements</AppText>
+            style={{
+              paddingHorizontal: 16,
+              paddingVertical: 9,
+              borderRadius: radius.pill,
+              backgroundColor: Colors.s3,
+              borderWidth: 0.5,
+              borderColor: Colors.border,
+              flexShrink: 0,
+            }}>
+            <AppText variant="button" style={{ fontSize: 13, color: Colors.t1 }}>Achievements</AppText>
           </Pressable>
-        </View>
+          {isPrimary ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: 16,
+                paddingVertical: 9,
+                borderRadius: radius.pill,
+                backgroundColor: Colors.redDim,
+                borderWidth: 0.5,
+                borderColor: Colors.redBorder,
+                flexShrink: 0,
+              }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.red }} />
+              <AppText variant="button" style={{ fontSize: 12, color: Colors.red }}>Primary Bike</AppText>
+            </View>
+          ) : (
+            <Pressable
+              onPress={() => setActiveBikeId(bike.id)}
+              style={{
+                paddingHorizontal: 16,
+                paddingVertical: 9,
+                borderRadius: radius.pill,
+                backgroundColor: Colors.s3,
+                borderWidth: 0.5,
+                borderColor: Colors.border,
+                flexShrink: 0,
+              }}>
+              <AppText variant="button" style={{ fontSize: 13, color: Colors.t1 }}>Set as Primary</AppText>
+            </Pressable>
+          )}
+        </ScrollView>
       </GlassCard>
 
       <SectionHeader title="Maintenance Tracker" />

@@ -36,19 +36,42 @@ export function useUserProfile(userId?: string) {
       };
     },
     initialData: useRemote ? undefined : localProfile,
+    staleTime: 5 * 60_000,
+    gcTime: 15 * 60_000,
   });
 }
 
 export function useUserAccess(userId?: string) {
   const profileQuery = useUserProfile(userId);
+  const needsPremiumResolution =
+    Boolean(userId)
+    && profileQuery.data?.access_override === 'none';
   const accessQuery = useQuery({
     queryKey: ['access', userId ?? 'local', profileQuery.data?.access_override, profileQuery.data?.subscription_status],
     enabled: Boolean(userId) && !profileQuery.isLoading,
     queryFn: () => getUserAccess(profileQuery.data),
+    staleTime: 2 * 60_000,
+    gcTime: 10 * 60_000,
   });
+
+  const accessData = accessQuery.data ?? {
+    hasAccess: true,
+    reason: 'bootstrap' as const,
+    accessOverride: profileQuery.data?.access_override ?? 'none',
+  };
+
+  const hasResolvedAccess = !needsPremiumResolution || accessQuery.isSuccess || accessQuery.isError;
+  const shouldRequirePaywall =
+    hasResolvedAccess
+    && accessData.reason !== 'bootstrap'
+    && !accessData.hasAccess;
 
   return {
     ...accessQuery,
-    isLoading: Boolean(userId) && (profileQuery.isLoading || accessQuery.isLoading),
+    data: accessData,
+    hasResolvedAccess,
+    shouldRequirePaywall,
+    isLoading: Boolean(userId) && profileQuery.isLoading,
+    isRefreshingPremium: Boolean(userId) && !profileQuery.isLoading && accessQuery.isFetching,
   };
 }

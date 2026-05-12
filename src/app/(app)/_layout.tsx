@@ -1,4 +1,4 @@
-import { Redirect, Stack, usePathname } from 'expo-router';
+import { Redirect, Stack } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { ActivityIndicator, Alert } from 'react-native';
 
@@ -8,18 +8,12 @@ import { env } from '@/lib/env';
 import { useAuth } from '@/hooks/use-auth';
 import { useReferralMutations, useReferrals } from '@/hooks/use-kurbada-data';
 import { useMaintenanceReminders } from '@/hooks/use-maintenance-reminders';
-import { useUserAccess } from '@/hooks/use-user-access';
-import { useAppStore } from '@/store/app-store';
 
 export default function AppLayout() {
-  const { session, loading } = useAuth();
-  const pathname = usePathname();
-  const hasCompletedBikeSetup = useAppStore((state) => state.hasCompletedBikeSetup);
-  const access = useUserAccess(session?.user.id);
+  const { session, loading, signingOut, bootstrapPhase } = useAuth();
   const referrals = useReferrals(session?.user.id);
   const { markReferralNotified } = useReferralMutations(session?.user.id);
   const bypassGate = env.devBypassAppGate;
-  const isBillingRoute = pathname === '/profile/billing';
   const shownReferralIdRef = useRef<string | null>(null);
 
   useMaintenanceReminders();
@@ -52,7 +46,11 @@ export default function AppLayout() {
     );
   }, [markReferralNotified, referrals.data, session?.user.id]);
 
-  if (loading && !bypassGate) {
+  if (signingOut && !bypassGate) {
+    return <Redirect href="/(public)/auth/sign-in" />;
+  }
+
+  if ((loading || bootstrapPhase === 'booting') && !bypassGate) {
     return (
       <AppScreen style={{ justifyContent: 'center', alignItems: 'center' }} showWordmark={false}>
         <ActivityIndicator size="large" color={palette.text} />
@@ -62,22 +60,6 @@ export default function AppLayout() {
 
   if (!bypassGate && !session) {
     return <Redirect href="/(public)/auth/sign-in" />;
-  }
-
-  if (!bypassGate && access.isLoading) {
-    return (
-      <AppScreen style={{ justifyContent: 'center', alignItems: 'center' }} showWordmark={false}>
-        <ActivityIndicator size="large" color={palette.text} />
-      </AppScreen>
-    );
-  }
-
-  if (!bypassGate && !access.data?.hasAccess && !isBillingRoute) {
-    return <Redirect href="/(public)/paywall" />;
-  }
-
-  if (!hasCompletedBikeSetup) {
-    return <Redirect href="/(public)/bike-setup" />;
   }
 
   return (

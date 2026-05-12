@@ -1,9 +1,10 @@
 import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, RefreshControl, View } from 'react-native';
+import { Alert, InteractionManager, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 
 import { TabTransition } from '@/components/navigation/tab-transition';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -47,14 +48,15 @@ export default function RideTabScreen() {
   const ridingPersona = useAppStore((state) => state.ridingPersona);
   const workMode = useAppStore((state) => state.workMode);
   const dailyEarningsGoal = useAppStore((state) => state.dailyEarningsGoal);
+  const [secondaryReady, setSecondaryReady] = useState(false);
   const bikes = useBikes(session?.user.id);
-  const rides = useRides(session?.user.id);
-  const recentRides = useRecentRideFeed(session?.user.id, 12);
-  const dashboardMetrics = useRideDashboardMetrics(session?.user.id);
+  const rides = useRides(session?.user.id, { enabled: secondaryReady });
+  const recentRides = useRecentRideFeed(session?.user.id, 12, { enabled: secondaryReady });
+  const dashboardMetrics = useRideDashboardMetrics(session?.user.id, { enabled: secondaryReady });
   const { syncPendingRides } = useRideMutations(session?.user.id);
-  const weather = useWeather();
-  const weatherWindow = useWeatherWindow();
-  const cachedLocation = useCachedLocation();
+  const weather = useWeather({ enabled: secondaryReady });
+  const weatherWindow = useWeatherWindow({ enabled: secondaryReady });
+  const cachedLocation = useCachedLocation({ enabled: secondaryReady });
   const allBikes = useMemo(() => bikes.data ?? [], [bikes.data]);
   const bikesById = useMemo(() => new Map(allBikes.map((bike) => [bike.id, bike])), [allBikes]);
   const primaryBike = useMemo(
@@ -68,13 +70,30 @@ export default function RideTabScreen() {
     }
   }, [activeBikeId, allBikes, setActiveBikeId]);
 
+  useFocusEffect(
+    useCallback(() => {
+      if (secondaryReady) {
+        return undefined;
+      }
+
+      const task = InteractionManager.runAfterInteractions(() => {
+        setSecondaryReady(true);
+        console.info('[bootstrap] ride_tab_secondary_ready');
+      });
+
+      return () => task.cancel();
+    }, [secondaryReady]),
+  );
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const handleRefresh = useCallback(async () => {
+    if (!secondaryReady) {
+      setSecondaryReady(true);
+    }
     setIsRefreshing(true);
     try {
+      await syncPendingRides.mutateAsync();
       const refetches = [
-        () => syncPendingRides.mutateAsync(),
-        (bikes as { refetch?: () => Promise<unknown> }).refetch,
         (rides as { refetch?: () => Promise<unknown> }).refetch,
         (recentRides as { refetch?: () => Promise<unknown> }).refetch,
         (dashboardMetrics as { refetch?: () => Promise<unknown> }).refetch,
@@ -86,7 +105,7 @@ export default function RideTabScreen() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [bikes, cachedLocation, dashboardMetrics, recentRides, rides, syncPendingRides, weather, weatherWindow]);
+  }, [cachedLocation, dashboardMetrics, recentRides, rides, secondaryReady, syncPendingRides, weather, weatherWindow]);
 
   const fuelPrice = dashboardMetrics.data?.latest_fuel_price ?? 65;
   const fuelRate = useMemo(
@@ -138,23 +157,11 @@ export default function RideTabScreen() {
 
   const openNearbySearch = useCallback(async (category: 'gas station' | 'restaurant') => {
     try {
-      const location = cachedLocation.data ?? await cachedLocation.refetch().then((result) => result.data);
-      if (!location || location.isFallback) {
-        Alert.alert('Location needed', 'Allow location access so Kurbada can search near you.');
-        return;
-      }
-
-      const latitude = location.lat.toFixed(5);
-      const longitude = location.lng.toFixed(5);
-      const query = encodeURIComponent(`${category} near ${latitude},${longitude}`);
-      const wazeUrl = `waze://?ll=${latitude},${longitude}&q=${query}`;
+      const location = cachedLocation.data;
+      const query = location && !location.isFallback
+        ? encodeURIComponent(`${category} near ${location.lat.toFixed(5)},${location.lng.toFixed(5)}`)
+        : encodeURIComponent(category === 'restaurant' ? 'restaurants near me' : 'gas stations near me');
       const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${query}`;
-
-      if (await Linking.canOpenURL(wazeUrl)) {
-        await Linking.openURL(wazeUrl);
-        return;
-      }
-
       await Linking.openURL(googleMapsUrl);
     } catch (error) {
       Alert.alert('Could not open maps', error instanceof Error ? error.message : 'Please try again.');
@@ -251,16 +258,41 @@ export default function RideTabScreen() {
           <Button title="Gas Stations" variant="secondary" onPress={() => void openNearbySearch('gas station')} />
         </View>
         <View style={{ flex: 1 }}>
-          <Button title="Food Stops" variant="secondary" onPress={() => void openNearbySearch('restaurant')} />
+          <Button title="Restaurants" variant="secondary" onPress={() => void openNearbySearch('restaurant')} />
         </View>
       </View>
     </GlassCard>
   ), [openNearbySearch]);
 
+  const recentRideItems = useMemo<RideTabItem[]>(() => {
+    if (!recentRides.data?.length) {
+      return [{ type: 'empty', key: 'rides-empty' }];
+    }
+
+    return recentRides.data.map((ride) => ({ type: 'ride', key: `ride-${ride.id}`, ride }));
+  }, [recentRides.data]);
+
   const tileItems = useMemo(() => {
     const tiles: RideTabItem[] = [
       { type: 'tile', key: 'hero', content: heroTile },
     ];
+
+    if (!secondaryReady) {
+      tiles.push({
+        type: 'tile',
+        key: 'loading-shell',
+        content: (
+          <GlassCard style={{ padding: 18, borderRadius: 18, gap: 8 }}>
+            <AppText variant="eyebrow">LOADING RIDE INSIGHTS</AppText>
+            <AppText variant="body" style={{ color: palette.textSecondary }}>
+              Bringing in your recent rides, weather, and maintenance snapshot.
+            </AppText>
+          </GlassCard>
+        ),
+      });
+      tiles.push({ type: 'tile', key: 'nearby', content: proximityTile });
+      return tiles;
+    }
 
     if (!workMode && weatherWindow.data?.window) {
       tiles.push({
@@ -309,23 +341,20 @@ export default function RideTabScreen() {
 
     tiles.push({ type: 'tile', key: 'monthly-cost', content: monthlyCostTile });
     tiles.push({ type: 'section', key: 'recent-section' });
-
-    if (recentRides.data?.length) {
-      recentRides.data.forEach((ride) => {
-        tiles.push({ type: 'ride', key: `ride-${ride.id}`, ride });
-      });
-    } else {
-      tiles.push({ type: 'empty', key: 'rides-empty' });
-    }
-
-    return tiles;
-  }, [efficiencyTrend, heroTile, monthlyCostTile, personalRecords, primaryBike, proximityTile, recentRides.data, rides.data, weatherWindow.data?.window, workMode]);
+    return [...tiles, ...recentRideItems];
+  }, [efficiencyTrend, heroTile, monthlyCostTile, personalRecords, primaryBike, proximityTile, recentRideItems, rides.data, secondaryReady, weatherWindow.data?.window, workMode]);
 
   const renderHeader = useCallback(() => (
     <View style={{ paddingHorizontal: 20, paddingTop: 8, gap: 16 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <AppText variant="brand">KURBADA</AppText>
-        <WeatherWidget weather={weather.data} isError={weather.isError} />
+        {secondaryReady ? (
+          <WeatherWidget weather={weather.data} isError={weather.isError} />
+        ) : (
+          <AppText variant="meta" style={{ color: palette.textTertiary }}>
+            Loading weather…
+          </AppText>
+        )}
       </View>
 
       <View style={{ gap: 6 }}>
@@ -341,17 +370,16 @@ export default function RideTabScreen() {
       </View>
 
       {allBikes.length > 1 ? (
-        <FlashList
-          data={allBikes}
+        <ScrollView
           horizontal
-          keyExtractor={(bike) => bike.id}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 8 }}
-          ItemSeparatorComponent={() => <View style={{ width: 8 }} />}
-          renderItem={({ item: bike }) => {
+          contentContainerStyle={{ gap: 8, paddingBottom: 8 }}
+          keyboardShouldPersistTaps="handled">
+          {allBikes.map((bike) => {
             const active = bike.id === primaryBike?.id;
             return (
               <Pressable
+                key={bike.id}
                 onPress={() => setActiveBikeId(bike.id)}
                 style={{
                   flexDirection: 'row',
@@ -377,11 +405,11 @@ export default function RideTabScreen() {
                 </AppText>
               </Pressable>
             );
-          }}
-        />
+          })}
+        </ScrollView>
       ) : null}
     </View>
-  ), [allBikes, primaryBike?.id, session?.user.user_metadata.display_name, setActiveBikeId, weather.data, weather.isError, workMode]);
+  ), [allBikes, primaryBike?.id, secondaryReady, session?.user.user_metadata.display_name, setActiveBikeId, weather.data, weather.isError, workMode]);
 
   const renderItem = useCallback(({ item }: { item: RideTabItem }) => {
     if (item.type === 'tile') {

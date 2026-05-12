@@ -4,7 +4,7 @@ import type { AccessOverride, Profile } from '@/types/domain';
 
 export type UserAccess = {
   hasAccess: boolean;
-  reason: 'disabled' | 'premium' | 'override' | 'missing';
+  reason: 'disabled' | 'premium' | 'override' | 'missing' | 'bootstrap';
   accessOverride: AccessOverride;
 };
 
@@ -19,7 +19,20 @@ export async function getUserAccess(profile?: Profile | null): Promise<UserAcces
     return { hasAccess: true, reason: 'override', accessOverride };
   }
 
-  const hasPremium = await getPremiumAccessState();
+  const hasPremium = await Promise.race<boolean | null>([
+    getPremiumAccessState(),
+    new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), 2500);
+    }),
+  ]);
+
+  if (hasPremium === null) {
+    return {
+      hasAccess: true,
+      reason: 'bootstrap',
+      accessOverride,
+    };
+  }
 
   return {
     hasAccess: hasPremium,

@@ -73,8 +73,8 @@ export default function OnboardingEmergencyScreen() {
       }
     }
     if (isOnboarding) {
-      setOnboardingStep(5);
-      router.push(getOnboardingRoute(5) as any);
+      setOnboardingStep(4);
+      router.push(getOnboardingRoute(4) as any);
     }
   };
 
@@ -92,11 +92,19 @@ export default function OnboardingEmergencyScreen() {
     <>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         {forOnboarding ? (
-          <Pressable onPress={() => { setOnboardingStep(3); router.replace(getOnboardingRoute(3) as any); }}>
+          <Pressable
+            onPress={() => {
+              setOnboardingStep(2);
+              if (router.canGoBack()) {
+                router.back();
+                return;
+              }
+              router.replace(getOnboardingRoute(2) as any);
+            }}>
             <Ionicons name="arrow-back" size={20} color={palette.textSecondary} />
           </Pressable>
         ) : null}
-        <AppText variant="label" style={{ color: palette.textSecondary }}>Step 4 of {ONBOARDING_TOTAL_STEPS}</AppText>
+        <AppText variant="label" style={{ color: palette.textSecondary }}>Step 3 of {ONBOARDING_TOTAL_STEPS}</AppText>
       </View>
 
       <View style={{ alignItems: 'center', gap: 16 }}>

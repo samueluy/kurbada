@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { GlassCard } from '@/components/ui/glass-card';
 import { palette, radius, typography } from '@/constants/theme';
 import { requestAccountDeletion } from '@/lib/account';
+import { queryClient } from '@/lib/query-client';
 import { useAppStore } from '@/store/app-store';
 
 export default function DeleteAccountScreen() {
@@ -31,6 +32,7 @@ export default function DeleteAccountScreen() {
             try {
               await requestAccountDeletion();
               resetForSignOut();
+              queryClient.clear();
               router.replace('/(public)/auth/sign-in');
             } catch (error) {
               Alert.alert(

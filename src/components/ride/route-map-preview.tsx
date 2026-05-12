@@ -16,21 +16,22 @@ export function RouteMapPreview({
   routeBounds?: RouteBounds;
 }) {
   const Mapbox = getMapboxModule();
+  const coordinates = routeGeoJson?.geometry?.coordinates as [number, number][] | undefined;
+  const firstCoordinate = coordinates?.[0];
 
-  if (Platform.OS === 'web' || !routeGeoJson || !Mapbox) {
+  if (Platform.OS === 'web' || !routeGeoJson || !Mapbox || !firstCoordinate) {
     return (
       <GlassCard style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8, padding: 20 }}>
         <AppText variant="label">Route preview</AppText>
-        <AppText variant="bodyBold">Native map standby</AppText>
+        <AppText variant="bodyBold">{Mapbox ? 'Route data unavailable' : 'Native map standby'}</AppText>
         <AppText variant="caption" style={{ textAlign: 'center', color: palette.textSecondary }}>
-          Mapbox appears automatically in a native development build once the access token is available.
+          {Mapbox
+            ? 'We could not load a usable route for this ride, but the rest of your summary is still available.'
+            : 'Mapbox appears automatically in a native development build once the access token is available.'}
         </AppText>
       </GlassCard>
     );
   }
-
-  const coordinates = routeGeoJson.geometry.coordinates as [number, number][];
-  const firstCoordinate = coordinates[0];
 
   return (
     <View style={{ flex: 1, overflow: 'hidden', borderRadius: 16 }}>

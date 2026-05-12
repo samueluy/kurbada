@@ -113,6 +113,7 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
               navigation.navigate(route.name);
             }}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
             style={{
               flex: 1,
               minHeight: 48,

@@ -19,6 +19,8 @@ export default function BikeSetupScreen() {
   const setOnboardingStep = useAppStore((state) => state.setOnboardingStep);
   const setPreferredMode = useAppStore((state) => state.setPreferredMode);
   const setOnboardingData = useAppStore((state) => state.setOnboardingData);
+  const clearAnonymousOnboardingDraft = useAppStore((state) => state.clearAnonymousOnboardingDraft);
+  const completeOnboarding = useAppStore((state) => state.completeOnboarding);
   const onboardingData = useAppStore((state) => state.onboardingData);
   const isOnboarding = params.flow === 'onboarding';
 
@@ -75,8 +77,8 @@ export default function BikeSetupScreen() {
     setPreferredMode(draft.ridingStyle);
 
     if (isOnboarding) {
-      setOnboardingStep(3);
-      router.push(getOnboardingRoute(3) as any);
+      setOnboardingStep(2);
+      router.push(getOnboardingRoute(2) as any);
     } else {
       router.replace('/(app)/(tabs)/ride');
     }
@@ -85,7 +87,7 @@ export default function BikeSetupScreen() {
   const content = (
     <>
         {isOnboarding ? (
-          <OnboardingHeader step={2} onBack={() => { setOnboardingStep(1); router.replace(getOnboardingRoute(1) as any); }} />
+          <OnboardingHeader step={1} />
         ) : null}
       <View style={{ gap: 8 }}>
         <AppText variant="screenTitle" style={{ fontSize: 30 }}>What do you ride?</AppText>
@@ -111,7 +113,18 @@ export default function BikeSetupScreen() {
               keyboardShouldPersistTaps="handled">
               {content}
             </ScrollView>
-            <Button title="Next →" onPress={handleNext} disabled={!isValid} />
+            <View style={{ gap: 10 }}>
+              <Button title="Next →" onPress={handleNext} disabled={!isValid} />
+              <Button
+                title="Already have an account? Sign in"
+                variant="ghost"
+                onPress={() => {
+                  clearAnonymousOnboardingDraft();
+                  completeOnboarding();
+                  router.replace('/(public)/auth/sign-in');
+                }}
+              />
+            </View>
           </GlassCard>
         </KeyboardAvoidingView>
       </AppScreen>

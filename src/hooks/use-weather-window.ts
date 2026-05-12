@@ -2,6 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useCachedLocation } from '@/hooks/use-cached-location';
 
+type WeatherWindowOptions = {
+  enabled?: boolean;
+};
+
 const CLEAR_PRECIP_THRESHOLD = 30; // percent
 const WEATHER_CODE_BAD_MIN = 51; // drizzle and up
 
@@ -84,12 +88,13 @@ export function findNextRideWindow(forecast: HourlyForecast[]): RideWindow | nul
   return null;
 }
 
-export function useWeatherWindow() {
-  const location = useCachedLocation();
+export function useWeatherWindow(options?: WeatherWindowOptions) {
+  const enabled = options?.enabled ?? true;
+  const location = useCachedLocation({ enabled });
 
   return useQuery({
     queryKey: ['weather-window', location.data?.lat, location.data?.lng],
-    enabled: Boolean(location.data),
+    enabled: enabled && Boolean(location.data),
     queryFn: async () => {
       const forecast = await fetchHourly(location.data!.lat, location.data!.lng);
       return {

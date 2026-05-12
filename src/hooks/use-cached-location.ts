@@ -2,6 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 import { Platform } from 'react-native';
 
+type CachedLocationOptions = {
+  enabled?: boolean;
+};
+
 export type CachedLocation = {
   lat: number;
   lng: number;
@@ -25,14 +29,15 @@ export async function fetchCachedLocation(): Promise<CachedLocation> {
   }
 
   try {
-    const permission = await Location.requestForegroundPermissionsAsync();
+    const permission = await Location.getForegroundPermissionsAsync();
     if (!permission.granted) {
       return { lat: DEFAULT_LAT, lng: DEFAULT_LNG, isFallback: true };
     }
 
-    const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
-    const lat = position.coords.latitude;
-    const lng = position.coords.longitude;
+    const lastKnownPosition = await Location.getLastKnownPositionAsync();
+    const seedPosition = lastKnownPosition ?? await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
+    const lat = seedPosition.coords.latitude;
+    const lng = seedPosition.coords.longitude;
     if (isValidCoords(lat, lng)) {
       return { lat, lng, isFallback: false };
     }
@@ -43,9 +48,10 @@ export async function fetchCachedLocation(): Promise<CachedLocation> {
   return { lat: DEFAULT_LAT, lng: DEFAULT_LNG, isFallback: true };
 }
 
-export function useCachedLocation() {
+export function useCachedLocation(options?: CachedLocationOptions) {
   return useQuery({
     queryKey: ['cached-location'],
+    enabled: options?.enabled ?? true,
     queryFn: fetchCachedLocation,
     staleTime: 5 * 60 * 1000,
     gcTime: 15 * 60 * 1000,

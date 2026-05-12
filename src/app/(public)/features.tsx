@@ -36,8 +36,8 @@ export default function OnboardingFeaturesScreen() {
     setRidingPersona(selected);
     // Auto-enable work mode if the rider picks work persona
     if (selected === 'work') setWorkMode(true);
-    setOnboardingStep(6);
-    router.push(getOnboardingRoute(6) as any);
+    setOnboardingStep(5);
+    router.push(getOnboardingRoute(5) as any);
   };
 
   return (
@@ -45,10 +45,18 @@ export default function OnboardingFeaturesScreen() {
       <GlassCard style={{ flex: 1, borderRadius: 0, paddingVertical: 28, paddingHorizontal: 24, gap: 18 }}>
         <ScrollView contentContainerStyle={{ gap: 20, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <Pressable onPress={() => { setOnboardingStep(4); router.replace(getOnboardingRoute(4) as any); }}>
+            <Pressable
+              onPress={() => {
+                setOnboardingStep(3);
+                if (router.canGoBack()) {
+                  router.back();
+                  return;
+                }
+                router.replace(getOnboardingRoute(3) as any);
+              }}>
               <Ionicons name="arrow-back" size={20} color={palette.textSecondary} />
             </Pressable>
-            <AppText variant="label" style={{ color: palette.textSecondary }}>Step 5 of {ONBOARDING_TOTAL_STEPS}</AppText>
+            <AppText variant="label" style={{ color: palette.textSecondary }}>Step 4 of {ONBOARDING_TOTAL_STEPS}</AppText>
           </View>
 
           <View style={{ alignItems: 'center', gap: 10 }}>

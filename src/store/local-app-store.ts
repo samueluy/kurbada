@@ -36,19 +36,51 @@ type LocalAppState = {
   updateRideListing: (listing: RideListing) => void;
   deleteRideListing: (listingId: string) => void;
   reportRideListing: (listingId: string) => void;
+  resetLocalStore: () => void;
 };
+
+const emptyProfile: Profile = {
+  id: '',
+  display_name: 'Kurbada Rider',
+  subscription_status: 'inactive',
+  access_override: 'none',
+  referral_code: '',
+};
+
+const emptyEmergencyInfo: EmergencyInfo = {
+  id: '',
+  full_name: '',
+  blood_type: '',
+  allergies: '',
+  conditions: '',
+  contact1_name: '',
+  contact1_phone: '',
+  contact2_name: '',
+  contact2_phone: '',
+};
+
+const LOCAL_APP_STORE_VERSION = 2;
+
+const initialProfile = __DEV__ ? sampleProfile : emptyProfile;
+const initialBikes = __DEV__ ? sampleBikes : [];
+const initialMaintenanceTasks = __DEV__ ? sampleMaintenanceTasks : [];
+const initialRides = __DEV__ ? sampleRides : [];
+const initialFuelLogs = __DEV__ ? sampleFuelLogs : [];
+const initialEmergencyInfo = __DEV__ ? sampleEmergencyInfo : emptyEmergencyInfo;
+const initialReferrals = __DEV__ ? sampleReferrals : [];
+const initialRideListings = __DEV__ ? sampleRideListings : [];
 
 export const useLocalAppStore = create<LocalAppState>()(
   persist(
     (set) => ({
-      profile: sampleProfile,
-      bikes: sampleBikes,
-      maintenanceTasks: sampleMaintenanceTasks,
-      rides: sampleRides,
+      profile: initialProfile,
+      bikes: initialBikes,
+      maintenanceTasks: initialMaintenanceTasks,
+      rides: initialRides,
       pendingRides: [],
-      fuelLogs: sampleFuelLogs,
-      emergencyInfo: sampleEmergencyInfo,
-      referrals: sampleReferrals,
+      fuelLogs: initialFuelLogs,
+      emergencyInfo: initialEmergencyInfo,
+      referrals: initialReferrals,
       updateProfile: (updates) =>
         set((state) => ({
           profile: { ...state.profile, ...updates },
@@ -118,7 +150,7 @@ export const useLocalAppStore = create<LocalAppState>()(
             item.id === referralId ? { ...item, notified_at: notifiedAt } : item,
           ),
         })),
-      rideListings: sampleRideListings,
+      rideListings: initialRideListings,
       addRideListing: (listing) =>
         set((state) => ({
           rideListings: [listing, ...state.rideListings],
@@ -137,6 +169,18 @@ export const useLocalAppStore = create<LocalAppState>()(
             item.id === listingId ? { ...item, is_reported: true } : item,
           ),
         })),
+      resetLocalStore: () =>
+        set({
+          profile: emptyProfile,
+          bikes: [],
+          maintenanceTasks: [],
+          rides: [],
+          pendingRides: [],
+          fuelLogs: [],
+          emergencyInfo: emptyEmergencyInfo,
+          referrals: [],
+          rideListings: [],
+        }),
       addMaintenanceTasks: (tasks: MaintenanceTask[]) =>
         set((state) => ({
           maintenanceTasks: [...tasks, ...state.maintenanceTasks],
@@ -163,7 +207,28 @@ export const useLocalAppStore = create<LocalAppState>()(
     }),
     {
       name: 'kurbada-local-data',
+      version: LOCAL_APP_STORE_VERSION,
       storage: createJSONStorage(() => appStorage),
+      migrate: (persistedState, version) => {
+        const persisted = (persistedState ?? {}) as Partial<LocalAppState>;
+
+        if (version < LOCAL_APP_STORE_VERSION) {
+          return {
+            ...persisted,
+            profile: persisted.profile?.id ? persisted.profile : emptyProfile,
+            bikes: persisted.bikes ?? [],
+            maintenanceTasks: persisted.maintenanceTasks ?? [],
+            rides: persisted.rides ?? [],
+            pendingRides: persisted.pendingRides ?? [],
+            fuelLogs: persisted.fuelLogs ?? [],
+            emergencyInfo: persisted.emergencyInfo?.id ? persisted.emergencyInfo : emptyEmergencyInfo,
+            referrals: persisted.referrals ?? [],
+            rideListings: persisted.rideListings ?? [],
+          };
+        }
+
+        return persistedState as LocalAppState;
+      },
     },
   ),
 );

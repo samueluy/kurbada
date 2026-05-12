@@ -1,34 +1,41 @@
-import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Pressable, ScrollView, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from "@expo/vector-icons";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useRef, useState } from "react";
+import { Animated, Pressable, ScrollView, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AppText } from '@/components/ui/app-text';
-import { Button } from '@/components/ui/button';
-import { KeyboardSheet } from '@/components/ui/keyboard-sheet';
-import { Colors, palette, radius } from '@/constants/theme';
-import { env } from '@/lib/env';
-import { normalizeReferralCode, validateReferralCode } from '@/lib/referrals';
+import { AppText } from "@/components/ui/app-text";
+import { Button } from "@/components/ui/button";
+import { KeyboardSheet } from "@/components/ui/keyboard-sheet";
+import { Colors, palette, radius } from "@/constants/theme";
+import { useAuth } from "@/hooks/use-auth";
+import { useReferralMutations } from "@/hooks/use-kurbada-data";
+import { useUserProfile } from "@/hooks/use-user-access";
+import { env } from "@/lib/env";
+import { normalizeReferralCode, validateReferralCode } from "@/lib/referrals";
 import {
+  canMakeRevenueCatPurchases,
   getCurrentOffering,
   getCurrentOfferingPackage,
   purchasePremium,
   restorePremiumPurchases,
   type RevenueCatPackage,
-} from '@/services/revenuecat';
-import { useAuth } from '@/hooks/use-auth';
-import { useReferralMutations } from '@/hooks/use-kurbada-data';
-import { useUserProfile } from '@/hooks/use-user-access';
-import { useAppStore } from '@/store/app-store';
-import { LinearGradient } from 'expo-linear-gradient';
+} from "@/services/revenuecat";
+import { useAppStore } from "@/store/app-store";
+import { LinearGradient } from "expo-linear-gradient";
 
 const features = [
-  ['Honest Ride Tracking', 'Route, speed, duration, fuel cost per run.'],
-  ['Emergency QR Lockscreen', 'Your blood type and contacts, scannable in seconds.'],
-  ['Shareable Ride Cards', 'Export polished ride graphics for TikTok and IG.'],
-  ['Maintenance Tracker', 'Service intervals and reminders, odometer-linked.'],
-  ['Lobby — Group Rides', 'Join or post group rides. Coordinate via Messenger.'],
+  ["Honest Ride Tracking", "Route, speed, duration, fuel cost per run."],
+  [
+    "Emergency QR Lockscreen",
+    "Your blood type and contacts, scannable in seconds.",
+  ],
+  ["Shareable Ride Cards", "Export polished ride graphics for TikTok and IG."],
+  ["Maintenance Tracker", "Service intervals and reminders, odometer-linked."],
+  [
+    "Lobby — Group Rides",
+    "Join or post group rides. Coordinate via Messenger.",
+  ],
 ];
 
 export default function PaywallScreen() {
@@ -38,34 +45,53 @@ export default function PaywallScreen() {
   const profile = useUserProfile(session?.user.id);
   const { applyReferralCode } = useReferralMutations(session?.user.id);
   const setOnboardingStep = useAppStore((state) => state.setOnboardingStep);
-  const setPurchaseCompleted = useAppStore((state) => state.setPurchaseCompleted);
+  const setPurchaseCompleted = useAppStore(
+    (state) => state.setPurchaseCompleted,
+  );
   const completeOnboarding = useAppStore((state) => state.completeOnboarding);
-  const hasCompletedOnboarding = useAppStore((state) => state.hasCompletedOnboarding);
+  const hasCompletedOnboarding = useAppStore(
+    (state) => state.hasCompletedOnboarding,
+  );
   const pendingReferralCode = useAppStore((state) => state.pendingReferralCode);
-  const setPendingReferralCode = useAppStore((state) => state.setPendingReferralCode);
-  const [showReferralSheet, setShowReferralSheet] = useState(Boolean(pendingReferralCode));
+  const setPendingReferralCode = useAppStore(
+    (state) => state.setPendingReferralCode,
+  );
+  const [showReferralSheet, setShowReferralSheet] = useState(
+    Boolean(pendingReferralCode),
+  );
   const [referralCode, setReferralCode] = useState(pendingReferralCode);
-  const [referralError, setReferralError] = useState('');
-  const [referralSuccess, setReferralSuccess] = useState('');
+  const [referralError, setReferralError] = useState("");
+  const [referralSuccess, setReferralSuccess] = useState("");
   const [isValidatingReferral, setIsValidatingReferral] = useState(false);
-  const [offeringPackage, setOfferingPackage] = useState<RevenueCatPackage | null>(null);
-  const [isLoadingOffering, setIsLoadingOffering] = useState(env.revenueCatEnabled);
-  const [purchaseError, setPurchaseError] = useState('');
+  const [offeringPackage, setOfferingPackage] =
+    useState<RevenueCatPackage | null>(null);
+  const [isLoadingOffering, setIsLoadingOffering] = useState(
+    env.revenueCatEnabled,
+  );
+  const [billingAvailable, setBillingAvailable] = useState(
+    !env.revenueCatEnabled,
+  );
+  const [purchaseError, setPurchaseError] = useState("");
   const [isPurchasing, setIsPurchasing] = useState(false);
-  const isOnboardingPaywall = params.context === 'onboarding';
+  const isOnboardingPaywall = params.context === "onboarding";
   const ctaScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (session && !hasCompletedOnboarding && !isOnboardingPaywall) {
       completeOnboarding();
     }
-  }, [session, hasCompletedOnboarding, isOnboardingPaywall, completeOnboarding]);
+  }, [
+    session,
+    hasCompletedOnboarding,
+    isOnboardingPaywall,
+    completeOnboarding,
+  ]);
 
   useEffect(() => {
     if (pendingReferralCode) {
       setReferralCode(pendingReferralCode);
       setShowReferralSheet(true);
-      setReferralSuccess('Referral code ready to apply.');
+      setReferralSuccess("Referral code ready to apply.");
     }
   }, [pendingReferralCode]);
 
@@ -79,9 +105,21 @@ export default function PaywallScreen() {
 
     const loadOffering = async () => {
       setIsLoadingOffering(true);
-      setPurchaseError('');
+      setPurchaseError("");
 
       try {
+        const canMakePurchases = await canMakeRevenueCatPurchases();
+        if (cancelled) return;
+
+        setBillingAvailable(canMakePurchases);
+        if (!canMakePurchases) {
+          setPurchaseError(
+            "Purchases aren't available on this device right now. Sign in if you already have access, or use a Play-enabled/App Store-capable device to subscribe.",
+          );
+          setOfferingPackage(null);
+          return;
+        }
+
         const [offering, selectedPackage] = await Promise.all([
           getCurrentOffering(true),
           getCurrentOfferingPackage(true),
@@ -90,11 +128,17 @@ export default function PaywallScreen() {
 
         setOfferingPackage(selectedPackage);
         if (!offering || !selectedPackage) {
-          setPurchaseError('No monthly Premium package is currently available in RevenueCat.');
+          setPurchaseError(
+            "No monthly Premium package is currently available in RevenueCat.",
+          );
         }
       } catch (error) {
         if (!cancelled) {
-          setPurchaseError(error instanceof Error ? error.message : 'Unable to load Premium offering.');
+          setPurchaseError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load Premium offering.",
+          );
         }
       } finally {
         if (!cancelled) {
@@ -111,14 +155,14 @@ export default function PaywallScreen() {
   }, []);
 
   const runPurchaseFlow = async () => {
-    setPurchaseError('');
+    setPurchaseError("");
     setIsPurchasing(true);
     try {
       const result = await purchasePremium();
       if (result.success) {
         setPurchaseCompleted(true);
-        setOnboardingStep(8);
-        router.replace('/(public)/success' as any);
+        setOnboardingStep(7);
+        router.replace("/(public)/success" as any);
         return;
       }
 
@@ -131,20 +175,20 @@ export default function PaywallScreen() {
   };
 
   const handleStartTrial = async () => {
-    setPurchaseError('');
+    setPurchaseError("");
 
     if (!session?.user.id && env.revenueCatEnabled) {
       if (referralCode.trim()) {
         setPendingReferralCode(normalizeReferralCode(referralCode));
       }
-      router.push('/(public)/auth/sign-up');
+      router.push("/(public)/auth/sign-up");
       return;
     }
 
     if (!env.revenueCatEnabled) {
       setPurchaseCompleted(true);
-      setOnboardingStep(8);
-      router.replace('/(public)/success' as any);
+      setOnboardingStep(7);
+      router.replace("/(public)/success" as any);
       return;
     }
 
@@ -153,11 +197,14 @@ export default function PaywallScreen() {
 
   const handleValidateReferral = async () => {
     setIsValidatingReferral(true);
-    setReferralError('');
-    setReferralSuccess('');
+    setReferralError("");
+    setReferralSuccess("");
 
     try {
-      const validation = await validateReferralCode(referralCode, session?.user.id);
+      const validation = await validateReferralCode(
+        referralCode,
+        session?.user.id,
+      );
 
       if (!validation.valid) {
         setReferralError(validation.reason);
@@ -171,12 +218,20 @@ export default function PaywallScreen() {
           code: validation.normalizedCode,
           referredDisplayName: profile.data?.display_name,
         });
-        setReferralSuccess(`${validation.referrer.display_name}'s code is locked in.`);
+        setReferralSuccess(
+          `${validation.referrer.display_name}'s code is locked in.`,
+        );
       } else {
-        setReferralSuccess(`${validation.referrer.display_name}'s code will be applied after you create your account.`);
+        setReferralSuccess(
+          `${validation.referrer.display_name}'s code will be applied after you create your account.`,
+        );
       }
     } catch (error) {
-      setReferralError(error instanceof Error ? error.message : 'Unable to validate that referral code.');
+      setReferralError(
+        error instanceof Error
+          ? error.message
+          : "Unable to validate that referral code.",
+      );
     } finally {
       setIsValidatingReferral(false);
     }
@@ -186,22 +241,24 @@ export default function PaywallScreen() {
     const result = await restorePremiumPurchases();
     if (result.success && result.hasPremium) {
       setPurchaseCompleted(true);
-      setOnboardingStep(8);
-      router.replace('/(public)/success' as any);
+      setOnboardingStep(7);
+      router.replace("/(public)/success" as any);
     } else if (!result.success) {
       setPurchaseError(result.reason);
     }
   };
 
   const buttonTitle = isPurchasing
-    ? 'Opening payment sheet…'
+    ? "Opening payment sheet…"
     : env.revenueCatEnabled
       ? session?.user.id
-        ? 'Start 7-Day Free Trial'
-        : 'Create Account to Start Trial'
-      : 'Continue (Dev Build)';
+        ? billingAvailable
+          ? "Start 7-Day Free Trial"
+          : "Purchases Unavailable"
+        : "Create Account to Start Trial"
+      : "Continue (Dev Build)";
 
-  const priceValue = offeringPackage?.packageType === 'ANNUAL' ? '₱590' : '₱59';
+  const priceValue = offeringPackage?.packageType === "ANNUAL" ? "₱590" : "₱59";
 
   return (
     <View style={{ flex: 1, backgroundColor: Colors.bg }}>
@@ -211,7 +268,13 @@ export default function PaywallScreen() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ flexGrow: 1 }}
       >
-        <View style={{ flex: 1, justifyContent: 'space-between', backgroundColor: Colors.bg }}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "space-between",
+            backgroundColor: Colors.bg,
+          }}
+        >
           <View>
             <View
               style={{
@@ -222,25 +285,47 @@ export default function PaywallScreen() {
               }}
             >
               {isOnboardingPaywall ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 18,
+                  }}
+                >
                   <Pressable
                     onPress={() => {
-                      setOnboardingStep(6);
-                      router.replace('/(public)/permissions' as any);
+                      setOnboardingStep(5);
+                      if (router.canGoBack()) {
+                        router.back();
+                        return;
+                      }
+                      router.replace("/(public)/permissions" as any);
                     }}
                     hitSlop={12}
                     style={{ padding: 4 }}
                   >
                     <Ionicons name="arrow-back" size={20} color={Colors.t2} />
                   </Pressable>
-                  <AppText variant="label" style={{ color: Colors.t3, fontSize: 10, letterSpacing: 2 }}>
-                    STEP 7 OF 7
+                  <AppText
+                    variant="label"
+                    style={{ color: Colors.t3, fontSize: 10, letterSpacing: 2 }}
+                  >
+                    STEP 6 OF 6
                   </AppText>
                   <View style={{ width: 28 }} />
                 </View>
               ) : null}
 
-              <AppText variant="label" style={{ color: Colors.t3, fontSize: 10, letterSpacing: 2, marginBottom: 10 }}>
+              <AppText
+                variant="label"
+                style={{
+                  color: Colors.t3,
+                  fontSize: 10,
+                  letterSpacing: 2,
+                  marginBottom: 10,
+                }}
+              >
                 KURBADA PREMIUM
               </AppText>
 
@@ -254,41 +339,63 @@ export default function PaywallScreen() {
                   marginBottom: 20,
                 }}
               >
-                UNLOCK THE{'\n'}FULL RIDE.
+                UNLOCK THE{"\n"}FULL RIDE.
               </AppText>
 
-              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "flex-end",
+                  gap: 10,
+                }}
+              >
                 <View
                   style={{
                     backgroundColor: Colors.red,
                     borderRadius: 10,
                     paddingHorizontal: 14,
                     paddingVertical: 8,
-                    flexDirection: 'row',
-                    alignItems: 'flex-end',
+                    flexDirection: "row",
+                    alignItems: "flex-end",
                     gap: 3,
                   }}
                 >
-                  <AppText variant="bodyBold" style={{ fontSize: 28, lineHeight: 30, color: '#FFFFFF' }}>
+                  <AppText
+                    variant="bodyBold"
+                    style={{ fontSize: 28, lineHeight: 30, color: "#FFFFFF" }}
+                  >
                     {priceValue}
                   </AppText>
-                  <AppText variant="meta" style={{ fontSize: 12, lineHeight: 16, color: 'rgba(255,255,255,0.65)' }}>
-                    /buwan
+                  <AppText
+                    variant="meta"
+                    style={{
+                      fontSize: 12,
+                      lineHeight: 16,
+                      color: "rgba(255,255,255,0.65)",
+                    }}
+                  >
+                    /month
                   </AppText>
                 </View>
 
                 <View style={{ gap: 2, paddingBottom: 2 }}>
-                  <AppText variant="bodyBold" style={{ fontSize: 12, color: Colors.t2 }}>
+                  <AppText
+                    variant="bodyBold"
+                    style={{ fontSize: 12, color: Colors.t2 }}
+                  >
                     7-day free trial
                   </AppText>
-                  <AppText variant="meta" style={{ fontSize: 11, color: Colors.t3 }}>
+                  <AppText
+                    variant="meta"
+                    style={{ fontSize: 11, color: Colors.t3 }}
+                  >
                     Cancel anytime
                   </AppText>
                 </View>
               </View>
 
               <LinearGradient
-                colors={[Colors.red, 'rgba(192,57,43,0)']}
+                colors={[Colors.red, "rgba(192,57,43,0)"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={{ width: 80, height: 1, marginTop: 20 }}
@@ -302,7 +409,7 @@ export default function PaywallScreen() {
                 marginHorizontal: 16,
                 borderWidth: 0.5,
                 borderColor: Colors.border,
-                overflow: 'hidden',
+                overflow: "hidden",
                 marginBottom: 16,
               }}
             >
@@ -314,8 +421,8 @@ export default function PaywallScreen() {
                     paddingHorizontal: 18,
                     borderBottomWidth: index === features.length - 1 ? 0 : 0.5,
                     borderBottomColor: Colors.border,
-                    flexDirection: 'row',
-                    alignItems: 'flex-start',
+                    flexDirection: "row",
+                    alignItems: "flex-start",
                     gap: 12,
                   }}
                 >
@@ -327,18 +434,24 @@ export default function PaywallScreen() {
                       backgroundColor: Colors.redDim,
                       borderWidth: 0.5,
                       borderColor: Colors.redBorder,
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      alignItems: "center",
+                      justifyContent: "center",
                       marginTop: 1,
                     }}
                   >
                     <Ionicons name="checkmark" size={10} color={Colors.red} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <AppText variant="bodyBold" style={{ fontSize: 14, color: Colors.t1 }}>
+                    <AppText
+                      variant="bodyBold"
+                      style={{ fontSize: 14, color: Colors.t1 }}
+                    >
                       {title}
                     </AppText>
-                    <AppText variant="meta" style={{ fontSize: 12, color: Colors.t3, marginTop: 2 }}>
+                    <AppText
+                      variant="meta"
+                      style={{ fontSize: 12, color: Colors.t3, marginTop: 2 }}
+                    >
                       {subtitle}
                     </AppText>
                   </View>
@@ -348,36 +461,46 @@ export default function PaywallScreen() {
 
             <Pressable
               onPress={() => setShowReferralSheet(true)}
-              style={{ alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, marginBottom: 20 }}
+              style={{
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "row",
+                gap: 6,
+                marginBottom: 20,
+              }}
             >
               <Ionicons name="gift-outline" size={13} color={Colors.t3} />
-              <AppText variant="meta" style={{ fontSize: 13, color: Colors.t3, textAlign: 'center' }}>
+              <AppText
+                variant="meta"
+                style={{ fontSize: 13, color: Colors.t3, textAlign: "center" }}
+              >
                 Have a referral code?
               </AppText>
             </Pressable>
 
-            {isLoadingOffering ? (
-              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-                <ActivityIndicator size="small" color={palette.textSecondary} />
-                <AppText variant="meta" style={{ color: palette.textSecondary }}>
-                  Loading RevenueCat offering…
-                </AppText>
-              </View>
-            ) : null}
-
             {purchaseError ? (
               <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
-                <AppText variant="meta" style={{ color: palette.danger, textAlign: 'center' }}>
+                <AppText
+                  variant="meta"
+                  style={{ color: palette.danger, textAlign: "center" }}
+                >
                   {purchaseError}
                 </AppText>
               </View>
             ) : null}
           </View>
 
-          <View style={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 16 }}>
+          <View
+            style={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 16 }}
+          >
             <Animated.View style={{ transform: [{ scale: ctaScale }] }}>
               <Pressable
-                disabled={isPurchasing || (env.revenueCatEnabled && Boolean(session?.user.id) && (isLoadingOffering || !offeringPackage))}
+                disabled={
+                  isPurchasing ||
+                  (env.revenueCatEnabled &&
+                    Boolean(session?.user.id) &&
+                    (isLoadingOffering || !offeringPackage || !billingAvailable))
+                }
                 onPress={handleStartTrial}
                 onPressIn={() => {
                   Animated.timing(ctaScale, {
@@ -398,9 +521,15 @@ export default function PaywallScreen() {
                   height: 56,
                   backgroundColor: Colors.red,
                   borderRadius: 16,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: isPurchasing || (env.revenueCatEnabled && Boolean(session?.user.id) && (isLoadingOffering || !offeringPackage)) ? 0.55 : 1,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  opacity:
+                    isPurchasing ||
+                    (env.revenueCatEnabled &&
+                      Boolean(session?.user.id) &&
+                      (isLoadingOffering || !offeringPackage || !billingAvailable))
+                      ? 0.55
+                      : 1,
                   shadowColor: Colors.red,
                   shadowOffset: { width: 0, height: 6 },
                   shadowOpacity: 0.35,
@@ -408,28 +537,69 @@ export default function PaywallScreen() {
                   elevation: 8,
                 }}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                  <AppText variant="bodyBold" style={{ fontSize: 16, color: '#FFFFFF' }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <AppText
+                    variant="bodyBold"
+                    style={{ fontSize: 16, color: "#FFFFFF" }}
+                  >
                     {buttonTitle}
                   </AppText>
-                  <Ionicons name="arrow-forward" size={16} color="#FFFFFF" style={{ marginLeft: 6 }} />
+                  <Ionicons
+                    name="arrow-forward"
+                    size={16}
+                    color="#FFFFFF"
+                    style={{ marginLeft: 6 }}
+                  />
                 </View>
               </Pressable>
             </Animated.View>
 
-            <View style={{ marginTop: 14, marginBottom: insets.bottom + 16, alignItems: 'center', gap: 10 }}>
-              <Pressable onPress={handleRestore} style={{ paddingVertical: 8, paddingHorizontal: 12 }}>
-                <AppText variant="bodyBold" style={{ fontSize: 13, color: Colors.t3 }}>
+            <View
+              style={{
+                marginTop: 14,
+                marginBottom: insets.bottom + 16,
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <Pressable
+                onPress={handleRestore}
+                style={{ paddingVertical: 8, paddingHorizontal: 12 }}
+              >
+                <AppText
+                  variant="bodyBold"
+                  style={{ fontSize: 13, color: Colors.t3 }}
+                >
                   Restore Purchase
                 </AppText>
               </Pressable>
+
+              {!session?.user.id ? (
+                <Pressable
+                  onPress={() => router.push('/(public)/auth/sign-in')}
+                  style={{ paddingVertical: 8, paddingHorizontal: 12 }}
+                >
+                  <AppText
+                    variant="bodyBold"
+                    style={{ fontSize: 13, color: Colors.t3 }}
+                  >
+                    Already have an account? Sign in
+                  </AppText>
+                </Pressable>
+              ) : null}
 
               <AppText
                 variant="meta"
                 style={{
                   fontSize: 11,
                   color: Colors.t3,
-                  textAlign: 'center',
+                  textAlign: "center",
                   paddingHorizontal: 32,
                   opacity: 0.6,
                 }}
@@ -451,8 +621,8 @@ export default function PaywallScreen() {
           value={referralCode}
           onChangeText={(value) => {
             setReferralCode(value.toUpperCase());
-            setReferralError('');
-            setReferralSuccess('');
+            setReferralError("");
+            setReferralSuccess("");
           }}
           placeholder="MARK450SR"
           placeholderTextColor={palette.textSecondary}
@@ -465,14 +635,14 @@ export default function PaywallScreen() {
             paddingHorizontal: 16,
             borderWidth: 0.5,
             borderColor: referralError ? palette.danger : palette.border,
-            backgroundColor: 'rgba(255,255,255,0.06)',
+            backgroundColor: "rgba(255,255,255,0.06)",
             color: palette.text,
-            fontFamily: 'DMSans_400Regular',
+            fontFamily: "DMSans_400Regular",
             fontSize: 15,
           }}
         />
         <Button
-          title={isValidatingReferral ? 'Checking...' : 'Validate Referral'}
+          title={isValidatingReferral ? "Checking..." : "Validate Referral"}
           variant="secondary"
           disabled={isValidatingReferral}
           onPress={handleValidateReferral}
@@ -483,8 +653,12 @@ export default function PaywallScreen() {
           </AppText>
         ) : null}
         {referralSuccess ? (
-          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-            <Ionicons name="checkmark-circle" size={16} color={palette.success} />
+          <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+            <Ionicons
+              name="checkmark-circle"
+              size={16}
+              color={palette.success}
+            />
             <AppText variant="meta" style={{ color: palette.success, flex: 1 }}>
               {referralSuccess}
             </AppText>

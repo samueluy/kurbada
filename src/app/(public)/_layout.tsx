@@ -9,7 +9,6 @@ export default function PublicLayout() {
         headerShown: false,
         contentStyle: { backgroundColor: palette.background },
         gestureEnabled: true,
-        fullScreenGestureEnabled: true,
         gestureDirection: 'horizontal',
       }}
     />

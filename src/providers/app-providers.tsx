@@ -21,11 +21,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppText } from '@/components/ui/app-text';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { palette } from '@/constants/theme';
+import { useAuth, AuthProvider } from '@/hooks/use-auth';
 import { env } from '@/lib/env';
 import { getMapboxModule } from '@/lib/mapbox';
 import { queryClient } from '@/lib/query-client';
 import { initializeRidePointStorage } from '@/lib/ride-point-storage';
-import { supabase } from '@/lib/supabase';
 import { OnboardingSyncBridge } from '@/providers/onboarding-sync-bridge';
 import { DailySummaryBridge } from '@/providers/daily-summary-bridge';
 import { PendingRideSyncBridge } from '@/providers/pending-ride-sync-bridge';
@@ -41,6 +41,16 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
+
+function RevenueCatIdentityBridge() {
+  const { session } = useAuth();
+
+  useEffect(() => {
+    void syncRevenueCatIdentity(session?.user.id ?? null);
+  }, [session?.user.id]);
+
+  return null;
+}
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   const [fontsLoaded] = useFonts({
@@ -78,23 +88,8 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
 
     void initializeRidePointStorage();
 
-    if (!supabase) {
-      return () => {
-        unsubscribeCustomerInfo();
-      };
-    }
-
-    supabase.auth.getSession().then(({ data }) => {
-      void syncRevenueCatIdentity(data.session?.user.id ?? null);
-    });
-
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      void syncRevenueCatIdentity(session?.user.id ?? null);
-    });
-
     return () => {
       unsubscribeCustomerInfo();
-      data.subscription.unsubscribe();
     };
   }, []);
 
@@ -124,15 +119,18 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
-          <BottomSheetModalProvider>
-            <StatusBar style="light" translucent backgroundColor="transparent" />
-            <ErrorBoundary>
-              <OnboardingSyncBridge />
-              <DailySummaryBridge />
-              <PendingRideSyncBridge />
-              {children}
-            </ErrorBoundary>
-          </BottomSheetModalProvider>
+          <AuthProvider>
+            <BottomSheetModalProvider>
+              <StatusBar style="light" translucent backgroundColor="transparent" />
+              <ErrorBoundary>
+                <RevenueCatIdentityBridge />
+                <OnboardingSyncBridge />
+                <DailySummaryBridge />
+                <PendingRideSyncBridge />
+                {children}
+              </ErrorBoundary>
+            </BottomSheetModalProvider>
+          </AuthProvider>
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
