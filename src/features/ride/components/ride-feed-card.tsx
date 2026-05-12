@@ -8,7 +8,7 @@ import { RideMapThumbnail } from '@/components/ride/ride-map-thumbnail';
 import { MoodBadge } from '@/features/ride/components/mood-badge';
 import { formatDateLabel } from '@/lib/format';
 import { palette } from '@/constants/theme';
-import type { RideRecord } from '@/types/domain';
+import type { RideFeedRecord, RideRecord } from '@/types/domain';
 
 function RideFeedCardImpl({
   ride,
@@ -16,7 +16,7 @@ function RideFeedCardImpl({
   onPress,
   onShare,
 }: {
-  ride: RideRecord;
+  ride: RideRecord | RideFeedRecord;
   bikeLabel?: string;
   onPress?: () => void;
   onShare?: () => void;

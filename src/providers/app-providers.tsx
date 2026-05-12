@@ -24,6 +24,7 @@ import { palette } from '@/constants/theme';
 import { env } from '@/lib/env';
 import { getMapboxModule } from '@/lib/mapbox';
 import { queryClient } from '@/lib/query-client';
+import { initializeRidePointStorage } from '@/lib/ride-point-storage';
 import { supabase } from '@/lib/supabase';
 import { OnboardingSyncBridge } from '@/providers/onboarding-sync-bridge';
 import { DailySummaryBridge } from '@/providers/daily-summary-bridge';
@@ -74,6 +75,8 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         Mapbox?.setAccessToken(env.mapboxToken);
       }
     }
+
+    void initializeRidePointStorage();
 
     if (!supabase) {
       return () => {

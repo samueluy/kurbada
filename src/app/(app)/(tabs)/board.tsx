@@ -16,7 +16,7 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { Colors, palette, radius } from '@/constants/theme';
 import { RideListingCard } from '@/features/board/components/ride-listing-card';
 import { useAuth } from '@/hooks/use-auth';
-import { useBoardMutations, useRideListings, useRsvpMutations, useRideListingRsvps } from '@/hooks/use-kurbada-data';
+import { useBoardFeed, useBoardMutations, useRsvpMutations, useRideListingRsvps } from '@/hooks/use-kurbada-data';
 import { useBlockedUsersStore } from '@/store/blocked-users-store';
 import { useAppStore } from '@/store/app-store';
 import type { RideListing } from '@/types/domain';
@@ -252,7 +252,7 @@ function JoinLobbySheet({
 export default function BoardTabScreen() {
   const { session } = useAuth();
   const insets = useSafeAreaInsets();
-  const listings = useRideListings(session?.user.id);
+  const listings = useBoardFeed(session?.user.id);
   const { deleteRideListing, reportRideListing } = useBoardMutations(session?.user.id);
   const [selectedListing, setSelectedListing] = useState<RideListing | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);

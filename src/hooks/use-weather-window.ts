@@ -1,10 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import * as Location from 'expo-location';
-import { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
 
-const DEFAULT_LAT = 14.5995;
-const DEFAULT_LNG = 120.9842;
+import { useCachedLocation } from '@/hooks/use-cached-location';
+
 const CLEAR_PRECIP_THRESHOLD = 30; // percent
 const WEATHER_CODE_BAD_MIN = 51; // drizzle and up
 
@@ -23,14 +20,6 @@ export type RideWindow = {
   startLabel: string; // "Tue 5 AM"
   endLabel: string; // "7 AM"
 };
-
-function isValidCoords(lat: number, lng: number) {
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
-  if (lat === 0 && lng === 0) return false;
-  if (lat < -90 || lat > 90) return false;
-  if (lng < -180 || lng > 180) return false;
-  return true;
-}
 
 async function fetchHourly(lat: number, lng: number): Promise<HourlyForecast[]> {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=precipitation_probability,weather_code,temperature_2m&timezone=${encodeURIComponent('Asia/Manila')}&forecast_days=2`;
@@ -65,10 +54,6 @@ function formatHourLabel(d: Date, includeDay = false) {
   return includeDay ? `${day} ${h12} ${ampm}` : `${h12} ${ampm}`;
 }
 
-/**
- * Finds the earliest upcoming 2+ hour window where the weather is "clear"
- * (low precipitation probability and benign weather code).
- */
 export function findNextRideWindow(forecast: HourlyForecast[]): RideWindow | null {
   let windowStart: HourlyForecast | null = null;
   let runLength = 0;
@@ -81,7 +66,6 @@ export function findNextRideWindow(forecast: HourlyForecast[]): RideWindow | nul
       if (runLength >= 2) {
         const start = new Date(windowStart.time);
         const endHour = forecast[i];
-        // End time = the end of the last clear hour slot
         const end = new Date(new Date(endHour.time).getTime() + 60 * 60 * 1000);
         return {
           startIso: start.toISOString(),
@@ -101,35 +85,13 @@ export function findNextRideWindow(forecast: HourlyForecast[]): RideWindow | nul
 }
 
 export function useWeatherWindow() {
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const location = useCachedLocation();
 
-  useEffect(() => {
-    if (Platform.OS === 'web') {
-      setCoords({ lat: DEFAULT_LAT, lng: DEFAULT_LNG });
-      return;
-    }
-
-    let cancelled = false;
-    Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low })
-      .then((pos) => {
-        if (cancelled) return;
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        setCoords(isValidCoords(lat, lng) ? { lat, lng } : { lat: DEFAULT_LAT, lng: DEFAULT_LNG });
-      })
-      .catch(() => {
-        if (!cancelled) setCoords({ lat: DEFAULT_LAT, lng: DEFAULT_LNG });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const query = useQuery({
-    queryKey: ['weather-window', coords?.lat, coords?.lng],
-    enabled: Boolean(coords),
+  return useQuery({
+    queryKey: ['weather-window', location.data?.lat, location.data?.lng],
+    enabled: Boolean(location.data),
     queryFn: async () => {
-      const forecast = await fetchHourly(coords!.lat, coords!.lng);
+      const forecast = await fetchHourly(location.data!.lat, location.data!.lng);
       return {
         forecast,
         window: findNextRideWindow(forecast),
@@ -139,6 +101,4 @@ export function useWeatherWindow() {
     refetchInterval: 60 * 60 * 1000,
     retry: 2,
   });
-
-  return query;
 }

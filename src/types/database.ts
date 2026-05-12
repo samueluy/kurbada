@@ -105,6 +105,7 @@ export type Database = {
           max_lean_angle_deg: number | null;
           fuel_used_liters: number | null;
           route_geojson: Json;
+          route_preview_geojson: Json;
           route_point_count_raw: number;
           route_point_count_simplified: number;
           route_bounds: Json;
@@ -169,6 +170,80 @@ export type Database = {
           is_reported?: boolean;
         };
         Update: Partial<Database['public']['Tables']['ride_listings']['Insert']>;
+      };
+    };
+    Views: {
+      ride_listings_feed: {
+        Row: {
+          id: string;
+          host_user_id: string;
+          title: string | null;
+          meetup_point: string;
+          meetup_coordinates: Json | null;
+          destination: string;
+          ride_date: string;
+          pace: 'chill' | 'moderate' | 'sporty';
+          lobby_platform: 'messenger' | 'telegram' | 'none';
+          lobby_link: string | null;
+          is_reported: boolean;
+          display_name: string;
+          created_at: string;
+          city: string | null;
+          photo_urls: string[] | null;
+          report_count: number;
+          is_hidden: boolean;
+          is_verified_host: boolean;
+          rsvp_going_count: number;
+          rsvp_maybe_count: number;
+        };
+      };
+    };
+    Functions: {
+      ride_dashboard_metrics: {
+        Args: { p_user_id?: string };
+        Returns: {
+          latest_ride_id: string | null;
+          latest_ride_distance_km: number;
+          latest_ride_max_speed_kmh: number;
+          latest_ride_fuel_used_liters: number;
+          latest_ride_started_at: string | null;
+          latest_fuel_price: number;
+          today_earnings: number;
+          today_fuel_cost: number;
+          today_trip_count: number;
+          month_distance_km: number;
+          month_fuel_cost: number;
+          month_maintenance_accrual: number;
+          month_total_cost: number;
+          month_cost_per_km: number;
+        }[];
+      };
+      leaderboard_weekly_km: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          user_id: string;
+          display_name: string;
+          total_km: number;
+          rank: number;
+        }[];
+      };
+      user_maintenance_overview: {
+        Args: { p_user_id?: string };
+        Returns: {
+          id: string;
+          bike_id: string;
+          task_name: string;
+          cost: number | null;
+          interval_km: number;
+          interval_days: number | null;
+          last_done_odometer_km: number;
+          last_done_date: string;
+          bike_make: string;
+          bike_model: string;
+          bike_nickname: string | null;
+          current_odometer_km: number;
+          bike_created_at: string;
+        }[];
       };
     };
   };

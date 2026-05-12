@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import type { RidePoint, RideSessionState } from '@/types/domain';
+import type { RideSessionState } from '@/types/domain';
 
 export type DashboardView = 'speed' | 'distance' | 'economy';
 
@@ -20,8 +20,6 @@ export type TelemetrySnapshot = {
 type RideStore = {
   state: RideSessionState;
   bikeId?: string;
-  points: RidePoint[];
-  foregroundPoints: RidePoint[];
   startedAt?: number;
   telemetry: TelemetrySnapshot;
   crashCountdown: number | null;
@@ -30,9 +28,6 @@ type RideStore = {
   fuelRateKmPerLiter: number;
   setState: (state: RideSessionState) => void;
   setBikeId: (bikeId?: string) => void;
-  appendPoint: (point: RidePoint) => void;
-  appendForegroundPoint: (point: RidePoint) => void;
-  getAllPoints: () => RidePoint[];
   resetRide: () => void;
   setStartedAt: (startedAt?: number) => void;
   setCrashCountdown: (value: number | null) => void;
@@ -55,11 +50,9 @@ const initialTelemetry: TelemetrySnapshot = {
   heading: 0,
 };
 
-export const useRideStore = create<RideStore>((set, get) => ({
+export const useRideStore = create<RideStore>((set) => ({
   state: 'idle',
   bikeId: undefined,
-  points: [],
-  foregroundPoints: [],
   startedAt: undefined,
   telemetry: initialTelemetry,
   crashCountdown: null,
@@ -68,13 +61,6 @@ export const useRideStore = create<RideStore>((set, get) => ({
   fuelRateKmPerLiter: 28,
   setState: (state) => set({ state }),
   setBikeId: (bikeId) => set({ bikeId }),
-  appendPoint: (point) => set((store) => ({ points: [...store.points, point] })),
-  appendForegroundPoint: (point) => set((store) => ({ foregroundPoints: [...store.foregroundPoints, point] })),
-  getAllPoints: () => {
-    const state = get();
-    const all = [...state.foregroundPoints, ...state.points].sort((a, b) => a.timestamp - b.timestamp);
-    return all.filter((p, i, arr) => i === 0 || p.timestamp !== arr[i - 1].timestamp);
-  },
   setStartedAt: (startedAt) => set({ startedAt }),
   setCrashCountdown: (crashCountdown) => set({ crashCountdown }),
   setFatiguePromptShown: (fatiguePromptShown) => set({ fatiguePromptShown }),
@@ -88,8 +74,6 @@ export const useRideStore = create<RideStore>((set, get) => ({
     set({
       state: 'idle',
       bikeId: undefined,
-      points: [],
-      foregroundPoints: [],
       startedAt: undefined,
       telemetry: initialTelemetry,
       crashCountdown: null,

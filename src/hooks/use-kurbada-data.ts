@@ -15,7 +15,29 @@ import { queryClient } from '@/lib/query-client';
 import { useAppStore } from '@/store/app-store';
 import { useLocalAppStore } from '@/store/local-app-store';
 import { useBlockedUsersStore } from '@/store/blocked-users-store';
-import type { Bike, EmergencyInfo, FuelLog, MaintenancePresetKey, MaintenanceTask, Profile, ReferralRecord, RideListing, RideRecord } from '@/types/domain';
+import type {
+  Bike,
+  EmergencyInfo,
+  FuelLog,
+  MaintenancePresetKey,
+  MaintenanceTask,
+  Profile,
+  ReferralRecord,
+  RideDashboardMetrics,
+  RideFeedRecord,
+  RideListing,
+  RideListingFeedRow,
+  RideRecord,
+} from '@/types/domain';
+
+const EMPTY_ROUTE_GEOJSON: GeoJSON.Feature<GeoJSON.LineString> = {
+  type: 'Feature',
+  properties: {},
+  geometry: {
+    type: 'LineString',
+    coordinates: [],
+  },
+};
 
 function toMaintenanceTemplates(keys: MaintenancePresetKey[], category: Bike['category']) {
   const fallbackKeys = keys.length ? keys : getDefaultMaintenancePresets(category);
@@ -143,6 +165,38 @@ function cleanDraftValue(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function toRouteFeature(value: unknown) {
+  if (
+    value
+    && typeof value === 'object'
+    && (value as GeoJSON.Feature<GeoJSON.LineString>).type === 'Feature'
+    && (value as GeoJSON.Feature<GeoJSON.LineString>).geometry?.type === 'LineString'
+  ) {
+    return value as GeoJSON.Feature<GeoJSON.LineString>;
+  }
+
+  return EMPTY_ROUTE_GEOJSON;
+}
+
+function toRideFeedRecord(record: RideRecord): RideFeedRecord {
+  return {
+    id: record.id,
+    bike_id: record.bike_id,
+    mode: record.mode,
+    started_at: record.started_at,
+    ended_at: record.ended_at,
+    distance_km: record.distance_km,
+    max_speed_kmh: record.max_speed_kmh,
+    avg_speed_kmh: record.avg_speed_kmh,
+    fuel_used_liters: record.fuel_used_liters,
+    elevation_gain_m: record.elevation_gain_m,
+    mood: record.mood,
+    route_bounds: record.route_bounds,
+    sync_status: record.sync_status,
+    route_preview_geojson: record.route_preview_geojson ?? record.route_geojson,
+  };
+}
+
 export function useBikes(userId?: string) {
   const localBikes = useLocalAppStore((state) => state.bikes);
   const useRemote = useRemoteMode(userId);
@@ -222,6 +276,104 @@ export function useRides(userId?: string) {
 
   if (!useRemote) {
     return { data: mergeRides(localRides), isLoading: false, error: null, isFetching: false };
+  }
+
+  return query;
+}
+
+export function useRecentRideFeed(userId?: string, limit = 12) {
+  const localRides = useLocalAppStore((state) => state.rides);
+  const pendingRides = useLocalAppStore((state) => state.pendingRides);
+  const useRemote = useRemoteMode(userId);
+
+  const mergeFeed = (rides: RideRecord[]) => {
+    const merged = new Map<string, RideFeedRecord>();
+
+    rides.forEach((ride) => {
+      merged.set(ride.id, toRideFeedRecord({ ...ride, sync_status: ride.sync_status ?? 'synced' }));
+    });
+
+    pendingRides.forEach((ride) => {
+      merged.set(ride.id, toRideFeedRecord({ ...ride, sync_status: 'pending' }));
+    });
+
+    return Array.from(merged.values())
+      .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())
+      .slice(0, limit);
+  };
+
+  const query = useQuery({
+    queryKey: ['rides-feed', userId ?? 'local', limit],
+    enabled: useRemote,
+    queryFn: async () => {
+      if (!supabase || !userId) return mergeFeed(localRides);
+      const { data, error } = await supabase
+        .from('rides')
+        .select('id, bike_id, mode, started_at, ended_at, distance_km, max_speed_kmh, avg_speed_kmh, fuel_used_liters, elevation_gain_m, mood, route_preview_geojson, route_bounds')
+        .eq('user_id', userId)
+        .order('started_at', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+
+      const remote = ((data ?? []) as any[]).map((ride) => ({
+        ...ride,
+        route_preview_geojson: toRouteFeature(ride.route_preview_geojson),
+        route_bounds: ride.route_bounds,
+        sync_status: 'synced' as const,
+      })) as RideFeedRecord[];
+
+      const merged = new Map<string, RideFeedRecord>(remote.map((ride) => [ride.id, ride]));
+      pendingRides.forEach((ride) => {
+        merged.set(ride.id, toRideFeedRecord({ ...ride, sync_status: 'pending' }));
+      });
+
+      return Array.from(merged.values())
+        .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())
+        .slice(0, limit);
+    },
+  });
+
+  if (!useRemote) {
+    return { data: mergeFeed(localRides), isLoading: false, error: null, isFetching: false };
+  }
+
+  return query;
+}
+
+export function useRideDetails(rideId?: string, userId?: string) {
+  const localRides = useLocalAppStore((state) => state.rides);
+  const pendingRides = useLocalAppStore((state) => state.pendingRides);
+  const useRemote = useRemoteMode(userId) && Boolean(rideId);
+  const localRide = [...pendingRides, ...localRides].find((ride) => ride.id === rideId) ?? null;
+
+  const query = useQuery({
+    queryKey: ['ride-details', userId ?? 'local', rideId ?? 'none'],
+    enabled: useRemote,
+    queryFn: async () => {
+      if (!supabase || !userId || !rideId) {
+        return localRide;
+      }
+
+      const { data, error } = await supabase
+        .from('rides')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('id', rideId)
+        .single();
+      if (error) throw error;
+
+      const row = data as any;
+      return {
+        ...row,
+        route_geojson: toRouteFeature(row.route_geojson),
+        route_preview_geojson: toRouteFeature(row.route_preview_geojson ?? row.route_geojson),
+      } as RideRecord;
+    },
+    initialData: localRide,
+  });
+
+  if (!useRemote) {
+    return { data: localRide, isLoading: false, error: null, isFetching: false };
   }
 
   return query;
@@ -479,6 +631,8 @@ export function useBikeMutations(userId?: string) {
     onSuccess: async (bike) => {
       await queryClient.invalidateQueries({ queryKey: ['bikes', userId ?? 'local'] });
       await queryClient.invalidateQueries({ queryKey: ['maintenance', bike.id] });
+      await queryClient.invalidateQueries({ queryKey: ['maintenance-overview', userId ?? 'local'] });
+      await queryClient.invalidateQueries({ queryKey: ['ride-dashboard-metrics', userId ?? 'local'] });
     },
   });
 
@@ -497,6 +651,8 @@ export function useBikeMutations(userId?: string) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['bikes', userId ?? 'local'] });
+      await queryClient.invalidateQueries({ queryKey: ['maintenance-overview', userId ?? 'local'] });
+      await queryClient.invalidateQueries({ queryKey: ['ride-dashboard-metrics', userId ?? 'local'] });
     },
   });
 
@@ -518,6 +674,14 @@ export function useRideMutations(userId?: string) {
         (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime(),
       );
     });
+    queryClient.setQueryData<RideFeedRecord[]>(['rides-feed', userId ?? 'local', 12], (current = []) => {
+      const next = new Map(current.map((item) => [item.id, item]));
+      next.set(ride.id, toRideFeedRecord(ride));
+      return Array.from(next.values())
+        .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())
+        .slice(0, 12);
+    });
+    queryClient.setQueryData(['ride-details', userId ?? 'local', ride.id], ride);
   };
 
   const saveRide = useMutation({
@@ -542,6 +706,7 @@ export function useRideMutations(userId?: string) {
           elevation_gain_m: ride.elevation_gain_m ?? null,
           mood: ride.mood ?? null,
           route_geojson: ride.route_geojson,
+          route_preview_geojson: ride.route_preview_geojson ?? ride.route_geojson,
           route_point_count_raw: ride.route_point_count_raw,
           route_point_count_simplified: ride.route_point_count_simplified,
           route_bounds: ride.route_bounds,
@@ -566,8 +731,19 @@ export function useRideMutations(userId?: string) {
 
       return localRide;
     },
-    onSuccess: async () => {
+    onSuccess: async (ride) => {
+      queryClient.setQueryData<RideFeedRecord[]>(['rides-feed', userId ?? 'local', 12], (current = []) => (
+        current.map((item) => (
+          item.id === ride.id
+            ? { ...item, mood: ride.mood }
+            : item
+        ))
+      ));
+      queryClient.setQueryData<RideRecord | null>(['ride-details', userId ?? 'local', ride.id], (current) => (
+        current ? { ...current, mood: ride.mood } : current
+      ));
       await queryClient.invalidateQueries({ queryKey: ['rides', userId ?? 'local'] });
+      await queryClient.invalidateQueries({ queryKey: ['ride-dashboard-metrics', userId ?? 'local'] });
     },
   });
 
@@ -595,14 +771,27 @@ export function useRideMutations(userId?: string) {
       }
       return { id: rideId, mood } as unknown as RideRecord;
     },
-    onSuccess: async () => {
+    onSuccess: async (ride) => {
+      queryClient.setQueryData<RideFeedRecord[]>(['rides-feed', userId ?? 'local', 12], (current = []) => (
+        current.map((item) => (
+          item.id === ride.id
+            ? { ...item, mood: ride.mood }
+            : item
+        ))
+      ));
+      queryClient.setQueryData<RideRecord | null>(['ride-details', userId ?? 'local', ride.id], (current) => (
+        current ? { ...current, mood: ride.mood } : current
+      ));
       await queryClient.invalidateQueries({ queryKey: ['rides', userId ?? 'local'] });
+      await queryClient.invalidateQueries({ queryKey: ['ride-dashboard-metrics', userId ?? 'local'] });
     },
   });
 
   const deleteRide = useMutation({
     mutationFn: async (rideId: string) => {
       deleteRideLocal(rideId);
+      queryClient.setQueryData<RideFeedRecord[]>(['rides-feed', userId ?? 'local', 12], (current = []) => current.filter((ride) => ride.id !== rideId));
+      queryClient.removeQueries({ queryKey: ['ride-details', userId ?? 'local', rideId] });
       if (supabase) {
         await supabase.from('rides').delete().eq('id', rideId);
       }
@@ -610,6 +799,7 @@ export function useRideMutations(userId?: string) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['rides', userId ?? 'local'] });
+      await queryClient.invalidateQueries({ queryKey: ['ride-dashboard-metrics', userId ?? 'local'] });
     },
   });
 
@@ -636,6 +826,7 @@ export function useRideMutations(userId?: string) {
           elevation_gain_m: ride.elevation_gain_m ?? null,
           mood: ride.mood ?? null,
           route_geojson: ride.route_geojson,
+          route_preview_geojson: ride.route_preview_geojson ?? ride.route_geojson,
           route_point_count_raw: ride.route_point_count_raw,
           route_point_count_simplified: ride.route_point_count_simplified,
           route_bounds: ride.route_bounds,
@@ -652,6 +843,7 @@ export function useRideMutations(userId?: string) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['rides', userId ?? 'local'] });
+      await queryClient.invalidateQueries({ queryKey: ['ride-dashboard-metrics', userId ?? 'local'] });
     },
   });
 
@@ -694,6 +886,7 @@ export function useFuelMutations(userId?: string) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['fuel-logs', userId ?? 'local'] });
+      await queryClient.invalidateQueries({ queryKey: ['ride-dashboard-metrics', userId ?? 'local'] });
     },
   });
 
@@ -707,6 +900,7 @@ export function useFuelMutations(userId?: string) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['fuel-logs', userId ?? 'local'] });
+      await queryClient.invalidateQueries({ queryKey: ['ride-dashboard-metrics', userId ?? 'local'] });
     },
   });
 
@@ -760,6 +954,8 @@ export function useMaintenanceMutations(userId?: string) {
     },
     onSuccess: async (task) => {
       await queryClient.invalidateQueries({ queryKey: ['maintenance', task.bike_id] });
+      await queryClient.invalidateQueries({ queryKey: ['maintenance-overview', userId ?? 'local'] });
+      await queryClient.invalidateQueries({ queryKey: ['ride-dashboard-metrics', userId ?? 'local'] });
     },
   });
 
@@ -783,6 +979,8 @@ export function useMaintenanceMutations(userId?: string) {
     },
     onSuccess: async (task) => {
       await queryClient.invalidateQueries({ queryKey: ['maintenance', task.bike_id] });
+      await queryClient.invalidateQueries({ queryKey: ['maintenance-overview', userId ?? 'local'] });
+      await queryClient.invalidateQueries({ queryKey: ['ride-dashboard-metrics', userId ?? 'local'] });
     },
   });
 
@@ -797,6 +995,8 @@ export function useMaintenanceMutations(userId?: string) {
     },
     onSuccess: async ({ bikeId }) => {
       await queryClient.invalidateQueries({ queryKey: ['maintenance', bikeId] });
+      await queryClient.invalidateQueries({ queryKey: ['maintenance-overview', userId ?? 'local'] });
+      await queryClient.invalidateQueries({ queryKey: ['ride-dashboard-metrics', userId ?? 'local'] });
     },
   });
 
@@ -1015,6 +1215,42 @@ export function useRideListings(userId?: string) {
   return query;
 }
 
+export function useBoardFeed(userId?: string) {
+  const localListings = useLocalAppStore((state) => state.rideListings);
+  const blockedIds = useBlockedUsersStore((state) => state.blockedUserIds);
+  const useRemote = Boolean(userId) && isSupabaseConfigured;
+
+  const visibleLocal = localListings
+    .filter((listing) => !listing.is_reported && !listing.is_hidden && !blockedIds.includes(listing.host_user_id))
+    .sort((a, b) => new Date(a.ride_date).getTime() - new Date(b.ride_date).getTime())
+    .map((listing) => ({
+      ...listing,
+      is_verified_host: Boolean(listing.is_verified_host),
+      rsvp_going_count: listing.rsvp_going_count ?? 0,
+      rsvp_maybe_count: listing.rsvp_maybe_count ?? 0,
+    })) as RideListingFeedRow[];
+
+  const query = useQuery({
+    queryKey: ['board-feed', userId ?? 'local'],
+    enabled: useRemote,
+    queryFn: async () => {
+      if (!supabase || !userId) return visibleLocal;
+      const { data, error } = await (supabase as any)
+        .from('ride_listings_feed')
+        .select('*')
+        .order('ride_date', { ascending: true });
+      if (error) throw error;
+      return ((data ?? []) as RideListingFeedRow[]).filter((listing) => !blockedIds.includes(listing.host_user_id));
+    },
+  });
+
+  if (!useRemote) {
+    return { data: visibleLocal, isLoading: false, error: null, isFetching: false };
+  }
+
+  return query;
+}
+
 export function useBoardMutations(userId?: string) {
   const queryClient = useQueryClient();
   const addRideListingLocal = useLocalAppStore((state) => state.addRideListing);
@@ -1061,6 +1297,7 @@ export function useBoardMutations(userId?: string) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['ride-listings', userId ?? 'local'] });
+      await queryClient.invalidateQueries({ queryKey: ['board-feed', userId ?? 'local'] });
     },
   });
 
@@ -1096,6 +1333,7 @@ export function useBoardMutations(userId?: string) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['ride-listings', userId ?? 'local'] });
+      await queryClient.invalidateQueries({ queryKey: ['board-feed', userId ?? 'local'] });
     },
   });
 
@@ -1109,6 +1347,7 @@ export function useBoardMutations(userId?: string) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['ride-listings', userId ?? 'local'] });
+      await queryClient.invalidateQueries({ queryKey: ['board-feed', userId ?? 'local'] });
     },
   });
 
@@ -1123,6 +1362,7 @@ export function useBoardMutations(userId?: string) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['ride-listings', userId ?? 'local'] });
+      await queryClient.invalidateQueries({ queryKey: ['board-feed', userId ?? 'local'] });
     },
   });
 
@@ -1176,10 +1416,94 @@ export function useEarningsMutations(userId?: string) {
     },
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: ['earnings', userId ?? 'local'] });
+      await client.invalidateQueries({ queryKey: ['ride-dashboard-metrics', userId ?? 'local'] });
     },
   });
 
   return { saveEarnings };
+}
+
+export function useRideDashboardMetrics(userId?: string) {
+  const localRides = useLocalAppStore((state) => state.rides);
+  const localFuelLogs = useLocalAppStore((state) => state.fuelLogs);
+  const localTasks = useLocalAppStore((state) => state.maintenanceTasks);
+  const useRemote = useRemoteMode(userId);
+
+  const buildLocalMetrics = (): RideDashboardMetrics => {
+    const latestRide = [...localRides].sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())[0];
+    const latestFuelPrice = localFuelLogs[0]?.price_per_liter ?? 65;
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const todayRides = localRides.filter((ride) => ride.started_at.slice(0, 10) === today);
+    const monthRides = localRides.filter((ride) => new Date(ride.started_at).getTime() >= monthStart);
+    const monthDistance = monthRides.reduce((sum, ride) => sum + ride.distance_km, 0);
+    const todayFuelCost = todayRides.reduce((sum, ride) => sum + (ride.fuel_used_liters ?? 0) * latestFuelPrice, 0);
+    const monthFuelLogs = localFuelLogs.filter((log) => new Date(log.logged_at).getTime() >= monthStart);
+    const monthFuelCost = monthFuelLogs.length
+      ? monthFuelLogs.reduce((sum, log) => sum + log.total_cost, 0)
+      : monthRides.reduce((sum, ride) => sum + (ride.fuel_used_liters ?? 0) * latestFuelPrice, 0);
+    const maintenancePerKm = localTasks.reduce((sum, task) => (
+      task.interval_km > 0 ? sum + ((task.cost ?? 500) / task.interval_km) : sum
+    ), 0);
+    const monthMaintenanceAccrual = monthDistance * maintenancePerKm;
+    const monthTotalCost = monthFuelCost + monthMaintenanceAccrual;
+
+    return {
+      latest_ride_id: latestRide?.id ?? null,
+      latest_ride_distance_km: latestRide?.distance_km ?? 0,
+      latest_ride_max_speed_kmh: latestRide?.max_speed_kmh ?? 0,
+      latest_ride_fuel_used_liters: latestRide?.fuel_used_liters ?? 0,
+      latest_ride_started_at: latestRide?.started_at ?? null,
+      latest_fuel_price: latestFuelPrice,
+      today_earnings: 0,
+      today_fuel_cost: todayFuelCost,
+      today_trip_count: todayRides.length,
+      month_distance_km: monthDistance,
+      month_fuel_cost: monthFuelCost,
+      month_maintenance_accrual: monthMaintenanceAccrual,
+      month_total_cost: monthTotalCost,
+      month_cost_per_km: monthDistance > 0 ? monthTotalCost / monthDistance : 0,
+    };
+  };
+
+  const normalizeMetrics = (metrics: Partial<RideDashboardMetrics> | null | undefined): RideDashboardMetrics => ({
+    latest_ride_id: metrics?.latest_ride_id ?? null,
+    latest_ride_distance_km: Number(metrics?.latest_ride_distance_km ?? 0),
+    latest_ride_max_speed_kmh: Number(metrics?.latest_ride_max_speed_kmh ?? 0),
+    latest_ride_fuel_used_liters: Number(metrics?.latest_ride_fuel_used_liters ?? 0),
+    latest_ride_started_at: metrics?.latest_ride_started_at ?? null,
+    latest_fuel_price: Number(metrics?.latest_fuel_price ?? 65),
+    today_earnings: Number(metrics?.today_earnings ?? 0),
+    today_fuel_cost: Number(metrics?.today_fuel_cost ?? 0),
+    today_trip_count: Number(metrics?.today_trip_count ?? 0),
+    month_distance_km: Number(metrics?.month_distance_km ?? 0),
+    month_fuel_cost: Number(metrics?.month_fuel_cost ?? 0),
+    month_maintenance_accrual: Number(metrics?.month_maintenance_accrual ?? 0),
+    month_total_cost: Number(metrics?.month_total_cost ?? 0),
+    month_cost_per_km: Number(metrics?.month_cost_per_km ?? 0),
+  });
+
+  const query = useQuery({
+    queryKey: ['ride-dashboard-metrics', userId ?? 'local'],
+    enabled: useRemote,
+    queryFn: async () => {
+      if (!supabase || !userId) {
+        return buildLocalMetrics();
+      }
+
+      const { data, error } = await (supabase as any).rpc('ride_dashboard_metrics', { p_user_id: userId });
+      if (error) throw error;
+      const row = (data?.[0] ?? null) as RideDashboardMetrics | null;
+      return row ? normalizeMetrics(row) : buildLocalMetrics();
+    },
+  });
+
+  if (!useRemote) {
+    return { data: buildLocalMetrics(), isLoading: false, error: null, isFetching: false };
+  }
+
+  return query;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1208,6 +1532,48 @@ export function useMaintenanceTasksAllBikes(userId?: string) {
   if (!useRemote) {
     return { data: localTasks, isLoading: false, error: null, isFetching: false };
   }
+  return query;
+}
+
+export function useMaintenanceOverview(userId?: string) {
+  const localTasks = useLocalAppStore((state) => state.maintenanceTasks);
+  const localBikes = useLocalAppStore((state) => state.bikes);
+  const useRemote = useRemoteMode(userId);
+
+  const query = useQuery({
+    queryKey: ['maintenance-overview', userId ?? 'local'],
+    enabled: useRemote,
+    queryFn: async () => {
+      if (!supabase || !userId) {
+        return localTasks.map((task) => {
+          const bike = localBikes.find((item) => item.id === task.bike_id);
+          return {
+            ...task,
+            bike_make: bike?.make ?? '',
+            bike_model: bike?.model ?? '',
+            bike_nickname: bike?.nickname ?? null,
+            current_odometer_km: bike?.current_odometer_km ?? 0,
+            bike_created_at: bike?.created_at ?? null,
+          };
+        });
+      }
+
+      const { data, error } = await (supabase as any).rpc('user_maintenance_overview', { p_user_id: userId });
+      if (error) throw error;
+      return (data ?? []) as (MaintenanceTask & {
+        bike_make: string;
+        bike_model: string;
+        bike_nickname: string | null;
+        current_odometer_km: number;
+        bike_created_at: string | null;
+      })[];
+    },
+  });
+
+  if (!useRemote) {
+    return { data: query.data ?? [], isLoading: false, error: null, isFetching: false };
+  }
+
   return query;
 }
 
@@ -1266,6 +1632,7 @@ export function useRsvpMutations(userId?: string) {
     onSuccess: async (_, variables) => {
       await client.invalidateQueries({ queryKey: ['ride-listing-rsvps', variables.listingId] });
       await client.invalidateQueries({ queryKey: ['ride-listings', userId ?? 'local'] });
+      await client.invalidateQueries({ queryKey: ['board-feed', userId ?? 'local'] });
     },
   });
 
@@ -1283,6 +1650,7 @@ export function useRsvpMutations(userId?: string) {
     onSuccess: async (listingId) => {
       await client.invalidateQueries({ queryKey: ['ride-listing-rsvps', listingId] });
       await client.invalidateQueries({ queryKey: ['ride-listings', userId ?? 'local'] });
+      await client.invalidateQueries({ queryKey: ['board-feed', userId ?? 'local'] });
     },
   });
 

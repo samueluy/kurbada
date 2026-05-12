@@ -117,9 +117,59 @@ export type RideRecord = {
   elevation_gain_m?: number | null;
   mood?: RideMood | null;
   route_geojson: GeoJSON.Feature<GeoJSON.LineString>;
+  route_preview_geojson?: GeoJSON.Feature<GeoJSON.LineString> | null;
   route_point_count_raw: number;
   route_point_count_simplified: number;
   route_bounds: RouteBounds;
+};
+
+export type RideFeedRecord = Pick<
+  RideRecord,
+  | 'id'
+  | 'bike_id'
+  | 'mode'
+  | 'started_at'
+  | 'ended_at'
+  | 'distance_km'
+  | 'max_speed_kmh'
+  | 'avg_speed_kmh'
+  | 'fuel_used_liters'
+  | 'elevation_gain_m'
+  | 'mood'
+  | 'route_bounds'
+  | 'sync_status'
+> & {
+  route_preview_geojson: GeoJSON.Feature<GeoJSON.LineString>;
+};
+
+export type RideListingFeedRow = RideListing & {
+  is_verified_host: boolean;
+  rsvp_going_count: number;
+  rsvp_maybe_count: number;
+};
+
+export type LeaderboardWeeklyKmRow = {
+  user_id: string;
+  display_name: string;
+  total_km: number;
+  rank: number;
+};
+
+export type RideDashboardMetrics = {
+  latest_ride_id: string | null;
+  latest_ride_distance_km: number;
+  latest_ride_max_speed_kmh: number;
+  latest_ride_fuel_used_liters: number;
+  latest_ride_started_at: string | null;
+  latest_fuel_price: number;
+  today_earnings: number;
+  today_fuel_cost: number;
+  today_trip_count: number;
+  month_distance_km: number;
+  month_fuel_cost: number;
+  month_maintenance_accrual: number;
+  month_total_cost: number;
+  month_cost_per_km: number;
 };
 
 export type RideMood = 'send_it' | 'epic' | 'chill' | 'brutal' | 'meh';

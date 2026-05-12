@@ -18,7 +18,7 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { StatCard } from '@/components/ui/stat-card';
 import { formatCurrencyPhp, formatDuration } from '@/lib/format';
 import { useAuth } from '@/hooks/use-auth';
-import { useEarningsMutations, useFuelLogs, useRideMutations, useRides } from '@/hooks/use-kurbada-data';
+import { useEarningsMutations, useFuelLogs, useRideDetails, useRideMutations } from '@/hooks/use-kurbada-data';
 import { palette, radius } from '@/constants/theme';
 import { rideStoryTemplates, type RideStoryTemplateId } from '@/lib/ride-story';
 import { MoodPicker } from '@/features/ride/components/mood-picker';
@@ -37,9 +37,9 @@ const platformLabels: Record<PlatformTag, string> = {
 export default function RideSummaryScreen() {
   const params = useLocalSearchParams<{ rideId?: string }>();
   const { session } = useAuth();
-  const rides = useRides(session?.user.id);
   const fuelLogs = useFuelLogs(session?.user.id);
-  const ride = rides.data?.find((item) => item.id === params.rideId) ?? rides.data?.[0];
+  const rideQuery = useRideDetails(params.rideId, session?.user.id);
+  const ride = rideQuery.data;
   const latestFuelPrice = useMemo(() => {
     const logs = fuelLogs.data ?? [];
     return logs[0]?.price_per_liter ?? 65;

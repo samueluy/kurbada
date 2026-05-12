@@ -1,13 +1,23 @@
-import * as FileSystem from 'expo-file-system/legacy';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
+
+import {
+  appendRidePoints,
+  clearRidePoints,
+  getActiveRidePointSession,
+  getRidePointCount,
+  getRidePoints,
+  initializeRidePointStorage,
+} from '@/lib/ride-point-storage';
 import type { RidePoint } from '@/types/domain';
 
 export const LOCATION_TASK_NAME = 'kurbada-bg-location';
-const STORAGE_PATH = `${FileSystem.documentDirectory}kurbada-ride-coords.json`;
 
 TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   if (error) return;
+
+  const rideId = await getActiveRidePointSession();
+  if (!rideId) return;
 
   const { locations } = data as { locations: Location.LocationObject[] };
   if (!locations?.length) return;
@@ -22,46 +32,21 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
     altitude: loc.coords.altitude ?? 0,
   }));
 
-  try {
-    let existing: RidePoint[] = [];
-    const fileInfo = await FileSystem.getInfoAsync(STORAGE_PATH);
-    if (fileInfo.exists) {
-      const content = await FileSystem.readAsStringAsync(STORAGE_PATH);
-      existing = JSON.parse(content);
-    }
-    const merged = [...existing, ...points];
-    await FileSystem.writeAsStringAsync(STORAGE_PATH, JSON.stringify(merged));
-  } catch {
-    // silently fail
-  }
+  await appendRidePoints(rideId, points).catch(() => undefined);
 });
 
-export async function getStoredCoords(): Promise<RidePoint[]> {
-  try {
-    const fileInfo = await FileSystem.getInfoAsync(STORAGE_PATH);
-    if (!fileInfo.exists) return [];
-    const content = await FileSystem.readAsStringAsync(STORAGE_PATH);
-    return JSON.parse(content);
-  } catch {
-    return [];
-  }
+export async function primeRidePointStorage() {
+  await initializeRidePointStorage();
 }
 
-export async function clearStoredCoords(): Promise<void> {
-  try {
-    await FileSystem.deleteAsync(STORAGE_PATH, { idempotent: true });
-  } catch {
-    // ignore
-  }
+export async function getStoredCoords(rideId: string): Promise<RidePoint[]> {
+  return getRidePoints(rideId);
 }
 
-export async function getCoordsCount(): Promise<number> {
-  try {
-    const fileInfo = await FileSystem.getInfoAsync(STORAGE_PATH);
-    if (!fileInfo.exists) return 0;
-    const content = await FileSystem.readAsStringAsync(STORAGE_PATH);
-    return JSON.parse(content).length;
-  } catch {
-    return 0;
-  }
+export async function clearStoredCoords(rideId: string): Promise<void> {
+  await clearRidePoints(rideId);
+}
+
+export async function getCoordsCount(rideId: string): Promise<number> {
+  return getRidePointCount(rideId);
 }

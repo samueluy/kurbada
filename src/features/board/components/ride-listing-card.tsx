@@ -6,7 +6,6 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { GlassCard } from '@/components/ui/glass-card';
 import { AppText } from '@/components/ui/app-text';
 import { palette, radius } from '@/constants/theme';
-import { getMapboxModule } from '@/lib/mapbox';
 import type { RideListing } from '@/types/domain';
 
 const paceColors: Record<RideListing['pace'], { bg: string; fg: string }> = {
@@ -22,54 +21,52 @@ const paceLabels: Record<RideListing['pace'], string> = {
 };
 
 function MapPreview({ listing }: { listing: RideListing }) {
-  const Mapbox = getMapboxModule();
   const coords = listing.meetup_coordinates;
-
-  if (Mapbox && coords) {
-    const pinShape = {
-      type: 'Feature' as const,
-      geometry: { type: 'Point' as const, coordinates: [coords.lng, coords.lat] },
-      properties: {},
-    };
-    return (
-      <View
-        pointerEvents="none"
-        style={{ height: 120, borderRadius: radius.md, overflow: 'hidden' }}>
-        <Mapbox.MapView
-          style={{ flex: 1 }}
-          styleURL="mapbox://styles/mapbox/dark-v11"
-          attributionEnabled={false}
-          logoEnabled={false}
-          compassEnabled={false}
-          scaleBarEnabled={false}
-          scrollEnabled={false}
-          zoomEnabled={false}
-          pitchEnabled={false}
-          rotateEnabled={false}>
-          <Mapbox.Camera zoomLevel={12} centerCoordinate={[coords.lng, coords.lat]} animationMode="none" />
-          <Mapbox.ShapeSource id={`lobby-pin-${listing.id}`} shape={pinShape}>
-            <Mapbox.CircleLayer
-              id={`lobby-pin-circle-${listing.id}`}
-              style={{ circleColor: palette.danger, circleRadius: 10, circleStrokeWidth: 2, circleStrokeColor: '#FFFFFF' }}
-            />
-          </Mapbox.ShapeSource>
-        </Mapbox.MapView>
-      </View>
-    );
-  }
-
-  if (Mapbox && !coords) {
-    return (
-      <View style={{ height: 120, borderRadius: radius.md, backgroundColor: '#0D1B2A', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-        <MapPin size={20} color={palette.textTertiary} />
-        <AppText variant="meta" style={{ color: palette.textSecondary }}>Meetup pin not set</AppText>
-      </View>
-    );
-  }
-
   return (
-    <View style={{ height: 120, borderRadius: radius.md, backgroundColor: '#0D1B2A', justifyContent: 'center', alignItems: 'center' }}>
-      <AppText variant="meta" style={{ color: palette.textSecondary }}>Map preview available in native build</AppText>
+    <View
+      style={{
+        height: 120,
+        borderRadius: radius.md,
+        backgroundColor: '#0D1B2A',
+        overflow: 'hidden',
+        padding: 14,
+        justifyContent: 'space-between',
+      }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <View style={{ gap: 4, flex: 1, paddingRight: 10 }}>
+          <AppText variant="label" style={{ color: palette.textTertiary }}>
+            MEETUP PIN
+          </AppText>
+          <AppText variant="bodyBold" numberOfLines={2}>
+            {listing.meetup_point}
+          </AppText>
+        </View>
+        <View
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 17,
+            backgroundColor: 'rgba(230,57,70,0.16)',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <MapPin size={16} color={palette.danger} />
+        </View>
+      </View>
+      <View style={{ gap: 8 }}>
+        <View style={{ flexDirection: 'row', gap: 6 }}>
+          <View style={{ flex: 1, height: 6, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)' }} />
+          <View style={{ width: 72, height: 6, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)' }} />
+        </View>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <AppText variant="meta" style={{ color: palette.textSecondary }}>
+            {coords ? `${coords.lat.toFixed(3)}, ${coords.lng.toFixed(3)}` : 'Pin saved without coordinates'}
+          </AppText>
+          <AppText variant="meta" style={{ color: palette.textTertiary }}>
+            Open full details to RSVP
+          </AppText>
+        </View>
+      </View>
     </View>
   );
 }
