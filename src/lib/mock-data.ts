@@ -32,7 +32,6 @@ export const sampleBikes: Bike[] = [
     engine_cc: 399,
     current_odometer_km: 12840,
     category: 'naked',
-    mount_profile_id: 'tank-center',
   },
 ];
 

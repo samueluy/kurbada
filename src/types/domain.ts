@@ -41,7 +41,6 @@ export type Bike = {
   engine_cc: number;
   current_odometer_km: number;
   category: 'sport' | 'naked' | 'adventure' | 'scooter';
-  mount_profile_id?: string;
   created_at?: string;
 };
 

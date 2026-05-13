@@ -1,5 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Colors, palette } from '@/constants/theme';
+import { Colors, layout, palette } from '@/constants/theme';
 import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -24,7 +24,7 @@ export default function TabsLayout() {
           backgroundColor: 'rgba(10,10,10,0.96)',
           borderTopColor: Colors.border,
           borderTopWidth: 0.5,
-          height: 58 + Math.max(insets.bottom, 10),
+          height: layout.tabBarHeight + Math.max(insets.bottom, 10),
           paddingTop: 8,
           paddingBottom: Math.max(insets.bottom, 10),
         },

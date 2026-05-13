@@ -80,7 +80,6 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       Notifications.setNotificationChannelAsync('kurbada-reminders', {
         name: 'Kurbada Reminders',
         importance: Notifications.AndroidImportance.HIGH,
-        sound: 'default',
         vibrationPattern: [0, 180, 80, 180],
         lightColor: '#E63946',
       }).catch(() => undefined);

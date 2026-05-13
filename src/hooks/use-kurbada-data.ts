@@ -715,7 +715,6 @@ export function useBikeMutations(userId?: string) {
           engine_cc: bike.engine_cc,
           current_odometer_km: bike.current_odometer_km,
           category: bike.category,
-          mount_profile_id: bike.mount_profile_id ?? null,
           user_id: userId,
         };
 

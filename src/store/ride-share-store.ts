@@ -5,6 +5,8 @@ import type { RideStoryTemplateId } from '@/lib/ride-story';
 type RideShareDraft = {
   rideId: string | null;
   templateId: RideStoryTemplateId;
+  shareMode: 'story' | 'replay';
+  textTone: 'light' | 'dark';
   photoUri?: string;
   photoScale: number;
   photoOffsetX: number;
@@ -12,6 +14,8 @@ type RideShareDraft = {
   overlayScale: number;
   overlayOffsetX: number;
   overlayOffsetY: number;
+  replayDurationSec: number;
+  replayCameraStyle: 'flyover';
 };
 
 type RideShareStore = {
@@ -25,6 +29,8 @@ type RideShareStore = {
 const defaultDraft = (rideId: string | null = null): RideShareDraft => ({
   rideId,
   templateId: 'distance_hero',
+  shareMode: 'story',
+  textTone: 'light',
   photoUri: undefined,
   photoScale: 1.3,
   photoOffsetX: 0,
@@ -32,6 +38,8 @@ const defaultDraft = (rideId: string | null = null): RideShareDraft => ({
   overlayScale: 1,
   overlayOffsetX: 0,
   overlayOffsetY: 0,
+  replayDurationSec: 8,
+  replayCameraStyle: 'flyover',
 });
 
 export const useRideShareStore = create<RideShareStore>((set) => ({

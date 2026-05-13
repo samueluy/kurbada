@@ -44,7 +44,7 @@ export const CardStyle = {
 } as const;
 
 export const spacing = { xxs: 4, xs: 8, sm: 12, md: 16, lg: 20, xl: 24, section: 28, xxl: 32, xxxl: 40, jumbo: 56 } as const;
-export const layout = { screenPadding: 20, tabBarHeight: 56, maxContentWidth: 920 } as const;
+export const layout = { screenPadding: 20, tabBarHeight: 58, maxContentWidth: 920 } as const;
 export const motion = { press: 120, fast: 140, base: 180, slow: 220 } as const;
 export const chartColors = [Colors.t1, Colors.t2, Colors.t3, Colors.t4];
 

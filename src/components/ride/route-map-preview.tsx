@@ -35,7 +35,7 @@ export function RouteMapPreview({
 
   return (
     <View style={{ flex: 1, overflow: 'hidden', borderRadius: 16 }}>
-      <Mapbox.MapView style={{ flex: 1 }} styleURL="mapbox://styles/mapbox/dark-v11" attributionEnabled={false} logoEnabled={false} compassEnabled={false} scaleBarEnabled={false}>
+      <Mapbox.MapView style={{ flex: 1 }} styleURL="mapbox://styles/mapbox/dark-v11" attributionEnabled logoEnabled compassEnabled={false} scaleBarEnabled={false}>
         {routeBounds ? (
           <Mapbox.Camera
             bounds={{ ne: [routeBounds.maxLng, routeBounds.maxLat], sw: [routeBounds.minLng, routeBounds.minLat] }}

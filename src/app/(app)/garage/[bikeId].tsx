@@ -1,12 +1,12 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Modal, Pressable, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, Modal, Pressable, ScrollView, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScrollScreen } from '@/components/ui/app-screen';
 import { Button } from '@/components/ui/button';
+import { FloatingToast } from '@/components/ui/floating-toast';
 import { FloatingField } from '@/components/ui/floating-field';
 import { GlassCard } from '@/components/ui/glass-card';
 import { KeyboardSheet } from '@/components/ui/keyboard-sheet';
@@ -39,38 +39,6 @@ function daysToMonthsLabel(days: number): string {
   return `${years}y ${rem}m`;
 }
 
-function Toast({ message, bottomInset }: { message: string; bottomInset: number }) {
-  const opacity = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.sequence([
-      Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-      Animated.delay(2000),
-      Animated.timing(opacity, { toValue: 0, duration: 300, useNativeDriver: true }),
-    ]).start();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return (
-    <Animated.View style={{
-      position: 'absolute',
-      bottom: bottomInset + 16,
-      left: 20,
-      right: 20,
-      opacity,
-      backgroundColor: Colors.s2,
-      borderRadius: radius.md,
-      borderLeftWidth: 3,
-      borderLeftColor: Colors.green,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      zIndex: 200,
-    }}>
-      <AppText variant="bodyBold" style={{ fontSize: 13 }}>{message}</AppText>
-    </Animated.View>
-  );
-}
-
 export default function BikeProfileScreen() {
   const params = useLocalSearchParams<{ bikeId?: string }>();
   const { session } = useAuth();
@@ -79,7 +47,6 @@ export default function BikeProfileScreen() {
   const tasks = useMaintenanceTasks(bike?.id);
   const { addMaintenanceTask, updateMaintenanceTask, deleteMaintenanceTask } = useMaintenanceMutations(session?.user.id);
   const { updateBikeMetadata } = useBikeMutations(session?.user.id);
-  const insets = useSafeAreaInsets();
   const activeBikeId = useAppStore((state) => state.activeBikeId);
   const setActiveBikeId = useAppStore((state) => state.setActiveBikeId);
   const isPrimary = bike?.id === activeBikeId;
@@ -643,7 +610,7 @@ export default function BikeProfileScreen() {
         </Pressable>
       </Modal>
 
-      {toastMessage ? <Toast message={toastMessage} bottomInset={insets.bottom + 88} /> : null}
+      {toastMessage ? <FloatingToast message={toastMessage} anchor="safe" /> : null}
     </AppScrollScreen>
   );
 }

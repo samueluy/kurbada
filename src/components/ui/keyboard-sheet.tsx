@@ -25,6 +25,7 @@ export function KeyboardSheet({
   const screenHeight = Dimensions.get('window').height;
   const keyboardInset = Platform.OS === 'android' ? Math.max(0, keyboardHeight - insets.bottom) : 0;
   const maxSheetHeight = Math.max(320, screenHeight - insets.top - 24);
+  const androidSheetHeight = Math.min(maxSheetHeight, Math.max(360, Math.round(screenHeight * 0.62)));
 
   useEffect(() => {
     if (visible) {
@@ -77,6 +78,7 @@ export function KeyboardSheet({
                 style={{
                   transform: [{ translateY }],
                   maxHeight: maxSheetHeight,
+                  ...(Platform.OS === 'android' ? { height: androidSheetHeight } : {}),
                   backgroundColor: palette.surfaceMuted,
                   borderTopLeftRadius: 24,
                   borderTopRightRadius: 24,
@@ -85,6 +87,7 @@ export function KeyboardSheet({
                   overflow: 'hidden',
                 }}>
                 <ScrollView
+                  style={{ flex: 1 }}
                   keyboardShouldPersistTaps="handled"
                   nestedScrollEnabled
                   automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
@@ -92,6 +95,7 @@ export function KeyboardSheet({
                   bounces={false}
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={{
+                    flexGrow: 1,
                     paddingHorizontal: 20,
                     paddingTop: 16,
                     paddingBottom:

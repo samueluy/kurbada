@@ -67,7 +67,6 @@ export type Database = {
           year: number;
           engine_cc: number;
           current_odometer_km: number;
-          mount_profile_id: string | null;
           category: string;
           created_at: string;
         };

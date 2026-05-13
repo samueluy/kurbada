@@ -300,6 +300,27 @@ export default function RideSummaryScreen() {
             })}
           </ScrollView>
 
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Button
+              title="White Text"
+              variant={draft.textTone === 'light' ? 'primary' : 'secondary'}
+              onPress={() => {
+                triggerLightHaptic();
+                updateDraft({ textTone: 'light' });
+              }}
+              style={{ flex: 1, minHeight: 40, borderRadius: radius.pill }}
+            />
+            <Button
+              title="Black Text"
+              variant={draft.textTone === 'dark' ? 'primary' : 'secondary'}
+              onPress={() => {
+                triggerLightHaptic();
+                updateDraft({ textTone: 'dark' });
+              }}
+              style={{ flex: 1, minHeight: 40, borderRadius: radius.pill }}
+            />
+          </View>
+
           <View style={{ alignItems: 'center' }}>
             <IgStoryCanvas
               ride={ride}
@@ -313,6 +334,7 @@ export default function RideSummaryScreen() {
               overlayScale={draft.overlayScale}
               overlayOffsetX={draft.overlayOffsetX}
               overlayOffsetY={draft.overlayOffsetY}
+              textTone={draft.textTone}
             />
           </View>
 
@@ -327,6 +349,7 @@ export default function RideSummaryScreen() {
               variant="secondary"
               onPress={() => {
                 triggerLightHaptic();
+                updateDraft({ shareMode: 'story' });
                 router.push({ pathname: '/(app)/ride/share-editor' as any, params: { rideId: ride.id } });
               }}
             />
@@ -341,9 +364,18 @@ export default function RideSummaryScreen() {
               />
             ) : null}
             <Button
-              title="Share"
+              title="Share Story"
               onPress={handleShareToStories}
               style={{ backgroundColor: palette.danger }}
+            />
+            <Button
+              title="Export Route Replay"
+              variant="secondary"
+              onPress={() => {
+                triggerLightHaptic();
+                updateDraft({ shareMode: 'replay' });
+                router.push({ pathname: '/(app)/ride/share-editor' as any, params: { rideId: ride.id } });
+              }}
             />
           </View>
         </GlassCard>
@@ -374,7 +406,15 @@ export default function RideSummaryScreen() {
         }}>
         <ViewShot
           ref={storyShotRef}
-          options={{ result: 'tmpfile', quality: 1, width: 1080, height: 1920, format: 'png' }}>
+          options={{
+            result: 'tmpfile',
+            quality: 1,
+            width: 1080,
+            height: 1920,
+            format: 'png',
+            handleGLSurfaceViewOnAndroid: true,
+            useRenderInContext: true,
+          }}>
           <IgStoryCanvas
             ride={ride}
             photoUri={draft.photoUri}
@@ -386,6 +426,7 @@ export default function RideSummaryScreen() {
             overlayScale={draft.overlayScale}
             overlayOffsetX={draft.overlayOffsetX}
             overlayOffsetY={draft.overlayOffsetY}
+            textTone={draft.textTone}
             width={1080}
           />
         </ViewShot>

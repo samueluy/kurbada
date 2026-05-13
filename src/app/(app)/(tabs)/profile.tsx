@@ -1,15 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
 import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, Share, View } from 'react-native';
+import { SvgUri } from 'react-native-svg';
 
 import { TabTransition } from '@/components/navigation/tab-transition';
 import { AppText } from '@/components/ui/app-text';
 import { AppScrollScreen } from '@/components/ui/app-screen';
 import { Button } from '@/components/ui/button';
+import { FloatingToast } from '@/components/ui/floating-toast';
 import { FloatingField } from '@/components/ui/floating-field';
 import { GlassCard } from '@/components/ui/glass-card';
 import { KeyboardSheet } from '@/components/ui/keyboard-sheet';
@@ -24,9 +27,60 @@ import { useBikes, useEmergencyInfo, useFuelLogs, useRides } from '@/hooks/use-k
 import { useRevenueCatStatus } from '@/hooks/use-revenuecat-status';
 import { useUserProfile } from '@/hooks/use-user-access';
 import { useAppStore } from '@/store/app-store';
+import { useLocalAppStore } from '@/store/local-app-store';
+import type { Profile } from '@/types/domain';
+
+function buildDicebearNotionistUrl(seed: string) {
+  const params = new URLSearchParams({
+    seed,
+    backgroundType: 'solid',
+    backgroundColor: 'f8efe6,e8d5c4,dceeff,f6d4dd,fff1bf',
+    size: '96',
+    scale: '92',
+  });
+  return `https://api.dicebear.com/9.x/notionists/svg?${params.toString()}`;
+}
+
+function ProfileAvatar({
+  displayName,
+  avatarUrl,
+}: {
+  displayName: string;
+  avatarUrl?: string | null;
+}) {
+  const [hasAvatarError, setHasAvatarError] = useState(false);
+
+  useEffect(() => {
+    setHasAvatarError(false);
+  }, [avatarUrl]);
+
+  return (
+    <View
+      style={{
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        overflow: 'hidden',
+        backgroundColor: '#F4E8DD',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+      {avatarUrl && !hasAvatarError ? (
+        <SvgUri width="100%" height="100%" uri={avatarUrl} onError={() => setHasAvatarError(true)} />
+      ) : (
+        <AppText variant="bodyBold" style={{ fontSize: 20 }}>
+          {(displayName || 'KR').slice(0, 2).toUpperCase()}
+        </AppText>
+      )}
+    </View>
+  );
+}
 
 export default function ProfileTabScreen() {
   const { session, signOut } = useAuth();
+  const queryClient = useQueryClient();
   const profile = useUserProfile(session?.user.id);
   const rides = useRides(session?.user.id);
   const fuelLogs = useFuelLogs(session?.user.id);
@@ -36,6 +90,7 @@ export default function ProfileTabScreen() {
   const customFuelPrice = useAppStore((state) => state.customFuelPricePerLiter);
   const setCustomFuelPrice = useAppStore((state) => state.setCustomFuelPricePerLiter);
   const workModeEnabled = useAppStore((state) => state.workMode);
+  const updateLocalProfile = useLocalAppStore((state) => state.updateProfile);
 
   const [showFuelPrice, setShowFuelPrice] = useState(false);
   const [fuelPriceInput, setFuelPriceInput] = useState('');
@@ -43,6 +98,8 @@ export default function ProfileTabScreen() {
   const [displayNameInput, setDisplayNameInput] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isRandomizingAvatar, setIsRandomizingAvatar] = useState(false);
 
   const totalDistance = useMemo(
     () => (rides.data ?? []).reduce((sum, ride) => sum + ride.distance_km, 0),
@@ -114,12 +171,27 @@ export default function ProfileTabScreen() {
     }
     try {
       const client = supabase as any;
-      const { error } = await client
+      const { data, error } = await client
         .from('profiles')
         .update({ display_name: trimmed })
-        .eq('id', session.user.id);
+        .eq('id', session.user.id)
+        .select()
+        .single();
       if (error) throw error;
+      queryClient.setQueryData(['profile', session.user.id], (current: Profile | undefined) => ({
+        ...(current ?? {
+          id: session.user.id,
+          display_name: trimmed,
+          subscription_status: profile.data?.subscription_status ?? 'inactive',
+          access_override: profile.data?.access_override ?? 'none',
+          referral_code: profile.data?.referral_code ?? '',
+        }),
+        display_name: data.display_name ?? trimmed,
+      }));
+      updateLocalProfile({ display_name: data.display_name ?? trimmed });
       setShowEditName(false);
+      setToastMessage('✓ Name updated');
+      setTimeout(() => setToastMessage(null), 2500);
       const refetchFn = (profile as { refetch?: () => Promise<unknown> }).refetch;
       await refetchFn?.();
     } catch (error) {
@@ -128,7 +200,61 @@ export default function ProfileTabScreen() {
         error instanceof Error ? error.message : 'Please try again.',
       );
     }
-  }, [displayNameInput, profile, session?.user.id]);
+  }, [displayNameInput, profile, queryClient, session?.user.id, updateLocalProfile]);
+
+  const handleRandomizeAvatar = useCallback(async () => {
+    const userId = session?.user.id;
+    const nextUrl = buildDicebearNotionistUrl(`${userId ?? 'local'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+
+    setIsRandomizingAvatar(true);
+    try {
+      if (!supabase || !userId) {
+        updateLocalProfile({ avatar_url: nextUrl });
+        queryClient.setQueryData(['profile', userId ?? 'local'], (current: Profile | undefined) => ({
+          ...(current ?? {
+            id: userId ?? 'local',
+            display_name: profile.data?.display_name ?? 'Kurbada Rider',
+            subscription_status: profile.data?.subscription_status ?? 'inactive',
+            access_override: profile.data?.access_override ?? 'none',
+            referral_code: profile.data?.referral_code ?? '',
+          }),
+          avatar_url: nextUrl,
+        }));
+      } else {
+        const client = supabase as any;
+        const { data, error } = await client
+          .from('profiles')
+          .update({ avatar_url: nextUrl })
+          .eq('id', userId)
+          .select()
+          .single();
+        if (error) throw error;
+        queryClient.setQueryData(['profile', userId], (current: Profile | undefined) => ({
+          ...(current ?? {
+            id: userId,
+            display_name: profile.data?.display_name ?? 'Kurbada Rider',
+            subscription_status: profile.data?.subscription_status ?? 'inactive',
+            access_override: profile.data?.access_override ?? 'none',
+            referral_code: profile.data?.referral_code ?? '',
+          }),
+          avatar_url: data.avatar_url ?? nextUrl,
+        }));
+        updateLocalProfile({ avatar_url: data.avatar_url ?? nextUrl });
+      }
+
+      setToastMessage('✓ Avatar randomized');
+      setTimeout(() => setToastMessage(null), 2500);
+      const refetchFn = (profile as { refetch?: () => Promise<unknown> }).refetch;
+      await refetchFn?.();
+    } catch (error) {
+      Alert.alert(
+        'Could not randomize avatar',
+        error instanceof Error ? error.message : 'Please try again.',
+      );
+    } finally {
+      setIsRandomizingAvatar(false);
+    }
+  }, [profile, queryClient, session?.user.id, updateLocalProfile]);
 
   // Prefer live RevenueCat status; fall back to profile table value while loading
   const billingStatusLabel = rcStatus.isLoading
@@ -145,9 +271,10 @@ export default function ProfileTabScreen() {
         </View>
 
         <GlassCard style={{ alignItems: 'center', gap: 12, padding: 22 }}>
-          <View style={{ width: 72, height: 72, borderRadius: 36, overflow: 'hidden', backgroundColor: palette.surfaceMuted, alignItems: 'center', justifyContent: 'center' }}>
-            <AppText variant="bodyBold" style={{ fontSize: 20 }}>{(profile.data?.display_name ?? 'KR').slice(0, 2).toUpperCase()}</AppText>
-          </View>
+          <ProfileAvatar
+            displayName={profile.data?.display_name ?? 'Kurbada Rider'}
+            avatarUrl={profile.data?.avatar_url}
+          />
           <Pressable
             onPress={() => {
               setDisplayNameInput(profile.data?.display_name ?? '');
@@ -162,6 +289,25 @@ export default function ProfileTabScreen() {
             </View>
           </Pressable>
           <AppText variant="meta" numberOfLines={1}>Member since {memberSince}</AppText>
+          <Pressable
+            disabled={isRandomizingAvatar}
+            onPress={() => {
+              void handleRandomizeAvatar();
+            }}
+            style={{ paddingVertical: 6, paddingHorizontal: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons
+                name="shuffle-outline"
+                size={14}
+                color={isRandomizingAvatar ? palette.textTertiary : palette.textSecondary}
+              />
+              <AppText
+                variant="label"
+                style={{ color: isRandomizingAvatar ? palette.textTertiary : palette.textSecondary }}>
+                {isRandomizingAvatar ? 'RANDOMIZING...' : 'RANDOMIZE AVATAR'}
+              </AppText>
+            </View>
+          </Pressable>
         </GlassCard>
 
         <SectionHeader title="Your Stats" />
@@ -403,6 +549,8 @@ export default function ProfileTabScreen() {
           </View>
         </View>
       </KeyboardSheet>
+
+      {toastMessage ? <FloatingToast message={toastMessage} anchor="tabs" /> : null}
     </TabTransition>
   );
 }

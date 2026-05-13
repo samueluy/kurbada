@@ -308,8 +308,8 @@ export default function CreateRideScreen() {
                 onPress={handleMapPress}
                 onLongPress={handleMapPress}
                 onMapIdle={() => setScrollEnabled(true)}
-                attributionEnabled={false}
-                logoEnabled={false}
+                attributionEnabled
+                logoEnabled
                 compassEnabled
               >
                 <Mapbox.Camera
