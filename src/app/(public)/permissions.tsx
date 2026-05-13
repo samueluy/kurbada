@@ -12,6 +12,7 @@ import { AppScreen } from '@/components/ui/app-screen';
 import { Button } from '@/components/ui/button';
 import { GlassCard } from '@/components/ui/glass-card';
 import { palette } from '@/constants/theme';
+import { triggerLightHaptic, triggerSuccessHaptic } from '@/lib/haptics';
 import { getOnboardingRoute, ONBOARDING_TOTAL_STEPS } from '@/lib/onboarding-flow';
 import { useAppStore } from '@/store/app-store';
 
@@ -27,13 +28,16 @@ export default function PermissionsScreen() {
   const [permissionsDone, setPermissionsDone] = useState(false);
   const [loadIndex, setLoadIndex] = useState(0);
   const completionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didAdvanceRef = useRef(false);
 
   const handleEnableTelemetry = async () => {
+    triggerLightHaptic();
     await Location.requestForegroundPermissionsAsync();
     await Notifications.requestPermissionsAsync();
     Accelerometer.setUpdateInterval(100);
     const sub = Accelerometer.addListener(() => undefined);
     setTimeout(() => sub.remove(), 1000);
+    didAdvanceRef.current = false;
     setPermissionsDone(true);
   };
 
@@ -46,6 +50,8 @@ export default function PermissionsScreen() {
         if (next >= loadingTexts.length) {
           clearInterval(interval);
           completionTimeoutRef.current = setTimeout(() => {
+            didAdvanceRef.current = true;
+            triggerSuccessHaptic();
             setOnboardingStep(6);
             router.push(getOnboardingRoute(6) as any);
           }, 500);
@@ -77,19 +83,20 @@ export default function PermissionsScreen() {
   }, [permissionsDone]);
 
   useFocusEffect(
-    useCallback(() => (
-      () => {
+    useCallback(() => {
+      if (didAdvanceRef.current && permissionsDone) {
+        didAdvanceRef.current = false;
+        setPermissionsDone(false);
+        setLoadIndex(0);
+      }
+
+      return () => {
         if (completionTimeoutRef.current) {
           clearTimeout(completionTimeoutRef.current);
           completionTimeoutRef.current = null;
         }
-
-        if (permissionsDone || loadIndex > 0) {
-          setPermissionsDone(false);
-          setLoadIndex(0);
-        }
-      }
-    ), [loadIndex, permissionsDone]),
+      };
+    }, [permissionsDone]),
   );
 
   if (!permissionsDone) {
@@ -104,6 +111,7 @@ export default function PermissionsScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <Pressable
                 onPress={() => {
+                  triggerLightHaptic();
                   setOnboardingStep(4);
                   if (router.canGoBack()) {
                     router.back();

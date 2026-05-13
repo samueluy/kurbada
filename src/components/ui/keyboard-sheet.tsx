@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { Animated, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Dimensions, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/app-text';
@@ -21,6 +21,10 @@ export function KeyboardSheet({
   const insets = useSafeAreaInsets();
   const translateY = useRef(new Animated.Value(420)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const screenHeight = Dimensions.get('window').height;
+  const bottomLift = Platform.OS === 'android' ? Math.max(0, keyboardHeight - insets.bottom) : 0;
+  const maxSheetHeight = Math.max(320, screenHeight - insets.top - 24 - bottomLift);
 
   useEffect(() => {
     if (visible) {
@@ -44,17 +48,36 @@ export function KeyboardSheet({
     opacity.setValue(0);
   }, [opacity, translateY, visible]);
 
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <Animated.View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.62)', opacity }}>
         <Pressable style={{ flex: 1, justifyContent: 'flex-end' }} onPress={onClose}>
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={Platform.OS === 'ios' ? Math.max(insets.top, 16) : 0}>
             <Pressable onPress={() => undefined}>
               <Animated.View
                 style={{
                   transform: [{ translateY }],
+                  maxHeight: maxSheetHeight,
+                  marginBottom: bottomLift,
                   backgroundColor: palette.surfaceMuted,
                   borderTopLeftRadius: 24,
                   borderTopRightRadius: 24,
@@ -64,13 +87,18 @@ export function KeyboardSheet({
                 }}>
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
+                  nestedScrollEnabled
                   automaticallyAdjustKeyboardInsets
+                  keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                   bounces={false}
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={{
                     paddingHorizontal: 20,
                     paddingTop: 16,
-                    paddingBottom: insets.bottom + 20,
+                    paddingBottom:
+                      insets.bottom
+                      + 20
+                      + (Platform.OS === 'android' ? 12 + Math.min(bottomLift, 96) : 0),
                     gap: 14,
                   }}>
                   <View style={{ alignItems: 'center', gap: 12 }}>

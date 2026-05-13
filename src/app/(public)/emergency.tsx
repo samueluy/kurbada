@@ -12,6 +12,7 @@ import { GlassCard } from '@/components/ui/glass-card';
 import { palette, radius } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useEmergencyMutations } from '@/hooks/use-kurbada-data';
+import { triggerLightHaptic, triggerSuccessHaptic } from '@/lib/haptics';
 import { getOnboardingRoute, ONBOARDING_TOTAL_STEPS } from '@/lib/onboarding-flow';
 import { useAppStore } from '@/store/app-store';
 import type { EmergencyBloodType } from '@/types/domain';
@@ -66,11 +67,13 @@ export default function OnboardingEmergencyScreen() {
   );
 
   const handleContinue = async (skip = false) => {
+    triggerLightHaptic();
     if (!skip) {
       setOnboardingData({ fullName: form.full_name, bloodType: form.blood_type, emergencyContactName: form.contact1_name, emergencyContactPhone: form.contact1_phone, allergies: form.allergies, conditions: form.conditions });
       if (session?.user.id) {
         await saveEmergencyInfo.mutateAsync({ ...form, id: form.id || '' });
       }
+      triggerSuccessHaptic();
     }
     if (isOnboarding) {
       setOnboardingStep(4);
@@ -94,6 +97,7 @@ export default function OnboardingEmergencyScreen() {
         {forOnboarding ? (
           <Pressable
             onPress={() => {
+              triggerLightHaptic();
               setOnboardingStep(2);
               if (router.canGoBack()) {
                 router.back();

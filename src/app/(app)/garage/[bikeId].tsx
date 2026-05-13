@@ -13,6 +13,7 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { Colors, palette, radius } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useBikeMutations, useBikes, useMaintenanceMutations, useMaintenanceTasks } from '@/hooks/use-kurbada-data';
+import { triggerLightHaptic, triggerSuccessHaptic, triggerWarningHaptic } from '@/lib/haptics';
 import { useAppStore } from '@/store/app-store';
 import type { MaintenanceTask } from '@/types/domain';
 
@@ -131,6 +132,7 @@ export default function BikeProfileScreen() {
 
   const handleLogService = (task: typeof confirmTask) => {
     if (!task || !bike) return;
+    triggerSuccessHaptic();
     updateMaintenanceTask.mutate({
       ...task,
       last_done_odometer_km: bike.current_odometer_km,
@@ -153,6 +155,7 @@ export default function BikeProfileScreen() {
       interval_days: newDays,
       cost: editCost.trim() ? Number(editCost) : undefined,
     });
+    triggerSuccessHaptic();
     setEditTask(null);
     setEditIntervalKm('');
     setEditIntervalMonths('');
@@ -162,6 +165,7 @@ export default function BikeProfileScreen() {
   };
 
   const handleDelete = (taskId: string, taskName: string) => {
+    triggerWarningHaptic();
     Alert.alert(
       `Delete ${taskName}?`,
       'This will remove the task and its service history.',
@@ -198,6 +202,7 @@ export default function BikeProfileScreen() {
           }}>
           <Pressable
             onPress={() => {
+              triggerLightHaptic();
               setNicknameInput(bike.nickname ?? '');
               setShowNicknameEdit(true);
             }}
@@ -214,6 +219,7 @@ export default function BikeProfileScreen() {
           </Pressable>
           <Pressable
             onPress={() => {
+              triggerLightHaptic();
               setOdometerInput(bike.current_odometer_km.toString());
               setShowOdometerEdit(true);
             }}
@@ -229,7 +235,10 @@ export default function BikeProfileScreen() {
             <AppText variant="button" style={{ fontSize: 13, color: Colors.t1 }}>Edit Odometer</AppText>
           </Pressable>
           <Pressable
-            onPress={() => router.push({ pathname: '/(app)/garage/achievements/[bikeId]' as any, params: { bikeId: bike.id } })}
+            onPress={() => {
+              triggerLightHaptic();
+              router.push({ pathname: '/(app)/garage/achievements/[bikeId]' as any, params: { bikeId: bike.id } });
+            }}
             style={{
               paddingHorizontal: 16,
               paddingVertical: 9,
@@ -260,7 +269,10 @@ export default function BikeProfileScreen() {
             </View>
           ) : (
             <Pressable
-              onPress={() => setActiveBikeId(bike.id)}
+              onPress={() => {
+                triggerLightHaptic();
+                setActiveBikeId(bike.id);
+              }}
               style={{
                 paddingHorizontal: 16,
                 paddingVertical: 9,
@@ -301,8 +313,14 @@ export default function BikeProfileScreen() {
           return (
             <View key={task.id}>
               <Pressable
-                onPress={() => setConfirmTask(task)}
-                onLongPress={() => setMenuTask(task)}
+                onPress={() => {
+                  triggerLightHaptic();
+                  setConfirmTask(task);
+                }}
+                onLongPress={() => {
+                  triggerLightHaptic();
+                  setMenuTask(task);
+                }}
                 style={{ paddingVertical: 12, gap: 4 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                   <View style={{ flex: 1, gap: 3 }}>
@@ -358,7 +376,14 @@ export default function BikeProfileScreen() {
       </GlassCard>
 
       <View style={{ paddingTop: 8 }}>
-        <Button title="+ Add Custom Task" variant="ghost" onPress={() => setShowCustomForm(true)} />
+        <Button
+          title="+ Add Custom Task"
+          variant="ghost"
+          onPress={() => {
+            triggerLightHaptic();
+            setShowCustomForm(true);
+          }}
+        />
       </View>
 
       {/* Log Service Confirmation Modal */}
@@ -449,6 +474,7 @@ export default function BikeProfileScreen() {
             <Button
               title="Save"
               onPress={() => {
+                triggerSuccessHaptic();
                 saveBike.mutate({ ...bike, nickname: nicknameInput.trim() || null });
                 setShowNicknameEdit(false);
               }}
@@ -479,6 +505,7 @@ export default function BikeProfileScreen() {
               onPress={() => {
                 const value = Number(odometerInput);
                 if (!isNaN(value) && value > 0) {
+                  triggerSuccessHaptic();
                   saveBike.mutate({ ...bike, current_odometer_km: value });
                 }
                 setShowOdometerEdit(false);
@@ -526,6 +553,7 @@ export default function BikeProfileScreen() {
                   last_done_odometer_km: bike.current_odometer_km,
                   last_done_date: new Date().toISOString().slice(0, 10),
                 });
+                triggerSuccessHaptic();
                 setShowCustomForm(false);
                 setCustomTaskName('');
                 setCustomInterval('');
@@ -550,7 +578,13 @@ export default function BikeProfileScreen() {
                 onPress={() => {
                   const t = menuTask;
                   setMenuTask(null);
-                  if (t) { setEditTask(t); setEditIntervalKm(t.interval_km.toString()); setEditIntervalMonths(t.interval_days ? Math.round(t.interval_days / 30).toString() : ''); setEditCost(t.cost?.toString() ?? ''); }
+                  if (t) {
+                    triggerLightHaptic();
+                    setEditTask(t);
+                    setEditIntervalKm(t.interval_km.toString());
+                    setEditIntervalMonths(t.interval_days ? Math.round(t.interval_days / 30).toString() : '');
+                    setEditCost(t.cost?.toString() ?? '');
+                  }
                 }}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 8 }}>
                 <Ionicons name="pencil-outline" size={20} color={palette.textSecondary} />
@@ -562,6 +596,7 @@ export default function BikeProfileScreen() {
                   const t = menuTask;
                   const def = t ? defaultIntervals[t.task_name] : undefined;
                   if (t && def) {
+                    triggerSuccessHaptic();
                     setMenuTask(null);
                     updateMaintenanceTask.mutate({ ...t, interval_km: def.km, interval_days: def.days });
                     setToastMessage('✓ Reset to default');

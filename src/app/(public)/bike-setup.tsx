@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScreen, AppScrollScreen } from '@/components/ui/app-screen';
@@ -11,6 +11,7 @@ import { OnboardingHeader } from '@/components/ui/onboarding-header';
 import { BikeIdentityForm, BIKE_IDENTITY_EMPTY, resolveBikeIdentity, type BikeIdentityDraft } from '@/features/garage/components/bike-identity-form';
 import { bikeBrands, getModelsForBrand, inferBikeCategory } from '@/lib/bike-models';
 import { getOnboardingRoute } from '@/lib/onboarding-flow';
+import { triggerLightHaptic } from '@/lib/haptics';
 import { useAppStore } from '@/store/app-store';
 import type { RideMode } from '@/types/domain';
 
@@ -65,6 +66,7 @@ export default function BikeSetupScreen() {
       return;
     }
 
+    triggerLightHaptic();
     setOnboardingData({
       bikeBrand: finalBrand,
       bikeModel: finalModel,
@@ -115,15 +117,23 @@ export default function BikeSetupScreen() {
             </ScrollView>
             <View style={{ gap: 10 }}>
               <Button title="Next →" onPress={handleNext} disabled={!isValid} />
-              <Button
-                title="Already have an account? Sign in"
-                variant="ghost"
-                onPress={() => {
-                  clearAnonymousOnboardingDraft();
-                  completeOnboarding();
-                  router.replace('/(public)/auth/sign-in');
-                }}
-              />
+              <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                <AppText variant="meta" style={{ color: palette.textSecondary }}>
+                  Already have an account?
+                </AppText>
+                <Pressable
+                  hitSlop={8}
+                  onPress={() => {
+                    triggerLightHaptic();
+                    clearAnonymousOnboardingDraft();
+                    completeOnboarding();
+                    router.replace('/(public)/auth/sign-in');
+                  }}>
+                  <AppText variant="meta" style={{ color: palette.text, textDecorationLine: 'underline' }}>
+                    Sign in
+                  </AppText>
+                </Pressable>
+              </View>
             </View>
           </GlassCard>
         </KeyboardAvoidingView>

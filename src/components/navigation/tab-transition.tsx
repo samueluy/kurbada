@@ -12,15 +12,15 @@ type TabTransitionProps = {
  * animation — the focus-driven animation runs on every tab switch.
  */
 export function TabTransition({ children }: TabTransitionProps) {
-  const opacity = useSharedValue(0);
-  const translateY = useSharedValue(8);
+  const opacity = useSharedValue(0.92);
+  const translateY = useSharedValue(6);
 
   useFocusEffect(
     useCallback(() => {
-      opacity.value = 0;
-      translateY.value = 8;
-      opacity.value = withTiming(1, { duration: 280, easing: Easing.out(Easing.quad) });
-      translateY.value = withTiming(0, { duration: 280, easing: Easing.out(Easing.quad) });
+      opacity.value = 0.92;
+      translateY.value = 6;
+      opacity.value = withTiming(1, { duration: 360, easing: Easing.out(Easing.cubic) });
+      translateY.value = withTiming(0, { duration: 360, easing: Easing.out(Easing.cubic) });
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
   );

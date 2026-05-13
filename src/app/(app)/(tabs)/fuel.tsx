@@ -14,6 +14,7 @@ import { FuelEntryCard } from '@/features/fuel/components/fuel-entry-card';
 import { FuelSummaryCard } from '@/features/fuel/components/fuel-summary-card';
 import { palette, radius } from '@/constants/theme';
 import { formatCurrencyPhp } from '@/lib/format';
+import { triggerLightHaptic, triggerSuccessHaptic, triggerWarningHaptic } from '@/lib/haptics';
 import { useAuth } from '@/hooks/use-auth';
 import { useBikes, useFuelLogs, useFuelMutations } from '@/hooks/use-kurbada-data';
 import type { FuelLog } from '@/types/domain';
@@ -24,8 +25,8 @@ export default function FuelTabScreen() {
   const fuelLogs = useFuelLogs(session?.user.id);
   const { saveFuelLog, deleteFuelLog } = useFuelMutations(session?.user.id);
   const [showForm, setShowForm] = useState(false);
-  const [liters, setLiters] = useState('7');
-  const [price, setPrice] = useState('66');
+  const [liters, setLiters] = useState('');
+  const [price, setPrice] = useState('');
   const [station, setStation] = useState('');
   const [octane, setOctane] = useState<'91' | '95' | '97' | '100'>('95');
   const formProgress = useRef(new Animated.Value(0)).current;
@@ -95,6 +96,7 @@ export default function FuelTabScreen() {
   }, []);
 
   const handleDeleteEntry = useCallback((item: FuelLog) => {
+    triggerWarningHaptic();
     Alert.alert(
       'Delete fuel entry?',
       'This log will be removed from your fuel history.',
@@ -151,7 +153,10 @@ export default function FuelTabScreen() {
             {(['91', '95', '97', '100'] as const).map((value) => (
               <Pressable
                 key={value}
-                onPress={() => setOctane(value)}
+                onPress={() => {
+                  triggerLightHaptic();
+                  setOctane(value);
+                }}
                 style={{
                   flex: 1,
                   borderRadius: radius.sm,
@@ -185,6 +190,7 @@ export default function FuelTabScreen() {
                 octane_rating: Number(octane) as 91 | 95 | 97 | 100,
                 station_name: station,
               });
+              triggerSuccessHaptic();
               resetForm();
               setShowForm(false);
             }}

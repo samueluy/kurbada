@@ -1,9 +1,9 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Platform, Pressable, View } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, View } from "react-native";
 
-import { AppScrollScreen } from "@/components/ui/app-screen";
+import { AppScreen } from "@/components/ui/app-screen";
 import { AppText } from "@/components/ui/app-text";
 import { Button } from "@/components/ui/button";
 import { FloatingField } from "@/components/ui/floating-field";
@@ -11,6 +11,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { palette, radius } from "@/constants/theme";
 import { useAuth } from "@/hooks/use-auth";
 import { useBoardMutations, useRideListings } from "@/hooks/use-kurbada-data";
+import { triggerLightHaptic, triggerSuccessHaptic } from "@/lib/haptics";
 import { env } from "@/lib/env";
 import { getMapboxModule } from "@/lib/mapbox";
 import type { LobbyPlatform, RidePace } from "@/types/domain";
@@ -74,6 +75,7 @@ export default function CreateRideScreen() {
   const [lobbyLink, setLobbyLink] = useState("");
   const [showDateTimePicker, setShowDateTimePicker] = useState(false);
   const [androidPickerMode, setAndroidPickerMode] = useState<"date" | "time" | null>(null);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
 
   useEffect(() => {
     if (!existingListing) return;
@@ -194,17 +196,23 @@ export default function CreateRideScreen() {
       await createRideListing.mutateAsync(payload);
     }
 
+    triggerSuccessHaptic();
     router.back();
   };
 
   return (
-    <AppScrollScreen
-      contentContainerStyle={{
-        paddingHorizontal: 16,
-        paddingBottom: 40,
-        gap: 18,
-      }}
-    >
+    <AppScreen style={{ paddingHorizontal: 0, paddingTop: 0 }} showWordmark={false}>
+      <ScrollView
+        scrollEnabled={scrollEnabled}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 40,
+          gap: 18,
+        }}
+      >
       <View style={{ gap: 8, paddingTop: 8 }}>
         <AppText variant="eyebrow">Create Ride</AppText>
         <AppText variant="screenTitle">
@@ -235,6 +243,7 @@ export default function CreateRideScreen() {
             title={showMapPin ? "Remove Map Pin" : "+ Pin Location on Map"}
             variant="ghost"
             onPress={() => {
+              triggerLightHaptic();
               setShowMapPin(!showMapPin);
               if (!showMapPin && !mapCenter) {
                 setMapCenter(
@@ -260,6 +269,7 @@ export default function CreateRideScreen() {
               </View>
               <Pressable
                 onPress={() => {
+                  triggerLightHaptic();
                   void handleMapSearch();
                 }}
                 style={{
@@ -277,12 +287,19 @@ export default function CreateRideScreen() {
               </Pressable>
             </View>
 
-            <View style={{ height: 220, borderRadius: radius.md, overflow: "hidden", borderWidth: 0.5, borderColor: palette.border }}>
+            <View
+              style={{ height: 220, borderRadius: radius.md, overflow: "hidden", borderWidth: 0.5, borderColor: palette.border }}
+              onTouchStart={() => setScrollEnabled(false)}
+              onTouchMove={() => setScrollEnabled(false)}
+              onTouchEnd={() => setScrollEnabled(true)}
+              onTouchCancel={() => setScrollEnabled(true)}
+            >
               <Mapbox.MapView
                 style={{ flex: 1 }}
                 styleURL="mapbox://styles/mapbox/dark-v11"
                 onPress={handleMapPress}
                 onLongPress={handleMapPress}
+                onMapIdle={() => setScrollEnabled(true)}
                 attributionEnabled={false}
                 logoEnabled={false}
                 compassEnabled
@@ -321,7 +338,11 @@ export default function CreateRideScreen() {
                 <AppText variant="meta" style={{ color: palette.textSecondary, flex: 1 }}>
                   Pin set at {meetupCoords.lat.toFixed(5)}, {meetupCoords.lng.toFixed(5)}
                 </AppText>
-                <Pressable onPress={() => setMeetupCoords(null)}>
+                <Pressable
+                  onPress={() => {
+                    triggerLightHaptic();
+                    setMeetupCoords(null);
+                  }}>
                   <AppText variant="button" style={{ color: palette.danger, fontSize: 12 }}>
                     Clear Pin
                   </AppText>
@@ -393,7 +414,10 @@ export default function CreateRideScreen() {
             {paceOptions.map((option) => (
               <Pressable
                 key={option.value}
-                onPress={() => setPace(option.value)}
+                onPress={() => {
+                  triggerLightHaptic();
+                  setPace(option.value);
+                }}
                 style={{
                   flex: 1,
                   borderRadius: radius.sm,
@@ -440,7 +464,10 @@ export default function CreateRideScreen() {
               return (
                 <Pressable
                   key={option.value}
-                  onPress={() => setLobbyPlatform(option.value)}
+                  onPress={() => {
+                    triggerLightHaptic();
+                    setLobbyPlatform(option.value);
+                  }}
                   style={{
                     borderRadius: radius.sm,
                     paddingVertical: 10,
@@ -491,11 +518,22 @@ export default function CreateRideScreen() {
 
       <Button
         title={existingListing ? "Save Changes" : "Post Ride"}
-        onPress={handlePost}
+        onPress={() => {
+          triggerLightHaptic();
+          void handlePost();
+        }}
         disabled={rideDate.getTime() < Date.now() || rideDate.getTime() > Date.now() + 365 * 24 * 60 * 60 * 1000}
         style={{ backgroundColor: palette.danger }}
       />
-      <Button title="Cancel" variant="ghost" onPress={() => router.back()} />
-    </AppScrollScreen>
+      <Button
+        title="Cancel"
+        variant="ghost"
+        onPress={() => {
+          triggerLightHaptic();
+          router.back();
+        }}
+      />
+      </ScrollView>
+    </AppScreen>
   );
 }

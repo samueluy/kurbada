@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { GlassCard } from '@/components/ui/glass-card';
 import { ProgressDots } from '@/components/ui/progress-dots';
 import { palette, radius } from '@/constants/theme';
+import { triggerLightHaptic } from '@/lib/haptics';
 import { getOnboardingRoute, ONBOARDING_TOTAL_STEPS } from '@/lib/onboarding-flow';
 import {
   getDefaultMaintenancePresets,
@@ -50,6 +51,7 @@ export default function OnboardingMaintenanceScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <Pressable
               onPress={() => {
+                triggerLightHaptic();
                 setOnboardingStep(1);
                 if (router.canGoBack()) {
                   router.back();
@@ -82,7 +84,10 @@ export default function OnboardingMaintenanceScreen() {
               return (
                 <Pressable
                   key={key}
-                  onPress={() => togglePreset(key)}
+                  onPress={() => {
+                    triggerLightHaptic();
+                    togglePreset(key);
+                  }}
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
@@ -119,6 +124,7 @@ export default function OnboardingMaintenanceScreen() {
         <Button
           title="Next →"
           onPress={() => {
+            triggerLightHaptic();
             setOnboardingStep(3);
             router.push(getOnboardingRoute(3) as any);
           }}

@@ -8,6 +8,7 @@ import { AppScreen } from '@/components/ui/app-screen';
 import { Button } from '@/components/ui/button';
 import { GlassCard } from '@/components/ui/glass-card';
 import { palette, radius } from '@/constants/theme';
+import { triggerLightHaptic } from '@/lib/haptics';
 import { getOnboardingRoute, ONBOARDING_TOTAL_STEPS } from '@/lib/onboarding-flow';
 import { useAppStore, type RidingPersona } from '@/store/app-store';
 
@@ -33,6 +34,7 @@ export default function OnboardingFeaturesScreen() {
   const [selected, setSelected] = useState<RidingPersona>(ridingPersona ?? 'leisure');
 
   const handleContinue = () => {
+    triggerLightHaptic();
     setRidingPersona(selected);
     // Auto-enable work mode if the rider picks work persona
     if (selected === 'work') setWorkMode(true);
@@ -47,6 +49,7 @@ export default function OnboardingFeaturesScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <Pressable
               onPress={() => {
+                triggerLightHaptic();
                 setOnboardingStep(3);
                 if (router.canGoBack()) {
                   router.back();
@@ -74,7 +77,10 @@ export default function OnboardingFeaturesScreen() {
               return (
                 <Pressable
                   key={opt.id}
-                  onPress={() => setSelected(opt.id)}
+                  onPress={() => {
+                    triggerLightHaptic();
+                    setSelected(opt.id);
+                  }}
                   style={{
                     flexDirection: 'row',
                     gap: 14,

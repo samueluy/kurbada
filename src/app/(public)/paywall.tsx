@@ -11,6 +11,7 @@ import { Colors, palette, radius } from "@/constants/theme";
 import { useAuth } from "@/hooks/use-auth";
 import { useReferralMutations } from "@/hooks/use-kurbada-data";
 import { useUserProfile } from "@/hooks/use-user-access";
+import { triggerLightHaptic, triggerSuccessHaptic } from "@/lib/haptics";
 import { env } from "@/lib/env";
 import { normalizeReferralCode, validateReferralCode } from "@/lib/referrals";
 import {
@@ -160,6 +161,7 @@ export default function PaywallScreen() {
     try {
       const result = await purchasePremium();
       if (result.success) {
+        triggerSuccessHaptic();
         setPurchaseCompleted(true);
         setOnboardingStep(7);
         router.replace("/(public)/success" as any);
@@ -186,6 +188,7 @@ export default function PaywallScreen() {
     }
 
     if (!env.revenueCatEnabled) {
+      triggerSuccessHaptic();
       setPurchaseCompleted(true);
       setOnboardingStep(7);
       router.replace("/(public)/success" as any);
@@ -240,6 +243,7 @@ export default function PaywallScreen() {
   const handleRestore = async () => {
     const result = await restorePremiumPurchases();
     if (result.success && result.hasPremium) {
+      triggerSuccessHaptic();
       setPurchaseCompleted(true);
       setOnboardingStep(7);
       router.replace("/(public)/success" as any);
@@ -295,6 +299,7 @@ export default function PaywallScreen() {
                 >
                   <Pressable
                     onPress={() => {
+                      triggerLightHaptic();
                       setOnboardingStep(5);
                       if (router.canGoBack()) {
                         router.back();
@@ -501,7 +506,10 @@ export default function PaywallScreen() {
                     Boolean(session?.user.id) &&
                     (isLoadingOffering || !offeringPackage || !billingAvailable))
                 }
-                onPress={handleStartTrial}
+                onPress={() => {
+                  triggerLightHaptic();
+                  void handleStartTrial();
+                }}
                 onPressIn={() => {
                   Animated.timing(ctaScale, {
                     toValue: 0.97,
@@ -569,7 +577,10 @@ export default function PaywallScreen() {
               }}
             >
               <Pressable
-                onPress={handleRestore}
+                onPress={() => {
+                  triggerLightHaptic();
+                  void handleRestore();
+                }}
                 style={{ paddingVertical: 8, paddingHorizontal: 12 }}
               >
                 <AppText
@@ -581,17 +592,22 @@ export default function PaywallScreen() {
               </Pressable>
 
               {!session?.user.id ? (
-                <Pressable
-                  onPress={() => router.push('/(public)/auth/sign-in')}
-                  style={{ paddingVertical: 8, paddingHorizontal: 12 }}
-                >
-                  <AppText
-                    variant="bodyBold"
-                    style={{ fontSize: 13, color: Colors.t3 }}
-                  >
-                    Already have an account? Sign in
+                <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4, flexWrap: 'wrap', paddingVertical: 8 }}>
+                  <AppText variant="meta" style={{ fontSize: 13, color: Colors.t3 }}>
+                    Already have an account?
                   </AppText>
-                </Pressable>
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() => {
+                      triggerLightHaptic();
+                      router.push('/(public)/auth/sign-in');
+                    }}
+                  >
+                    <AppText variant="bodyBold" style={{ fontSize: 13, color: Colors.t2 }}>
+                      Sign in
+                    </AppText>
+                  </Pressable>
+                </View>
               ) : null}
 
               <AppText

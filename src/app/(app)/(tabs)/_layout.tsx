@@ -1,10 +1,20 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, palette } from '@/constants/theme';
 import { Tabs } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { triggerLightHaptic } from '@/lib/haptics';
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
+      screenListeners={{
+        tabPress: () => {
+          triggerLightHaptic();
+        },
+      }}
       screenOptions={{
         headerShown: false,
         sceneStyle: { backgroundColor: palette.background },
@@ -14,12 +24,13 @@ export default function TabsLayout() {
           backgroundColor: 'rgba(10,10,10,0.96)',
           borderTopColor: Colors.border,
           borderTopWidth: 0.5,
-          height: 64,
-          paddingTop: 6,
-          paddingBottom: 8,
+          height: 58 + Math.max(insets.bottom, 10),
+          paddingTop: 8,
+          paddingBottom: Math.max(insets.bottom, 10),
         },
         tabBarLabelStyle: {
           fontSize: 11,
+          marginBottom: 2,
         },
         tabBarHideOnKeyboard: true,
       }}

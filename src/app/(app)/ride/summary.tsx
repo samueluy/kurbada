@@ -2,9 +2,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, InteractionManager, Modal, Pressable, ScrollView, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { runOnJS, useAnimatedReaction, useSharedValue } from 'react-native-reanimated';
+import { Alert, InteractionManager, Pressable, ScrollView, View } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 
 import { RouteMapPreview } from '@/components/ride/route-map-preview';
@@ -22,7 +20,9 @@ import { useEarningsMutations, useFuelLogs, useRideDetails, useRideMutations } f
 import { palette, radius } from '@/constants/theme';
 import { rideStoryTemplates, type RideStoryTemplateId } from '@/lib/ride-story';
 import { MoodPicker } from '@/features/ride/components/mood-picker';
+import { triggerLightHaptic, triggerSuccessHaptic, triggerWarningHaptic } from '@/lib/haptics';
 import { useAppStore, type PlatformTag } from '@/store/app-store';
+import { useRideShareStore } from '@/store/ride-share-store';
 import type { RideMood } from '@/types/domain';
 
 const platformLabels: Record<PlatformTag, string> = {
@@ -57,15 +57,32 @@ export default function RideSummaryScreen() {
   const { saveEarnings } = useEarningsMutations(session?.user.id);
   const { updateRideMood, deleteRide } = useRideMutations(session?.user.id);
   const storyShotRef = useRef<any>(null);
+  const draft = useRideShareStore((state) => state.draft);
+  const initializeDraft = useRideShareStore((state) => state.initializeDraft);
+  const updateDraft = useRideShareStore((state) => state.updateDraft);
+  const clearPhoto = useRideShareStore((state) => state.clearPhoto);
 
   useEffect(() => {
     setMood(ride?.mood ?? null);
   }, [ride?.mood]);
 
+  useEffect(() => {
+    if (ride?.id) {
+      initializeDraft(ride.id);
+    }
+  }, [initializeDraft, ride?.id]);
+
   const handleSaveMood = async (next: RideMood) => {
     if (!ride) return;
+    triggerLightHaptic();
     setMood(next);
-    try { await updateRideMood.mutateAsync({ rideId: ride.id, mood: next }); setMoodSaved(true); } catch { /* */ }
+    try {
+      await updateRideMood.mutateAsync({ rideId: ride.id, mood: next });
+      triggerSuccessHaptic();
+      setMoodSaved(true);
+    } catch {
+      // ignore
+    }
   };
 
   const handleSaveEarnings = async () => {
@@ -74,6 +91,7 @@ export default function RideSummaryScreen() {
     if (!Number.isFinite(amount) || amount <= 0) { Alert.alert('Invalid amount', 'Enter a valid amount.'); return; }
     try {
       await saveEarnings.mutateAsync({ user_id: session.user.id, ride_id: ride.id, bike_id: ride.bike_id, earned_at: ride.ended_at.slice(0, 10), amount, platform, notes: null });
+      triggerSuccessHaptic();
       setEarningsSaved(true);
     } catch (error) { Alert.alert('Save failed', error instanceof Error ? error.message : 'Please try again.'); }
   };
@@ -82,10 +100,16 @@ export default function RideSummaryScreen() {
     try {
       const pickerResult = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
       if (pickerResult.canceled || !pickerResult.assets?.length) return;
-      setStoryPhoto(pickerResult.assets[0].uri);
-      setPhotoScale(1.3); setPhotoOffsetX(0); setPhotoOffsetY(-40);
-      setAdjustMode('photo');
-      setShowPhotoAdjust(true);
+      triggerSuccessHaptic();
+      updateDraft({
+        photoUri: pickerResult.assets[0].uri,
+        photoScale: 1.3,
+        photoOffsetX: 0,
+        photoOffsetY: -40,
+      });
+      if (ride?.id) {
+        router.push({ pathname: '/(app)/ride/share-editor' as any, params: { rideId: ride.id } });
+      }
     } catch (error) { Alert.alert('Photo picker failed', error instanceof Error ? error.message : 'Could not open photo library.'); }
   };
 
@@ -98,129 +122,9 @@ export default function RideSummaryScreen() {
   };
 
   const handleShareToStories = async () => {
-    if (!storyPhoto) { await pickStoryPhoto(); return; }
+    if (!draft.photoUri) { await pickStoryPhoto(); return; }
     InteractionManager.runAfterInteractions(() => { void captureAndShare(); });
   };
-  const [selectedTemplate, setSelectedTemplate] = useState<RideStoryTemplateId>('distance_hero');
-  const [storyPhoto, setStoryPhoto] = useState<string | undefined>();
-  const [showPhotoAdjust, setShowPhotoAdjust] = useState(false);
-  const [adjustMode, setAdjustMode] = useState<'photo' | 'template'>('photo');
-  const [photoScale, setPhotoScale] = useState(1.3);
-  const [photoOffsetX, setPhotoOffsetX] = useState(0);
-  const [photoOffsetY, setPhotoOffsetY] = useState(-40);
-  const [overlayScale, setOverlayScale] = useState(1);
-  const [overlayOffsetX, setOverlayOffsetX] = useState(0);
-  const [overlayOffsetY, setOverlayOffsetY] = useState(0);
-  const draftPhotoScale = useSharedValue(1.3);
-  const draftPhotoOffsetX = useSharedValue(0);
-  const draftPhotoOffsetY = useSharedValue(-40);
-  const draftOverlayScale = useSharedValue(1);
-  const draftOverlayOffsetX = useSharedValue(0);
-  const draftOverlayOffsetY = useSharedValue(0);
-  const gestureStartScale = useSharedValue(1);
-  const gestureStartX = useSharedValue(0);
-  const gestureStartY = useSharedValue(0);
-  const adjustModeValue = useSharedValue<0 | 1>(0);
-
-  useEffect(() => {
-    adjustModeValue.value = adjustMode === 'photo' ? 0 : 1;
-  }, [adjustMode, adjustModeValue]);
-
-  useEffect(() => {
-    if (!showPhotoAdjust) return;
-    draftPhotoScale.value = photoScale;
-    draftPhotoOffsetX.value = photoOffsetX;
-    draftPhotoOffsetY.value = photoOffsetY;
-    draftOverlayScale.value = overlayScale;
-    draftOverlayOffsetX.value = overlayOffsetX;
-    draftOverlayOffsetY.value = overlayOffsetY;
-  }, [
-    adjustMode,
-    draftOverlayOffsetX,
-    draftOverlayOffsetY,
-    draftOverlayScale,
-    draftPhotoOffsetX,
-    draftPhotoOffsetY,
-    draftPhotoScale,
-    overlayOffsetX,
-    overlayOffsetY,
-    overlayScale,
-    photoOffsetX,
-    photoOffsetY,
-    photoScale,
-    showPhotoAdjust,
-  ]);
-
-  useAnimatedReaction(
-    () => ({
-      photoScale: draftPhotoScale.value,
-      photoOffsetX: draftPhotoOffsetX.value,
-      photoOffsetY: draftPhotoOffsetY.value,
-      overlayScale: draftOverlayScale.value,
-      overlayOffsetX: draftOverlayOffsetX.value,
-      overlayOffsetY: draftOverlayOffsetY.value,
-    }),
-    (next, previous) => {
-      if (
-        previous
-        && next.photoScale === previous.photoScale
-        && next.photoOffsetX === previous.photoOffsetX
-        && next.photoOffsetY === previous.photoOffsetY
-        && next.overlayScale === previous.overlayScale
-        && next.overlayOffsetX === previous.overlayOffsetX
-        && next.overlayOffsetY === previous.overlayOffsetY
-      ) {
-        return;
-      }
-
-      runOnJS(setPhotoScale)(Number(next.photoScale.toFixed(3)));
-      runOnJS(setPhotoOffsetX)(Number(next.photoOffsetX.toFixed(1)));
-      runOnJS(setPhotoOffsetY)(Number(next.photoOffsetY.toFixed(1)));
-      runOnJS(setOverlayScale)(Number(next.overlayScale.toFixed(3)));
-      runOnJS(setOverlayOffsetX)(Number(next.overlayOffsetX.toFixed(1)));
-      runOnJS(setOverlayOffsetY)(Number(next.overlayOffsetY.toFixed(1)));
-    },
-  );
-
-  const editorGesture = useMemo(() => Gesture.Simultaneous(
-    Gesture.Pan()
-      .onBegin(() => {
-        gestureStartX.value = adjustModeValue.value === 0 ? draftPhotoOffsetX.value : draftOverlayOffsetX.value;
-        gestureStartY.value = adjustModeValue.value === 0 ? draftPhotoOffsetY.value : draftOverlayOffsetY.value;
-      })
-      .onUpdate((event) => {
-        if (adjustModeValue.value === 0) {
-          draftPhotoOffsetX.value = gestureStartX.value + event.translationX;
-          draftPhotoOffsetY.value = gestureStartY.value + event.translationY;
-          return;
-        }
-        draftOverlayOffsetX.value = gestureStartX.value + event.translationX;
-        draftOverlayOffsetY.value = gestureStartY.value + event.translationY;
-      }),
-    Gesture.Pinch()
-      .onBegin(() => {
-        gestureStartScale.value = adjustModeValue.value === 0 ? draftPhotoScale.value : draftOverlayScale.value;
-      })
-      .onUpdate((event) => {
-        const nextScale = Math.max(0.6, Math.min(3, gestureStartScale.value * event.scale));
-        if (adjustModeValue.value === 0) {
-          draftPhotoScale.value = nextScale;
-          return;
-        }
-        draftOverlayScale.value = nextScale;
-      }),
-  ), [
-    adjustModeValue,
-    draftOverlayOffsetX,
-    draftOverlayOffsetY,
-    draftOverlayScale,
-    draftPhotoOffsetX,
-    draftPhotoOffsetY,
-    draftPhotoScale,
-    gestureStartScale,
-    gestureStartX,
-    gestureStartY,
-  ]);
   const estimatedFuelCost = (ride?.fuel_used_liters ?? 0) * (latestFuelPrice ?? 65);
 
   if (rideQuery.isLoading && !ride) {
@@ -375,13 +279,16 @@ export default function RideSummaryScreen() {
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
             {rideStoryTemplates.map((template) => {
-              const active = selectedTemplate === template.id;
+              const active = draft.templateId === template.id;
               return (
                 <Button
                   key={template.id}
                   title={template.label}
                   variant={active ? 'primary' : 'secondary'}
-                  onPress={() => setSelectedTemplate(template.id)}
+                  onPress={() => {
+                    triggerLightHaptic();
+                    updateDraft({ templateId: template.id as RideStoryTemplateId });
+                  }}
                   style={{
                     minHeight: 40,
                     paddingHorizontal: 14,
@@ -396,56 +303,40 @@ export default function RideSummaryScreen() {
           <View style={{ alignItems: 'center' }}>
             <IgStoryCanvas
               ride={ride}
-              photoUri={storyPhoto}
-              templateId={selectedTemplate}
+              photoUri={draft.photoUri}
+              templateId={draft.templateId}
               fuelPricePerLiter={latestFuelPrice}
               width={240}
-              photoScale={photoScale}
-              photoOffsetX={photoOffsetX}
-              photoOffsetY={photoOffsetY}
-              overlayScale={overlayScale}
-              overlayOffsetX={overlayOffsetX}
-              overlayOffsetY={overlayOffsetY}
+              photoScale={draft.photoScale}
+              photoOffsetX={draft.photoOffsetX}
+              photoOffsetY={draft.photoOffsetY}
+              overlayScale={draft.overlayScale}
+              overlayOffsetX={draft.overlayOffsetX}
+              overlayOffsetY={draft.overlayOffsetY}
             />
           </View>
 
           <View style={{ gap: 10 }}>
             <Button
-              title={storyPhoto ? 'Change Photo' : 'Pick Album Photo'}
+              title="Choose Photo"
               variant="secondary"
               onPress={pickStoryPhoto}
             />
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View style={{ flex: 1 }}>
-                <Button
-                  title="Adjust Photo"
-                  variant="secondary"
-                  onPress={() => {
-                    setAdjustMode('photo');
-                    setShowPhotoAdjust(true);
-                  }}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Button
-                  title="Adjust Template"
-                  variant="secondary"
-                  onPress={() => {
-                    setAdjustMode('template');
-                    setShowPhotoAdjust(true);
-                  }}
-                />
-              </View>
-            </View>
-            {storyPhoto ? (
+            <Button
+              title="Adjust"
+              variant="secondary"
+              onPress={() => {
+                triggerLightHaptic();
+                router.push({ pathname: '/(app)/ride/share-editor' as any, params: { rideId: ride.id } });
+              }}
+            />
+            {draft.photoUri ? (
               <Button
                 title="Use Route Background Instead"
                 variant="ghost"
                 onPress={() => {
-                  setStoryPhoto(undefined);
-                  setPhotoScale(1.3);
-                  setPhotoOffsetX(0);
-                  setPhotoOffsetY(-40);
+                  triggerLightHaptic();
+                  clearPhoto();
                 }}
               />
             ) : null}
@@ -461,6 +352,7 @@ export default function RideSummaryScreen() {
           title="Delete Ride"
           variant="ghost"
           onPress={() => {
+            triggerWarningHaptic();
             Alert.alert('Delete this ride?', 'This will permanently remove the ride record and its route data.', [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Delete', style: 'destructive', onPress: () => { deleteRide.mutate(ride.id); router.replace('/(app)/(tabs)/ride'); } },
@@ -468,92 +360,6 @@ export default function RideSummaryScreen() {
           }}
         />
       </AppScrollScreen>
-
-      <Modal visible={showPhotoAdjust} transparent animationType="fade">
-        <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', paddingHorizontal: 20, gap: 16 }}>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Pressable
-              onPress={() => setAdjustMode('photo')}
-              style={{
-                flex: 1,
-                borderRadius: radius.pill,
-                paddingVertical: 10,
-                alignItems: 'center',
-                backgroundColor: adjustMode === 'photo' ? palette.text : 'rgba(255,255,255,0.06)',
-              }}>
-              <AppText variant="button" style={{ fontSize: 12, color: adjustMode === 'photo' ? palette.background : palette.textSecondary }}>
-                Photo
-              </AppText>
-            </Pressable>
-            <Pressable
-              onPress={() => setAdjustMode('template')}
-              style={{
-                flex: 1,
-                borderRadius: radius.pill,
-                paddingVertical: 10,
-                alignItems: 'center',
-                backgroundColor: adjustMode === 'template' ? palette.text : 'rgba(255,255,255,0.06)',
-              }}>
-              <AppText variant="button" style={{ fontSize: 12, color: adjustMode === 'template' ? palette.background : palette.textSecondary }}>
-                Template
-              </AppText>
-            </Pressable>
-          </View>
-
-          <GestureDetector gesture={editorGesture}>
-            <View style={{ alignItems: 'center' }}>
-              <IgStoryCanvas
-                ride={ride}
-                photoUri={storyPhoto}
-                templateId={selectedTemplate}
-                fuelPricePerLiter={latestFuelPrice}
-                photoScale={photoScale}
-                photoOffsetX={photoOffsetX}
-                photoOffsetY={photoOffsetY}
-                overlayScale={overlayScale}
-                overlayOffsetX={overlayOffsetX}
-                overlayOffsetY={overlayOffsetY}
-                width={300}
-              />
-            </View>
-          </GestureDetector>
-
-          <View style={{ gap: 8 }}>
-            <AppText variant="meta" style={{ color: palette.textSecondary, textAlign: 'center', fontSize: 12 }}>
-              {adjustMode === 'photo'
-                ? 'Pinch to zoom the photo and drag to position it.'
-                : 'Pinch to scale the template and drag it into place.'}
-            </AppText>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View style={{ flex: 1 }}>
-                <Button
-                  title="Reset"
-                  variant="secondary"
-                  onPress={() => {
-                    if (adjustMode === 'photo') {
-                      draftPhotoScale.value = 1.3;
-                      draftPhotoOffsetX.value = 0;
-                      draftPhotoOffsetY.value = -40;
-                      return;
-                    }
-
-                    draftOverlayScale.value = 1;
-                    draftOverlayOffsetX.value = 0;
-                    draftOverlayOffsetY.value = 0;
-                  }}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Button
-                  title="Done"
-                  onPress={() => setShowPhotoAdjust(false)}
-                  style={{ backgroundColor: palette.danger }}
-                />
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       <View
         pointerEvents="none"
@@ -571,15 +377,15 @@ export default function RideSummaryScreen() {
           options={{ result: 'tmpfile', quality: 1, width: 1080, height: 1920, format: 'png' }}>
           <IgStoryCanvas
             ride={ride}
-            photoUri={storyPhoto}
-            templateId={selectedTemplate}
+            photoUri={draft.photoUri}
+            templateId={draft.templateId}
             fuelPricePerLiter={latestFuelPrice}
-            photoScale={photoScale}
-            photoOffsetX={photoOffsetX}
-            photoOffsetY={photoOffsetY}
-            overlayScale={overlayScale}
-            overlayOffsetX={overlayOffsetX}
-            overlayOffsetY={overlayOffsetY}
+            photoScale={draft.photoScale}
+            photoOffsetX={draft.photoOffsetX}
+            photoOffsetY={draft.photoOffsetY}
+            overlayScale={draft.overlayScale}
+            overlayOffsetX={draft.overlayOffsetX}
+            overlayOffsetY={draft.overlayOffsetY}
             width={1080}
           />
         </ViewShot>
