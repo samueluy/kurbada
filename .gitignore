@@ -45,3 +45,16 @@ app-example
 
 #keystore
 *.jks
+
+# Android / Gradle build outputs
+**/android/build/
+**/.gradle/
+**/build/
+
+# Kotlin/Java temp files
+*.class
+*.dex
+
+# builds
+*.aab
+*.apk
