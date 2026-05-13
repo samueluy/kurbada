@@ -79,6 +79,8 @@ type AppStore = {
   hasSeenCommunityGuidelines: boolean;
   dailySummaryEnabled: boolean;
   dailySummaryHour: number; // 0-23, local time
+  comebackNudgesEnabled: boolean;
+  lobbyRemindersEnabled: boolean;
   acknowledgedBikeMilestones: Record<string, number[]>; // bikeId -> list of odo km thresholds
   setHasSeenSplash: () => void;
   completeOnboarding: () => void;
@@ -106,6 +108,8 @@ type AppStore = {
   setHasSeenCommunityGuidelines: (value: boolean) => void;
   setDailySummaryEnabled: (value: boolean) => void;
   setDailySummaryHour: (hour: number) => void;
+  setComebackNudgesEnabled: (value: boolean) => void;
+  setLobbyRemindersEnabled: (value: boolean) => void;
   acknowledgeBikeMilestone: (bikeId: string, milestoneKm: number) => void;
   resetForSignOut: () => void;
   markOnboardingSyncing: () => void;
@@ -115,7 +119,7 @@ type AppStore = {
   resetOnboardingData: () => void;
 };
 
-const APP_STORE_VERSION = 2;
+const APP_STORE_VERSION = 3;
 
 function migrateOnboardingStep(step: number | undefined): OnboardingStep {
   switch (step) {
@@ -172,6 +176,8 @@ export const useAppStore = create<AppStore>()(
       hasSeenCommunityGuidelines: false,
       dailySummaryEnabled: false,
       dailySummaryHour: 21,
+      comebackNudgesEnabled: true,
+      lobbyRemindersEnabled: true,
       acknowledgedBikeMilestones: {},
       setHasSeenSplash: () => set({ hasSeenSplash: true }),
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
@@ -226,6 +232,8 @@ export const useAppStore = create<AppStore>()(
       setHasSeenCommunityGuidelines: (hasSeenCommunityGuidelines) => set({ hasSeenCommunityGuidelines }),
       setDailySummaryEnabled: (dailySummaryEnabled) => set({ dailySummaryEnabled }),
       setDailySummaryHour: (dailySummaryHour) => set({ dailySummaryHour }),
+      setComebackNudgesEnabled: (comebackNudgesEnabled) => set({ comebackNudgesEnabled }),
+      setLobbyRemindersEnabled: (lobbyRemindersEnabled) => set({ lobbyRemindersEnabled }),
       acknowledgeBikeMilestone: (bikeId, milestoneKm) =>
         set((state) => {
           const existing = state.acknowledgedBikeMilestones[bikeId] ?? [];
@@ -310,6 +318,8 @@ export const useAppStore = create<AppStore>()(
               persisted.onboardingDraftTargetMode === 'new-account-only'
                 ? persisted.onboardingDraftTargetEmail ?? null
                 : null,
+            comebackNudgesEnabled: persisted.comebackNudgesEnabled ?? true,
+            lobbyRemindersEnabled: persisted.lobbyRemindersEnabled ?? true,
           };
         }
 
@@ -363,10 +373,12 @@ export const useAppStore = create<AppStore>()(
         workMode: state.workMode,
         dailyEarningsGoal: state.dailyEarningsGoal,
         hasSeenCommunityGuidelines: state.hasSeenCommunityGuidelines,
-        dailySummaryEnabled: state.dailySummaryEnabled,
-        dailySummaryHour: state.dailySummaryHour,
-        acknowledgedBikeMilestones: state.acknowledgedBikeMilestones,
-      }),
+          dailySummaryEnabled: state.dailySummaryEnabled,
+          dailySummaryHour: state.dailySummaryHour,
+          comebackNudgesEnabled: state.comebackNudgesEnabled,
+          lobbyRemindersEnabled: state.lobbyRemindersEnabled,
+          acknowledgedBikeMilestones: state.acknowledgedBikeMilestones,
+        }),
     },
   ),
 );

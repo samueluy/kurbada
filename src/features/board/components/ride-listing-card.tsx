@@ -1,11 +1,11 @@
 import { CalendarDays, Flag, MapPin, Star, Users } from 'lucide-react-native';
 import { memo } from 'react';
 import { Image, Pressable, ScrollView, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { GlassCard } from '@/components/ui/glass-card';
 import { AppText } from '@/components/ui/app-text';
 import { palette, radius } from '@/constants/theme';
+import { getStaticPointMapUrl } from '@/lib/static-map';
 import type { RideListing } from '@/types/domain';
 
 const paceColors: Record<RideListing['pace'], { bg: string; fg: string }> = {
@@ -22,6 +22,13 @@ const paceLabels: Record<RideListing['pace'], string> = {
 
 function MapPreview({ listing }: { listing: RideListing }) {
   const coords = listing.meetup_coordinates;
+  const mapUrl = getStaticPointMapUrl({
+    coordinate: coords,
+    width: 320,
+    height: 120,
+    zoom: 12.8,
+  });
+
   return (
     <View
       style={{
@@ -29,41 +36,45 @@ function MapPreview({ listing }: { listing: RideListing }) {
         borderRadius: radius.md,
         backgroundColor: '#0D1B2A',
         overflow: 'hidden',
-        padding: 14,
-        justifyContent: 'space-between',
       }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <View style={{ gap: 4, flex: 1, paddingRight: 10 }}>
-          <AppText variant="label" style={{ color: palette.textTertiary }}>
-            MEETUP PIN
+      {mapUrl ? (
+        <Image
+          source={{ uri: mapUrl }}
+          style={{ width: '100%', height: '100%' }}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 }}>
+          <MapPin size={18} color={palette.danger} />
+          <AppText variant="bodyBold" style={{ marginTop: 8 }}>
+            Meetup map unavailable
           </AppText>
-          <AppText variant="bodyBold" numberOfLines={2}>
+          <AppText variant="meta" style={{ color: palette.textSecondary, textAlign: 'center', marginTop: 4 }}>
+            Add meetup coordinates to show the area and roads here.
+          </AppText>
+        </View>
+      )}
+      <View
+        style={{
+          position: 'absolute',
+          left: 12,
+          right: 12,
+          bottom: 12,
+          borderRadius: radius.md,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          backgroundColor: 'rgba(10,10,10,0.72)',
+          gap: 4,
+        }}>
+        <AppText variant="label" style={{ color: palette.textTertiary }}>
+          MEETUP PIN
+        </AppText>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+          <AppText variant="bodyBold" numberOfLines={1} style={{ flex: 1 }}>
             {listing.meetup_point}
           </AppText>
-        </View>
-        <View
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: 17,
-            backgroundColor: 'rgba(230,57,70,0.16)',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-          <MapPin size={16} color={palette.danger} />
-        </View>
-      </View>
-      <View style={{ gap: 8 }}>
-        <View style={{ flexDirection: 'row', gap: 6 }}>
-          <View style={{ flex: 1, height: 6, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)' }} />
-          <View style={{ width: 72, height: 6, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)' }} />
-        </View>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <AppText variant="meta" style={{ color: palette.textSecondary }}>
-            {coords ? `${coords.lat.toFixed(3)}, ${coords.lng.toFixed(3)}` : 'Pin saved without coordinates'}
-          </AppText>
-          <AppText variant="meta" style={{ color: palette.textTertiary }}>
-            Open full details to RSVP
+            {coords ? `${coords.lat.toFixed(3)}, ${coords.lng.toFixed(3)}` : 'No pin'}
           </AppText>
         </View>
       </View>
@@ -96,24 +107,12 @@ function RideListingCardImpl({
   onPress?: () => void;
   onReport?: () => void;
 }) {
-  const expanded = useSharedValue(0);
   const goingCount = listing.rsvp_going_count ?? 0;
   const maybeCount = listing.rsvp_maybe_count ?? 0;
-
-  const expandStyle = useAnimatedStyle(() => ({
-    height: withTiming(expanded.value ? 80 : 0, { duration: 200 }),
-    opacity: withTiming(expanded.value ? 1 : 0, { duration: 200 }),
-    overflow: 'hidden' as const,
-  }));
-
-  const handlePress = () => {
-    expanded.value = expanded.value ? 0 : 1;
-    onPress?.();
-  };
   const displayTitle = listing.title?.trim() || listing.destination;
 
   return (
-    <Pressable onPress={handlePress} style={({ pressed }) => [{ opacity: pressed ? 0.94 : 1 }]}>
+    <Pressable onPress={onPress} style={({ pressed }) => [{ opacity: pressed ? 0.94 : 1 }]}>
       <GlassCard style={{ padding: 14, gap: 12 }}>
         <MapPreview listing={listing} />
         {listing.photo_urls?.length ? <PhotoStrip urls={listing.photo_urls} /> : null}
@@ -185,13 +184,10 @@ function RideListingCardImpl({
             {listing.is_verified_host ? ' · Verified host' : ''}
           </AppText>
         </View>
-
-        <Animated.View style={[expandStyle, { gap: 10 }]}>
-          <View style={{ height: 0.5, backgroundColor: palette.divider }} />
-          <AppText variant="meta" numberOfLines={3} style={{ color: palette.textSecondary }}>
-            Meet at {listing.meetup_point}. Ride pace: {paceLabels[listing.pace].toLowerCase()}. Tap to RSVP and see details.
-          </AppText>
-        </Animated.View>
+        <View style={{ height: 0.5, backgroundColor: palette.divider }} />
+        <AppText variant="meta" numberOfLines={2} style={{ color: palette.textSecondary }}>
+          Meet at {listing.meetup_point}. Ride pace: {paceLabels[listing.pace].toLowerCase()}. Tap for details and RSVP.
+        </AppText>
       </GlassCard>
     </Pressable>
   );

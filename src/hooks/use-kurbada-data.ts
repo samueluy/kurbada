@@ -34,6 +34,17 @@ type QueryToggleOptions = {
   enabled?: boolean;
 };
 
+type BikeSaveInput = Omit<Bike, 'id'> & {
+  id?: string;
+  maintenancePresetKeys?: MaintenancePresetKey[];
+};
+
+type BikeMetadataUpdateInput = {
+  id: string;
+  nickname?: string | null;
+  current_odometer_km?: number;
+};
+
 const EMPTY_ROUTE_GEOJSON: GeoJSON.Feature<GeoJSON.LineString> = {
   type: 'Feature',
   properties: {},
@@ -681,10 +692,21 @@ export function useBikeMutations(userId?: string) {
   const upsertBikeLocal = useLocalAppStore((state) => state.upsertBike);
   const deleteBikeLocal = useLocalAppStore((state) => state.deleteBike);
   const setMaintenanceTasksForBike = useLocalAppStore((state) => state.setMaintenanceTasksForBike);
+  const localBikes = useLocalAppStore((state) => state.bikes);
 
-  const saveBike = useMutation({
-    mutationFn: async (bike: Bike & { maintenancePresetKeys?: MaintenancePresetKey[] }) => {
+  const upsertBikeCaches = (savedBike: Bike) => {
+    upsertBikeLocal(savedBike);
+    queryClient.setQueryData<Bike[]>(['bikes', userId ?? 'local'], (current = []) => (
+      current.some((item) => item.id === savedBike.id)
+        ? current.map((item) => (item.id === savedBike.id ? savedBike : item))
+        : [savedBike, ...current]
+    ));
+  };
+
+  const saveBikeSetup = useMutation({
+    mutationFn: async (bike: BikeSaveInput) => {
       if (supabase && userId) {
+        const client = supabase as any;
         const payload = {
           make: bike.make,
           model: bike.model,
@@ -697,28 +719,37 @@ export function useBikeMutations(userId?: string) {
           user_id: userId,
         };
 
-        const builder = bike.id
-          ? supabase.from('bikes').upsert({ ...payload, id: bike.id } as any, { onConflict: 'id' })
-          : supabase.from('bikes').insert(payload as any);
+        const isEditingExistingBike = Boolean(bike.id);
+        const hasPresetSelection = Array.isArray(bike.maintenancePresetKeys) && bike.maintenancePresetKeys.length > 0;
+
+        const builder = isEditingExistingBike
+          ? client.from('bikes').update(payload).eq('id', bike.id).eq('user_id', userId)
+          : client.from('bikes').insert(payload);
 
         const { data, error } = await builder.select().single();
         if (error) throw error;
 
         const savedBike = data as Bike;
-        upsertBikeLocal(savedBike);
-        await reconcileMaintenanceTemplates({
-          bikeId: savedBike.id,
-          category: savedBike.category,
-          currentOdometerKm: savedBike.current_odometer_km,
-          selectedPresetKeys: bike.maintenancePresetKeys ?? [],
-          userId,
-          setMaintenanceTasksForBike,
-        });
+        upsertBikeCaches(savedBike);
+
+        if (hasPresetSelection) {
+          await reconcileMaintenanceTemplates({
+            bikeId: savedBike.id,
+            category: savedBike.category,
+            currentOdometerKm: savedBike.current_odometer_km,
+            selectedPresetKeys: bike.maintenancePresetKeys ?? [],
+            userId,
+            setMaintenanceTasksForBike,
+          });
+        } else if (!isEditingExistingBike) {
+          await queryClient.invalidateQueries({ queryKey: ['maintenance', savedBike.id] });
+        }
+
         return savedBike;
       }
 
-      const localBike = { ...bike, id: bike.id || createId() };
-      upsertBikeLocal(localBike);
+      const localBike: Bike = { ...bike, id: bike.id || createId() };
+      upsertBikeCaches(localBike);
       await reconcileMaintenanceTemplates({
         bikeId: localBike.id,
         category: localBike.category,
@@ -727,6 +758,50 @@ export function useBikeMutations(userId?: string) {
         setMaintenanceTasksForBike,
       });
       return localBike;
+    },
+    onSuccess: async (bike) => {
+      await queryClient.invalidateQueries({ queryKey: ['bikes', userId ?? 'local'] });
+      await queryClient.invalidateQueries({ queryKey: ['maintenance', bike.id] });
+      await queryClient.invalidateQueries({ queryKey: ['maintenance-overview', userId ?? 'local'] });
+      await queryClient.invalidateQueries({ queryKey: ['ride-dashboard-metrics', userId ?? 'local'] });
+    },
+  });
+
+  const updateBikeMetadata = useMutation({
+    mutationFn: async ({ id, ...changes }: BikeMetadataUpdateInput) => {
+      const currentBike = queryClient.getQueryData<Bike[]>(['bikes', userId ?? 'local'])?.find((item) => item.id === id)
+        ?? localBikes.find((item) => item.id === id);
+
+      if (!currentBike) {
+        throw new Error('Bike not found.');
+      }
+
+      const cleanedChanges = Object.fromEntries(
+        Object.entries(changes).filter(([, value]) => value !== undefined),
+      ) as Partial<Bike>;
+
+      if (!Object.keys(cleanedChanges).length) {
+        return currentBike;
+      }
+
+      if (supabase && userId) {
+        const client = supabase as any;
+        const { data, error } = await client
+          .from('bikes')
+          .update(cleanedChanges)
+          .eq('id', id)
+          .eq('user_id', userId)
+          .select()
+          .single();
+        if (error) throw error;
+        const savedBike = data as Bike;
+        upsertBikeCaches(savedBike);
+        return savedBike;
+      }
+
+      const savedBike = { ...currentBike, ...cleanedChanges };
+      upsertBikeCaches(savedBike);
+      return savedBike;
     },
     onSuccess: async (bike) => {
       await queryClient.invalidateQueries({ queryKey: ['bikes', userId ?? 'local'] });
@@ -756,7 +831,7 @@ export function useBikeMutations(userId?: string) {
     },
   });
 
-  return { saveBike, deleteBike };
+  return { saveBikeSetup, updateBikeMetadata, deleteBike };
 }
 
 export function useRideMutations(userId?: string) {
@@ -1133,6 +1208,7 @@ export function useEmergencyMutations(userId?: string) {
   const saveEmergencyInfo = useMutation({
     mutationFn: async (info: EmergencyInfo) => {
       if (supabase && userId) {
+        const client = supabase as any;
         const payload = {
           full_name: info.full_name,
           blood_type: info.blood_type,
@@ -1145,7 +1221,7 @@ export function useEmergencyMutations(userId?: string) {
           user_id: userId,
         };
 
-        const existingResponse = await supabase
+        const existingResponse = await client
           .from('emergency_info')
           .select('id')
           .eq('user_id', userId)
@@ -1154,8 +1230,8 @@ export function useEmergencyMutations(userId?: string) {
         const existingId = info.id || (existingResponse.data as { id?: string } | null)?.id;
 
         const builder = existingId
-          ? supabase.from('emergency_info').update(payload as any).eq('id', existingId as any)
-          : supabase.from('emergency_info').insert(payload as any);
+          ? client.from('emergency_info').update(payload).eq('id', existingId)
+          : client.from('emergency_info').insert(payload);
 
         const { data, error } = await builder.select().single();
         if (error) throw error;
@@ -1192,7 +1268,7 @@ export function useOnboardingSync(userId?: string, userEmail?: string | null) {
   const completeBikeSetup = useAppStore((state) => state.completeBikeSetup);
   const bikes = useBikes(userId);
   const emergency = useEmergencyInfo(userId);
-  const { saveBike } = useBikeMutations(userId);
+  const { saveBikeSetup } = useBikeMutations(userId);
   const { saveEmergencyInfo } = useEmergencyMutations(userId);
   const bikeBrand = cleanDraftValue(onboardingData.bikeBrand);
   const bikeModel = cleanDraftValue(onboardingData.bikeModel);
@@ -1279,8 +1355,8 @@ export function useOnboardingSync(userId?: string, userEmail?: string | null) {
               && item.year === resolvedYear,
           );
 
-          const bike = await saveBike.mutateAsync({
-            id: existingBike?.id ?? '',
+          const bike = await saveBikeSetup.mutateAsync({
+            id: existingBike?.id,
             make: bikeBrand,
             model: bikeModel,
             year: resolvedYear,
@@ -1341,10 +1417,11 @@ export function useOnboardingSync(userId?: string, userEmail?: string | null) {
   };
 }
 
-export function useRideListings(userId?: string) {
+export function useRideListings(userId?: string, options?: QueryToggleOptions) {
   const localListings = useLocalAppStore((state) => state.rideListings);
   const blockedIds = useBlockedUsersStore((state) => state.blockedUserIds);
   const useRemote = Boolean(userId) && isSupabaseConfigured;
+  const isEnabled = options?.enabled ?? true;
 
   const visibleLocal = localListings
     .filter((listing) => !listing.is_reported && !blockedIds.includes(listing.host_user_id))
@@ -1352,7 +1429,7 @@ export function useRideListings(userId?: string) {
 
   const query = useQuery({
     queryKey: ['ride-listings', userId ?? 'local'],
-    enabled: useRemote,
+    enabled: useRemote && isEnabled,
     queryFn: async () => {
       if (!supabase || !userId) return visibleLocal;
       const { data, error } = await supabase
@@ -1728,6 +1805,31 @@ export function useRideListingRsvps(listingId?: string) {
   if (!useRemote) {
     return { data: [] as import('@/types/domain').RideRSVP[], isLoading: false, error: null, isFetching: false };
   }
+  return query;
+}
+
+export function useMyRideListingRsvps(userId?: string) {
+  const useRemote = isSupabaseConfigured && Boolean(userId);
+
+  const query = useQuery({
+    queryKey: ['my-ride-listing-rsvps', userId ?? 'none'],
+    enabled: useRemote,
+    queryFn: async () => {
+      if (!supabase || !userId) return [] as import('@/types/domain').RideRSVP[];
+      const { data, error } = await (supabase as any)
+        .from('ride_listing_rsvps')
+        .select('*')
+        .eq('user_id', userId);
+      if (error) throw error;
+      return (data ?? []) as import('@/types/domain').RideRSVP[];
+    },
+    staleTime: 60_000,
+  });
+
+  if (!useRemote) {
+    return { data: [] as import('@/types/domain').RideRSVP[], isLoading: false, error: null, isFetching: false };
+  }
+
   return query;
 }
 

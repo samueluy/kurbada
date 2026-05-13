@@ -100,6 +100,7 @@ export function useRideSession() {
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rideStartedAtRef = useRef<number | null>(null);
   const rideIdRef = useRef<string | null>(null);
+  const startingAltitudeRef = useRef<number | null>(null);
   const lastGForcePublishAtRef = useRef(0);
   const getRideState = useRideStore.getState;
 
@@ -142,6 +143,7 @@ export function useRideSession() {
     if (rideState.state !== 'active') {
       recentGForcesRef.current = [];
       recentSpeedsRef.current = [];
+      startingAltitudeRef.current = null;
       cleanupSubscriptions();
       return;
     }
@@ -176,6 +178,7 @@ export function useRideSession() {
     recentGForcesRef.current = [];
     recentSpeedsRef.current = [];
     rideIdRef.current = createId();
+    startingAltitudeRef.current = null;
     rideActions.setBikeId(bikeId);
     rideActions.setFuelPricePerLiter(fuelPricePerLiter);
     rideActions.setFuelRateKmPerLiter(fuelRateKmPerLiter);
@@ -209,8 +212,8 @@ export function useRideSession() {
       distanceInterval: 5,
       showsBackgroundLocationIndicator: true,
       foregroundService: {
-        notificationTitle: 'Kurbada — Ride in progress',
-        notificationBody: 'Tracking your route in the background',
+        notificationTitle: 'Ride tracking is active',
+        notificationBody: 'Kurbada is recording your route, speed, and crash alerts.',
         notificationColor: '#E63946',
       },
     }).catch(() => undefined);
@@ -290,6 +293,7 @@ export function useRideSession() {
       await clearActiveRidePointSession();
       rideStartedAtRef.current = null;
       rideIdRef.current = null;
+      startingAltitudeRef.current = null;
       rideActions.resetRide();
       return savedRide;
     } catch {
@@ -365,6 +369,10 @@ export function useRideSession() {
         distanceInterval: 5,
       },
       (location) => {
+        if (startingAltitudeRef.current == null && location.coords.altitude != null) {
+          startingAltitudeRef.current = location.coords.altitude;
+        }
+
         const point: RidePoint = {
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
@@ -400,12 +408,15 @@ export function useRideSession() {
         const fuelRate = Math.max(currentStore.fuelRateKmPerLiter, 0.1);
         const fuelLiters = newDistance / fuelRate;
         const fuelCost = fuelLiters * currentStore.fuelPricePerLiter;
+        const relativeAltitude = point.altitude != null && startingAltitudeRef.current != null
+          ? point.altitude - startingAltitudeRef.current
+          : 0;
 
         const heading = location.coords.heading ?? currentStore.heading;
 
         currentStore.updateTelemetry({
           speedKmh: point.speedKmh,
-          altitudeMeters: point.altitude ?? 0,
+          altitudeMeters: relativeAltitude,
           distanceKm: newDistance,
           elevationGainM: newElevationGain,
           maxSpeedKmh: Math.max(currentStore.maxSpeedKmh, point.speedKmh),

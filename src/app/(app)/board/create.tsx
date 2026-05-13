@@ -44,6 +44,7 @@ export default function CreateRideScreen() {
     session?.user.id,
   );
   const Mapbox = getMapboxModule();
+  const canRenderMapPicker = Boolean(Mapbox) && Boolean(env.mapboxToken);
   const params = useLocalSearchParams<{ listingId?: string }>();
   const listingId = params?.listingId;
   const existingListing = useMemo(
@@ -238,25 +239,32 @@ export default function CreateRideScreen() {
           placeholder="Shell Marcos Highway"
         />
 
-        {Mapbox && (
-          <Button
-            title={showMapPin ? "Remove Map Pin" : "+ Pin Location on Map"}
-            variant="ghost"
-            onPress={() => {
-              triggerLightHaptic();
-              setShowMapPin(!showMapPin);
-              if (!showMapPin && !mapCenter) {
-                setMapCenter(
-                  meetupCoords
-                    ? [meetupCoords.lng, meetupCoords.lat]
-                    : [121.0437, 14.5995],
-                );
-              }
-            }}
-            />
-          )}
+        <Button
+          title={showMapPin ? "Remove Map Pin" : "+ Pin Location on Map"}
+          variant="ghost"
+          onPress={() => {
+            triggerLightHaptic();
+            setShowMapPin(!showMapPin);
+            if (!showMapPin && !mapCenter) {
+              setMapCenter(
+                meetupCoords
+                  ? [meetupCoords.lng, meetupCoords.lat]
+                  : [121.0437, 14.5995],
+              );
+            }
+          }}
+        />
 
-        {Mapbox && showMapPin ? (
+        {showMapPin && !canRenderMapPicker ? (
+          <View style={{ borderRadius: radius.md, borderWidth: 0.5, borderColor: palette.border, backgroundColor: palette.surfaceMuted, padding: 14, gap: 8 }}>
+            <AppText variant="bodyBold">Map picker unavailable</AppText>
+            <AppText variant="meta" style={{ color: palette.textSecondary }}>
+              The interactive map could not load on this build, but you can still post the ride using the meetup point text field above.
+            </AppText>
+          </View>
+        ) : null}
+
+        {showMapPin && Mapbox && env.mapboxToken ? (
           <View style={{ gap: 10 }}>
             <View style={{ flexDirection: "row", gap: 8 }}>
               <View style={{ flex: 1 }}>

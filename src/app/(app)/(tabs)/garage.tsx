@@ -19,7 +19,7 @@ import { inferBikeCategory } from '@/lib/bike-models';
 export default function GarageTabScreen() {
   const { session } = useAuth();
   const bikes = useBikes(session?.user.id);
-  const { saveBike, deleteBike } = useBikeMutations(session?.user.id);
+  const { saveBikeSetup, deleteBike } = useBikeMutations(session?.user.id);
   const isSubmittingRef = useRef(false);
   const [showForm, setShowForm] = useState(false);
   const [draft, setDraft] = useState<BikeIdentityDraft>(BIKE_IDENTITY_EMPTY);
@@ -52,8 +52,7 @@ export default function GarageTabScreen() {
 
     isSubmittingRef.current = true;
     try {
-      await saveBike.mutateAsync({
-        id: '',
+      await saveBikeSetup.mutateAsync({
         make: finalBrand,
         model: finalModel,
         nickname: finalNickname || null,

@@ -76,6 +76,7 @@ export default function AppLayout() {
       <Stack.Screen name="ride/summary" options={{ presentation: 'card', gestureEnabled: true }} />
       <Stack.Screen name="ride/share-editor" options={{ presentation: 'card', gestureEnabled: true }} />
       <Stack.Screen name="garage/[bikeId]" />
+      <Stack.Screen name="board/[listingId]" options={{ presentation: 'card', gestureEnabled: true }} />
       <Stack.Screen name="board/create" options={{ presentation: 'card', gestureEnabled: true }} />
       <Stack.Screen name="board/community-guidelines" options={{ presentation: 'modal' }} />
       <Stack.Screen name="board/blocked-users" />

@@ -71,7 +71,10 @@
       [
         "expo-notifications",
         {
-          "sounds": []
+          "sounds": [],
+          "icon": "./assets/images/logo-white-transparent.png",
+          "color": "#E63946",
+          "defaultChannel": "kurbada-reminders"
         }
       ],
       "expo-sharing",

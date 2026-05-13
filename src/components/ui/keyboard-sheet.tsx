@@ -23,8 +23,8 @@ export function KeyboardSheet({
   const opacity = useRef(new Animated.Value(0)).current;
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const screenHeight = Dimensions.get('window').height;
-  const bottomLift = Platform.OS === 'android' ? Math.max(0, keyboardHeight - insets.bottom) : 0;
-  const maxSheetHeight = Math.max(320, screenHeight - insets.top - 24 - bottomLift);
+  const keyboardInset = Platform.OS === 'android' ? Math.max(0, keyboardHeight - insets.bottom) : 0;
+  const maxSheetHeight = Math.max(320, screenHeight - insets.top - 24);
 
   useEffect(() => {
     if (visible) {
@@ -70,14 +70,13 @@ export function KeyboardSheet({
       <Animated.View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.62)', opacity }}>
         <Pressable style={{ flex: 1, justifyContent: 'flex-end' }} onPress={onClose}>
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={Platform.OS === 'ios' ? Math.max(insets.top, 16) : 0}>
             <Pressable onPress={() => undefined}>
               <Animated.View
                 style={{
                   transform: [{ translateY }],
                   maxHeight: maxSheetHeight,
-                  marginBottom: bottomLift,
                   backgroundColor: palette.surfaceMuted,
                   borderTopLeftRadius: 24,
                   borderTopRightRadius: 24,
@@ -88,7 +87,7 @@ export function KeyboardSheet({
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
                   nestedScrollEnabled
-                  automaticallyAdjustKeyboardInsets
+                  automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
                   keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                   bounces={false}
                   showsVerticalScrollIndicator={false}
@@ -98,7 +97,7 @@ export function KeyboardSheet({
                     paddingBottom:
                       insets.bottom
                       + 20
-                      + (Platform.OS === 'android' ? 12 + Math.min(bottomLift, 96) : 0),
+                      + (Platform.OS === 'android' ? Math.min(keyboardInset + 12, 180) : 0),
                     gap: 14,
                   }}>
                   <View style={{ alignItems: 'center', gap: 12 }}>

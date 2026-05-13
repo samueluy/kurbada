@@ -12,6 +12,7 @@ import { AppText } from '@/components/ui/app-text';
 import { AppScreen } from '@/components/ui/app-screen';
 import { Button } from '@/components/ui/button';
 import { GlassCard } from '@/components/ui/glass-card';
+import { KeyboardSheet } from '@/components/ui/keyboard-sheet';
 import { SectionHeader } from '@/components/ui/section-header';
 import { StatCard } from '@/components/ui/stat-card';
 import { palette } from '@/constants/theme';
@@ -48,7 +49,10 @@ export default function RideTabScreen() {
   const ridingPersona = useAppStore((state) => state.ridingPersona);
   const workMode = useAppStore((state) => state.workMode);
   const dailyEarningsGoal = useAppStore((state) => state.dailyEarningsGoal);
+  const customFuelPricePerLiter = useAppStore((state) => state.customFuelPricePerLiter);
   const [secondaryReady, setSecondaryReady] = useState(false);
+  const [showRidePicker, setShowRidePicker] = useState(false);
+  const [selectedRideBikeId, setSelectedRideBikeId] = useState<string | null>(null);
   const bikes = useBikes(session?.user.id);
   const rides = useRides(session?.user.id, { enabled: secondaryReady });
   const recentRides = useRecentRideFeed(session?.user.id, 12, { enabled: secondaryReady });
@@ -69,6 +73,12 @@ export default function RideTabScreen() {
       setActiveBikeId(allBikes[0].id);
     }
   }, [activeBikeId, allBikes, setActiveBikeId]);
+
+  useEffect(() => {
+    if (!selectedRideBikeId && primaryBike?.id) {
+      setSelectedRideBikeId(primaryBike.id);
+    }
+  }, [primaryBike?.id, selectedRideBikeId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -107,11 +117,7 @@ export default function RideTabScreen() {
     }
   }, [cachedLocation, dashboardMetrics, recentRides, rides, secondaryReady, syncPendingRides, weather, weatherWindow]);
 
-  const fuelPrice = dashboardMetrics.data?.latest_fuel_price ?? 65;
-  const fuelRate = useMemo(
-    () => estimateFuelRate(primaryBike?.engine_cc, primaryBike?.category, 'hustle'),
-    [primaryBike?.category, primaryBike?.engine_cc],
-  );
+  const baseFuelPrice = customFuelPricePerLiter ?? dashboardMetrics.data?.latest_fuel_price ?? 65;
   const latestRide = dashboardMetrics.data
     ? {
         distance_km: dashboardMetrics.data.latest_ride_distance_km,
@@ -144,16 +150,38 @@ export default function RideTabScreen() {
   const efficiencyTrend = useMemo(() => computeEfficiencyTrend(rides.data ?? []), [rides.data]);
   const personalRecords = useMemo(() => computePersonalRecords(rides.data ?? []), [rides.data]);
 
-  const startRide = useCallback(() => {
+  const selectedRideBike = useMemo(
+    () => allBikes.find((bike) => bike.id === selectedRideBikeId) ?? primaryBike,
+    [allBikes, primaryBike, selectedRideBikeId],
+  );
+  const selectedRideFuelRate = useMemo(
+    () => estimateFuelRate(selectedRideBike?.engine_cc, selectedRideBike?.category, 'hustle'),
+    [selectedRideBike?.category, selectedRideBike?.engine_cc],
+  );
+
+  const openRidePicker = useCallback(() => {
     if (!primaryBike) {
       router.push('/(public)/bike-setup');
       return;
     }
+
+    setSelectedRideBikeId(primaryBike.id);
+    setShowRidePicker(true);
+  }, [primaryBike]);
+
+  const startRide = useCallback(() => {
+    if (!selectedRideBike) {
+      router.push('/(public)/bike-setup');
+      return;
+    }
+
+    setActiveBikeId(selectedRideBike.id);
+    setShowRidePicker(false);
     router.push({
       pathname: '/(app)/ride/active',
-      params: { bikeId: primaryBike.id, fuelPrice, fuelRate },
+      params: { bikeId: selectedRideBike.id, fuelPrice: baseFuelPrice, fuelRate: selectedRideFuelRate },
     });
-  }, [fuelPrice, fuelRate, primaryBike]);
+  }, [baseFuelPrice, selectedRideBike, selectedRideFuelRate, setActiveBikeId]);
 
   const openNearbySearch = useCallback(async (category: 'gas station' | 'restaurant') => {
     try {
@@ -202,7 +230,7 @@ export default function RideTabScreen() {
             </View>
           </View>
         ) : null}
-        <Button title="Start Shift  →" onPress={startRide} style={{ borderRadius: 13, minHeight: 52 }} />
+        <Button title="Start Shift  →" onPress={openRidePicker} style={{ borderRadius: 13, minHeight: 52 }} />
       </GlassCard>
     ) : (
       <GlassCard style={{ padding: 18, borderRadius: 18, gap: 12 }}>
@@ -220,10 +248,10 @@ export default function RideTabScreen() {
           <StatCard label="Top Speed" value={latestRide?.max_speed_kmh.toFixed(0) ?? '0'} unit="km/h" />
           <StatCard label="Fuel" value={latestRide?.fuel_used_liters?.toFixed(1) ?? '0.0'} unit="L" />
         </View>
-        <Button title="Start Ride  →" onPress={startRide} style={{ borderRadius: 13, minHeight: 52 }} />
+        <Button title="Start Ride  →" onPress={openRidePicker} style={{ borderRadius: 13, minHeight: 52 }} />
       </GlassCard>
     )
-  ), [dailyEarningsGoal, latestRide?.distance_km, latestRide?.fuel_used_liters, latestRide?.max_speed_kmh, ridingPersona, startRide, todaysNet, workMode]);
+  ), [dailyEarningsGoal, latestRide?.distance_km, latestRide?.fuel_used_liters, latestRide?.max_speed_kmh, openRidePicker, ridingPersona, todaysNet, workMode]);
 
   const monthlyCostTile = useMemo(() => (
     <GlassCard style={{ padding: 18, borderRadius: 18, gap: 10 }}>
@@ -469,6 +497,59 @@ export default function RideTabScreen() {
             />
           }
         />
+
+        <KeyboardSheet
+          visible={showRidePicker}
+          onClose={() => setShowRidePicker(false)}
+          title="Choose bike for this ride"
+          subtitle="We’ll log the kilometers and fuel estimate against the motorcycle you pick here.">
+          <View style={{ gap: 10 }}>
+            {allBikes.map((bike) => {
+              const active = bike.id === selectedRideBike?.id;
+              const estimatedRate = estimateFuelRate(bike.engine_cc, bike.category, 'hustle');
+              return (
+                <Pressable
+                  key={bike.id}
+                  onPress={() => setSelectedRideBikeId(bike.id)}
+                  style={{
+                    borderRadius: 16,
+                    borderWidth: 1,
+                    borderColor: active ? palette.danger : palette.border,
+                    backgroundColor: active ? 'rgba(230,57,70,0.12)' : palette.surfaceMuted,
+                    paddingHorizontal: 14,
+                    paddingVertical: 14,
+                    gap: 8,
+                  }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <AppText variant="bodyBold">
+                        {bike.nickname?.trim() || `${bike.make} ${bike.model}`}
+                      </AppText>
+                      <AppText variant="meta" style={{ color: palette.textSecondary }}>
+                        {bike.year} · {bike.engine_cc}cc · {bike.current_odometer_km.toLocaleString()} km
+                      </AppText>
+                    </View>
+                    {active ? (
+                      <MaterialCommunityIcons name="check-circle" size={18} color={palette.danger} />
+                    ) : null}
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <StatCard label="Fuel Price" value={`₱${baseFuelPrice.toFixed(0)}`} unit="/L" />
+                    <StatCard label="Fuel Rate" value={estimatedRate.toFixed(0)} unit="km/L" />
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Button title="Cancel" variant="ghost" onPress={() => setShowRidePicker(false)} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button title="Start Ride" onPress={startRide} style={{ borderRadius: 13, minHeight: 48 }} />
+            </View>
+          </View>
+        </KeyboardSheet>
       </AppScreen>
     </TabTransition>
   );

@@ -23,6 +23,10 @@ export default function NotificationsScreen() {
   const setDailySummaryEnabled = useAppStore((state) => state.setDailySummaryEnabled);
   const dailySummaryHour = useAppStore((state) => state.dailySummaryHour);
   const setDailySummaryHour = useAppStore((state) => state.setDailySummaryHour);
+  const comebackNudgesEnabled = useAppStore((state) => state.comebackNudgesEnabled);
+  const setComebackNudgesEnabled = useAppStore((state) => state.setComebackNudgesEnabled);
+  const lobbyRemindersEnabled = useAppStore((state) => state.lobbyRemindersEnabled);
+  const setLobbyRemindersEnabled = useAppStore((state) => state.setLobbyRemindersEnabled);
   const [showAddThreshold, setShowAddThreshold] = useState(false);
   const [newThreshold, setNewThreshold] = useState('');
 
@@ -76,7 +80,7 @@ export default function NotificationsScreen() {
         </View>
       </GlassCard>
 
-      <SectionHeader title="Daily Summary" />
+      <SectionHeader title="Engagement" />
       <GlassCard style={{ padding: 18, gap: 12 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <View style={{ flex: 1, gap: 4 }}>
@@ -90,6 +94,38 @@ export default function NotificationsScreen() {
             onValueChange={setDailySummaryEnabled}
             trackColor={{ false: palette.surfaceMuted, true: palette.lime }}
             thumbColor={dailySummaryEnabled ? '#FFFFFF' : palette.textTertiary}
+          />
+        </View>
+
+        <View style={{ height: 0.5, backgroundColor: palette.border }} />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <AppText variant="bodyBold">Comeback nudges</AppText>
+            <AppText variant="meta" style={{ color: palette.textSecondary }}>
+              A gentle reminder if you haven&apos;t logged a ride in a few days.
+            </AppText>
+          </View>
+          <Switch
+            value={comebackNudgesEnabled}
+            onValueChange={setComebackNudgesEnabled}
+            trackColor={{ false: palette.surfaceMuted, true: palette.lime }}
+            thumbColor={comebackNudgesEnabled ? '#FFFFFF' : palette.textTertiary}
+          />
+        </View>
+
+        <View style={{ height: 0.5, backgroundColor: palette.border }} />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <AppText variant="bodyBold">Lobby reminders</AppText>
+            <AppText variant="meta" style={{ color: palette.textSecondary }}>
+              Reminds you about joined or hosted rides an hour before meetup.
+            </AppText>
+          </View>
+          <Switch
+            value={lobbyRemindersEnabled}
+            onValueChange={setLobbyRemindersEnabled}
+            trackColor={{ false: palette.surfaceMuted, true: palette.lime }}
+            thumbColor={lobbyRemindersEnabled ? '#FFFFFF' : palette.textTertiary}
           />
         </View>
 

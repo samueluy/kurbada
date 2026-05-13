@@ -28,6 +28,7 @@ import { queryClient } from '@/lib/query-client';
 import { initializeRidePointStorage } from '@/lib/ride-point-storage';
 import { OnboardingSyncBridge } from '@/providers/onboarding-sync-bridge';
 import { DailySummaryBridge } from '@/providers/daily-summary-bridge';
+import { EngagementNotificationsBridge } from '@/providers/engagement-notifications-bridge';
 import { PendingRideSyncBridge } from '@/providers/pending-ride-sync-bridge';
 import { configureRevenueCat, subscribeToCustomerInfo, syncRevenueCatIdentity } from '@/services/revenuecat';
 
@@ -75,6 +76,15 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(palette.background).catch(() => undefined);
     configureRevenueCat().catch(() => undefined);
+    if (Platform.OS === 'android') {
+      Notifications.setNotificationChannelAsync('kurbada-reminders', {
+        name: 'Kurbada Reminders',
+        importance: Notifications.AndroidImportance.HIGH,
+        sound: 'default',
+        vibrationPattern: [0, 180, 80, 180],
+        lightColor: '#E63946',
+      }).catch(() => undefined);
+    }
     const unsubscribeCustomerInfo = subscribeToCustomerInfo(() => {
       void queryClient.invalidateQueries({ queryKey: ['access'] });
     });
@@ -126,6 +136,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
                 <RevenueCatIdentityBridge />
                 <OnboardingSyncBridge />
                 <DailySummaryBridge />
+                <EngagementNotificationsBridge />
                 <PendingRideSyncBridge />
                 {children}
               </ErrorBoundary>

@@ -2,6 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, Modal, Pressable, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScrollScreen } from '@/components/ui/app-screen';
@@ -38,7 +39,7 @@ function daysToMonthsLabel(days: number): string {
   return `${years}y ${rem}m`;
 }
 
-function Toast({ message }: { message: string }) {
+function Toast({ message, bottomInset }: { message: string; bottomInset: number }) {
   const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -53,7 +54,7 @@ function Toast({ message }: { message: string }) {
   return (
     <Animated.View style={{
       position: 'absolute',
-      bottom: 100,
+      bottom: bottomInset + 16,
       left: 20,
       right: 20,
       opacity,
@@ -77,7 +78,8 @@ export default function BikeProfileScreen() {
   const bike = bikes.data?.find((item) => item.id === params.bikeId);
   const tasks = useMaintenanceTasks(bike?.id);
   const { addMaintenanceTask, updateMaintenanceTask, deleteMaintenanceTask } = useMaintenanceMutations(session?.user.id);
-  const { saveBike } = useBikeMutations(session?.user.id);
+  const { updateBikeMetadata } = useBikeMutations(session?.user.id);
+  const insets = useSafeAreaInsets();
   const activeBikeId = useAppStore((state) => state.activeBikeId);
   const setActiveBikeId = useAppStore((state) => state.setActiveBikeId);
   const isPrimary = bike?.id === activeBikeId;
@@ -475,8 +477,15 @@ export default function BikeProfileScreen() {
               title="Save"
               onPress={() => {
                 triggerSuccessHaptic();
-                saveBike.mutate({ ...bike, nickname: nicknameInput.trim() || null });
-                setShowNicknameEdit(false);
+                void updateBikeMetadata.mutateAsync({ id: bike.id, nickname: nicknameInput.trim() || null })
+                  .then(() => {
+                    setShowNicknameEdit(false);
+                    setToastMessage('✓ Name updated');
+                    setTimeout(() => setToastMessage(null), 2500);
+                  })
+                  .catch((error) => {
+                    Alert.alert('Could not update bike', error instanceof Error ? error.message : 'Please try again.');
+                  });
               }}
               style={{ backgroundColor: Colors.red, borderRadius: 13, minHeight: 48 }}
             />
@@ -506,9 +515,18 @@ export default function BikeProfileScreen() {
                 const value = Number(odometerInput);
                 if (!isNaN(value) && value > 0) {
                   triggerSuccessHaptic();
-                  saveBike.mutate({ ...bike, current_odometer_km: value });
+                  void updateBikeMetadata.mutateAsync({ id: bike.id, current_odometer_km: value })
+                    .then(() => {
+                      setShowOdometerEdit(false);
+                      setToastMessage('✓ Odometer updated');
+                      setTimeout(() => setToastMessage(null), 2500);
+                    })
+                    .catch((error) => {
+                      Alert.alert('Could not update odometer', error instanceof Error ? error.message : 'Please try again.');
+                    });
+                  return;
                 }
-                setShowOdometerEdit(false);
+                Alert.alert('Invalid odometer', 'Please enter a valid odometer value.');
               }}
               style={{ backgroundColor: Colors.red, borderRadius: 13, minHeight: 48 }}
             />
@@ -625,7 +643,7 @@ export default function BikeProfileScreen() {
         </Pressable>
       </Modal>
 
-      {toastMessage ? <Toast message={toastMessage} /> : null}
+      {toastMessage ? <Toast message={toastMessage} bottomInset={insets.bottom + 88} /> : null}
     </AppScrollScreen>
   );
 }
