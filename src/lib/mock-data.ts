@@ -15,11 +15,11 @@ const SAMPLE_EMERGENCY_ID = '3df7fe44-6dd3-4cb6-8dfe-e1f83aa4f44a';
 
 export const sampleProfile: Profile = {
   id: '9cf2d582-9504-4e0a-a564-5c68fa237f71',
-  display_name: 'Samuel Rider',
+  display_name: 'Demo Rider',
   member_since: '2026-05-01',
   subscription_status: 'trialing',
   access_override: 'development',
-  referral_code: 'SAMUEL9F71',
+  referral_code: 'DEMO9F71',
 };
 
 export const sampleBikes: Bike[] = [
@@ -95,11 +95,11 @@ export const sampleFuelLogs: FuelLog[] = [
 
 export const sampleEmergencyInfo: EmergencyInfo = {
   id: SAMPLE_EMERGENCY_ID,
-  full_name: 'Samuel Uy',
-  blood_type: 'O+',
+  full_name: 'Demo Rider',
+  blood_type: 'unknown',
   allergies: 'None reported',
   conditions: 'None reported',
-  contact1_name: 'Emergency Contact',
+  contact1_name: 'Primary Contact',
   contact1_phone: '+639171112233',
   contact2_name: 'Secondary Contact',
   contact2_phone: '+639189998877',
@@ -120,7 +120,7 @@ export const sampleRideListings: RideListing[] = [
     is_reported: false,
     is_hidden: false,
     report_count: 0,
-    display_name: 'Samuel Rider',
+    display_name: 'Demo Rider',
     created_at: new Date().toISOString(),
     is_verified_host: true,
     rsvp_going_count: 2,

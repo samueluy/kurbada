@@ -213,7 +213,7 @@ export default function CreateRideScreen() {
           gap: 18,
         }}
       >
-      <View style={{ gap: 8, paddingTop: 8 }}>
+      <View style={{ gap: 8, paddingTop: 18 }}>
         <AppText variant="eyebrow">Create Ride</AppText>
         <AppText variant="screenTitle">
           {existingListing ? "Edit your group ride." : "Post a group ride."}

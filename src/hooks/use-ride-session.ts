@@ -24,6 +24,17 @@ import type { RidePoint } from '@/types/domain';
 
 Accelerometer.setUpdateInterval(100);
 
+const SPEEDOMETER_EGO_BOOST = 1.08;
+const LOW_GRAVITY_THRESHOLD_G = 0.45;
+const IMPACT_THRESHOLD_G = 3.15;
+const SEVERE_IMPACT_THRESHOLD_G = 5.25;
+const IMPACT_SEQUENCE_WINDOW_MS = 1800;
+const CRASH_TRIGGER_HOLD_MS = 120;
+
+function applySpeedometerBoost(speedKmh: number) {
+  return Number((Math.max(0, speedKmh) * SPEEDOMETER_EGO_BOOST).toFixed(1));
+}
+
 export function useRideSession() {
   const { session } = useAuth();
   const { saveRide } = useRideMutations(session?.user.id);
@@ -81,6 +92,7 @@ export function useRideSession() {
   const locationSubscriptionRef = useRef<Location.LocationSubscription | null>(null);
   const accelSubscriptionRef = useRef<{ remove: () => void } | null>(null);
   const crashThresholdSinceRef = useRef<number | null>(null);
+  const lowGravitySinceRef = useRef<number | null>(null);
   const recentGForcesRef = useRef<number[]>([]);
   const recentSpeedsRef = useRef<number[]>([]);
   const foregroundPointsRef = useRef<RidePoint[]>([]);
@@ -142,7 +154,11 @@ export function useRideSession() {
         lastGForcePublishAtRef.current = Date.now();
         currentStore.updateTelemetry({ gForce: rawGForce });
       }
-      maybeTriggerCrashAlert(getSmoothedGForce(rawGForce));
+      maybeTriggerCrashAlert({
+        rawGForce,
+        smoothedGForce: getSmoothedGForce(rawGForce),
+        speedKmh: currentStore.speedKmh,
+      });
     });
 
     startLocationWatch().catch(() => undefined);
@@ -156,6 +172,7 @@ export function useRideSession() {
     foregroundPointsRef.current = [];
     pendingPersistPointsRef.current = [];
     crashThresholdSinceRef.current = null;
+    lowGravitySinceRef.current = null;
     recentGForcesRef.current = [];
     recentSpeedsRef.current = [];
     rideIdRef.current = createId();
@@ -242,6 +259,9 @@ export function useRideSession() {
     }, 0);
 
     const maxSpeed = normalizedPoints.reduce((m, p) => Math.max(m, p.speedKmh), 0);
+    const rawAverageSpeed = startedAt > 0
+      ? Number((totalDistance / ((Date.now() - startedAt) / 3_600_000)).toFixed(1))
+      : 0;
     const ride = {
       id: rideId,
       bike_id: rideState.bikeId,
@@ -250,11 +270,8 @@ export function useRideSession() {
       started_at: new Date(startedAt).toISOString(),
       ended_at: new Date().toISOString(),
       distance_km: Number(totalDistance.toFixed(1)),
-      max_speed_kmh: Number(maxSpeed.toFixed(1)),
-      avg_speed_kmh:
-        startedAt > 0
-          ? Number((totalDistance / ((Date.now() - startedAt) / 3_600_000)).toFixed(1))
-          : 0,
+      max_speed_kmh: applySpeedometerBoost(maxSpeed),
+      avg_speed_kmh: applySpeedometerBoost(rawAverageSpeed),
       max_lean_angle_deg: null,
       fuel_used_liters: Number(rideState.telemetry.estimatedFuelLiters.toFixed(2)),
       elevation_gain_m: Number(rideState.telemetry.elevationGainM.toFixed(1)),
@@ -295,14 +312,34 @@ export function useRideSession() {
     rideActions.setFatiguePromptShown(false);
   };
 
-  function maybeTriggerCrashAlert(gForce: number) {
+  function maybeTriggerCrashAlert({
+    rawGForce,
+    smoothedGForce,
+    speedKmh,
+  }: {
+    rawGForce: number;
+    smoothedGForce: number;
+    speedKmh: number;
+  }) {
     const currentStore = getRideState();
+    const now = Date.now();
 
     if (!crashAlertsEnabled) return;
-    if (gForce > 4.5) {
+
+    if (rawGForce <= LOW_GRAVITY_THRESHOLD_G) {
+      lowGravitySinceRef.current = now;
+    }
+
+    const sawRecentLowGravity = lowGravitySinceRef.current != null
+      && now - lowGravitySinceRef.current <= IMPACT_SEQUENCE_WINDOW_MS;
+    const impactDetected = rawGForce >= IMPACT_THRESHOLD_G || smoothedGForce >= 3.6;
+    const severeImpactDetected = rawGForce >= SEVERE_IMPACT_THRESHOLD_G;
+    const motionTriggeredImpact = impactDetected && (speedKmh >= 8 || sawRecentLowGravity);
+
+    if (severeImpactDetected || motionTriggeredImpact) {
       if (!crashThresholdSinceRef.current) {
-        crashThresholdSinceRef.current = Date.now();
-      } else if (Date.now() - crashThresholdSinceRef.current > 250 && currentStore.crashCountdown === null) {
+        crashThresholdSinceRef.current = now;
+      } else if (now - crashThresholdSinceRef.current > CRASH_TRIGGER_HOLD_MS && currentStore.crashCountdown === null) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
         // 15-second cancellable countdown (rider can abort if false positive)
         currentStore.setCrashCountdown(15);
@@ -346,7 +383,7 @@ export function useRideSession() {
           previousFilteredSpeedKmh: getRideState().speedKmh,
           distanceDeltaKm: distanceDelta,
         });
-        point.speedKmh = filteredSpeedKmh;
+        point.speedKmh = applySpeedometerBoost(filteredSpeedKmh);
         // Positive altitude deltas only; ignore small GPS jitter (<3m) to keep the total clean.
         let elevationDelta = 0;
         if (previous && previous.altitude != null && point.altitude != null) {
@@ -367,11 +404,11 @@ export function useRideSession() {
         const heading = location.coords.heading ?? currentStore.heading;
 
         currentStore.updateTelemetry({
-          speedKmh: filteredSpeedKmh,
+          speedKmh: point.speedKmh,
           altitudeMeters: point.altitude ?? 0,
           distanceKm: newDistance,
           elevationGainM: newElevationGain,
-          maxSpeedKmh: Math.max(currentStore.maxSpeedKmh, filteredSpeedKmh),
+          maxSpeedKmh: Math.max(currentStore.maxSpeedKmh, point.speedKmh),
           estimatedFuelLiters: fuelLiters,
           estimatedFuelCost: fuelCost,
           heading: heading || currentStore.heading,

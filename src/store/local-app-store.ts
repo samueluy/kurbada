@@ -59,7 +59,7 @@ const emptyEmergencyInfo: EmergencyInfo = {
   contact2_phone: '',
 };
 
-const LOCAL_APP_STORE_VERSION = 2;
+const LOCAL_APP_STORE_VERSION = 3;
 
 const initialProfile = __DEV__ ? sampleProfile : emptyProfile;
 const initialBikes = __DEV__ ? sampleBikes : [];
@@ -215,13 +215,19 @@ export const useLocalAppStore = create<LocalAppState>()(
         if (version < LOCAL_APP_STORE_VERSION) {
           return {
             ...persisted,
-            profile: persisted.profile?.id ? persisted.profile : emptyProfile,
+            profile:
+              persisted.profile?.id && persisted.profile.id !== sampleProfile.id
+                ? persisted.profile
+                : emptyProfile,
             bikes: persisted.bikes ?? [],
             maintenanceTasks: persisted.maintenanceTasks ?? [],
             rides: persisted.rides ?? [],
             pendingRides: persisted.pendingRides ?? [],
             fuelLogs: persisted.fuelLogs ?? [],
-            emergencyInfo: persisted.emergencyInfo?.id ? persisted.emergencyInfo : emptyEmergencyInfo,
+            emergencyInfo:
+              persisted.emergencyInfo?.id && persisted.emergencyInfo.id !== sampleEmergencyInfo.id
+                ? persisted.emergencyInfo
+                : emptyEmergencyInfo,
             referrals: persisted.referrals ?? [],
             rideListings: persisted.rideListings ?? [],
           };

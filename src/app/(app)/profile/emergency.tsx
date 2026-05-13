@@ -17,7 +17,7 @@ import { useEmergencyInfo, useEmergencyMutations } from '@/hooks/use-kurbada-dat
 const emptyEmergencyInfo = {
   id: '',
   full_name: '',
-  blood_type: 'O+' as const,
+  blood_type: '' as const,
   allergies: '',
   conditions: '',
   contact1_name: '',
@@ -47,13 +47,13 @@ export default function EmergencyScreen() {
         <AppText variant="meta" style={{ color: palette.textSecondary }}>
           Store rider details and generate a QR wallpaper for your lock screen.
         </AppText>
-        <FloatingField label="Full Name" value={form.full_name} onChangeText={(value) => setForm({ ...form, full_name: value })} placeholder="Samuel Uy" />
-        <FloatingField label="Blood Type" value={form.blood_type} onChangeText={(value) => setForm({ ...form, blood_type: value as typeof form.blood_type })} placeholder="O+" />
+        <FloatingField label="Full Name" value={form.full_name} onChangeText={(value) => setForm({ ...form, full_name: value })} placeholder="Juan dela Cruz" />
+        <FloatingField label="Blood Type" value={form.blood_type} onChangeText={(value) => setForm({ ...form, blood_type: value as typeof form.blood_type })} placeholder="A+, O+, or Unknown" />
         <FloatingField label="Allergies" value={form.allergies} onChangeText={(value) => setForm({ ...form, allergies: value })} placeholder="None reported" />
         <FloatingField label="Medical Conditions" value={form.conditions} onChangeText={(value) => setForm({ ...form, conditions: value })} placeholder="None reported" />
-        <FloatingField label="Emergency Contact 1 Name" value={form.contact1_name} onChangeText={(value) => setForm({ ...form, contact1_name: value })} placeholder="Emergency Contact" />
+        <FloatingField label="Emergency Contact 1 Name" value={form.contact1_name} onChangeText={(value) => setForm({ ...form, contact1_name: value })} placeholder="Primary contact" />
         <FloatingField label="Emergency Contact 1 Phone" value={form.contact1_phone} onChangeText={(value) => setForm({ ...form, contact1_phone: value })} placeholder="+63917..." keyboardType="phone-pad" />
-        <FloatingField label="Emergency Contact 2 Name" value={form.contact2_name} onChangeText={(value) => setForm({ ...form, contact2_name: value })} placeholder="Secondary Contact" />
+        <FloatingField label="Emergency Contact 2 Name" value={form.contact2_name} onChangeText={(value) => setForm({ ...form, contact2_name: value })} placeholder="Secondary contact" />
         <FloatingField label="Emergency Contact 2 Phone" value={form.contact2_phone} onChangeText={(value) => setForm({ ...form, contact2_phone: value })} placeholder="+63918..." keyboardType="phone-pad" />
         <Button
           title="Save Emergency Info"

@@ -316,7 +316,7 @@ export default function BoardTabScreen() {
 
   return (
     <TabTransition>
-      <AppScreen style={{ backgroundColor: palette.background }}>
+      <AppScreen style={{ backgroundColor: palette.background, paddingTop: 14 }}>
         <FlatList
           data={filteredListings}
           keyExtractor={(item) => item.id}

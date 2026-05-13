@@ -17,7 +17,6 @@ export function EmergencyQRCard({
 }) {
   return (
     <GlassCard style={{ padding: 18, gap: 16, borderWidth: 0.5, borderColor: palette.danger }}>
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: palette.danger }} />
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
         <View style={{ flex: 1, minWidth: 0, gap: 8 }}>
           <View style={{ alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.xs, backgroundColor: 'rgba(192,57,43,0.15)' }}>

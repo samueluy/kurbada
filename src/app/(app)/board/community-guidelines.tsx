@@ -48,7 +48,7 @@ export default function CommunityGuidelinesScreen() {
   };
 
   return (
-    <AppScrollScreen contentContainerStyle={{ flexGrow: 1 }} showWordmark={false}>
+    <AppScrollScreen contentContainerStyle={{ flexGrow: 1, paddingTop: 14 }} showWordmark={false}>
       <View style={{ gap: 8 }}>
         <AppText variant="eyebrow">Community Guidelines</AppText>
         <AppText variant="screenTitle" style={{ fontSize: 28 }}>

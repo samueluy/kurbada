@@ -505,7 +505,12 @@ export function useEmergencyInfo(userId?: string) {
     enabled: useRemote,
     queryFn: async () => {
       if (!supabase || !userId) return localEmergencyInfo;
-      const { data, error } = await supabase.from('emergency_info').select('*').eq('user_id', userId).maybeSingle();
+      const { data, error } = await supabase
+        .from('emergency_info')
+        .select('*')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
       if (error) throw error;
       return (data as EmergencyInfo | null) ?? localEmergencyInfo;
     },
@@ -1140,19 +1145,29 @@ export function useEmergencyMutations(userId?: string) {
           user_id: userId,
         };
 
-        const builder = info.id
-          ? supabase.from('emergency_info').upsert({ ...payload, id: info.id } as any, { onConflict: 'id' })
+        const existingResponse = await supabase
+          .from('emergency_info')
+          .select('id')
+          .eq('user_id', userId)
+          .limit(1)
+          .maybeSingle();
+        const existingId = info.id || (existingResponse.data as { id?: string } | null)?.id;
+
+        const builder = existingId
+          ? supabase.from('emergency_info').update(payload as any).eq('id', existingId as any)
           : supabase.from('emergency_info').insert(payload as any);
 
         const { data, error } = await builder.select().single();
         if (error) throw error;
         const savedInfo = data as EmergencyInfo;
         updateEmergencyInfoLocal(savedInfo);
+        queryClient.setQueryData(['emergency', userId], savedInfo);
         return savedInfo;
       }
 
       const localInfo = { ...info, id: info.id || createId() };
       updateEmergencyInfoLocal(localInfo);
+      queryClient.setQueryData(['emergency', userId ?? 'local'], localInfo);
       return localInfo;
     },
     onSuccess: async () => {

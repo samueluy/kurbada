@@ -1,9 +1,9 @@
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { runOnJS, useAnimatedReaction, useSharedValue } from 'react-native-reanimated';
+import { runOnJS, useSharedValue } from 'react-native-reanimated';
 
 import { IgStoryCanvas } from '@/components/ride/ig-story-canvas';
 import { AppText } from '@/components/ui/app-text';
@@ -40,6 +40,9 @@ export default function RideShareEditorScreen() {
   const gestureStartX = useSharedValue(0);
   const gestureStartY = useSharedValue(0);
   const adjustModeValue = useSharedValue<0 | 1>(0);
+  const hydratedRideIdRef = useRef<string | null>(null);
+  const [editorDraft, setEditorDraft] = useState(draft);
+  const editorDraftRef = useRef(draft);
 
   useEffect(() => {
     if (rideId) {
@@ -51,7 +54,22 @@ export default function RideShareEditorScreen() {
     adjustModeValue.value = adjustMode === 'photo' ? 0 : 1;
   }, [adjustMode, adjustModeValue]);
 
+  const updateEditorDraft = useCallback((patch: Partial<typeof draft>) => {
+    setEditorDraft((current) => {
+      const next = { ...current, ...patch };
+      editorDraftRef.current = next;
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
+    if (!rideId || draft.rideId !== rideId || hydratedRideIdRef.current === rideId) {
+      return;
+    }
+
+    hydratedRideIdRef.current = rideId;
+    editorDraftRef.current = draft;
+    setEditorDraft(draft);
     draftPhotoScale.value = draft.photoScale;
     draftPhotoOffsetX.value = draft.photoOffsetX;
     draftPhotoOffsetY.value = draft.photoOffsetY;
@@ -65,46 +83,20 @@ export default function RideShareEditorScreen() {
     draft.photoOffsetX,
     draft.photoOffsetY,
     draft.photoScale,
+    draft.rideId,
     draftOverlayOffsetX,
     draftOverlayOffsetY,
     draftOverlayScale,
     draftPhotoOffsetX,
     draftPhotoOffsetY,
     draftPhotoScale,
+    draft,
+    rideId,
   ]);
 
-  useAnimatedReaction(
-    () => ({
-      photoScale: draftPhotoScale.value,
-      photoOffsetX: draftPhotoOffsetX.value,
-      photoOffsetY: draftPhotoOffsetY.value,
-      overlayScale: draftOverlayScale.value,
-      overlayOffsetX: draftOverlayOffsetX.value,
-      overlayOffsetY: draftOverlayOffsetY.value,
-    }),
-    (next, previous) => {
-      if (
-        previous
-        && next.photoScale === previous.photoScale
-        && next.photoOffsetX === previous.photoOffsetX
-        && next.photoOffsetY === previous.photoOffsetY
-        && next.overlayScale === previous.overlayScale
-        && next.overlayOffsetX === previous.overlayOffsetX
-        && next.overlayOffsetY === previous.overlayOffsetY
-      ) {
-        return;
-      }
-
-      runOnJS(updateDraft)({
-        photoScale: Number(next.photoScale.toFixed(3)),
-        photoOffsetX: Number(next.photoOffsetX.toFixed(1)),
-        photoOffsetY: Number(next.photoOffsetY.toFixed(1)),
-        overlayScale: Number(next.overlayScale.toFixed(3)),
-        overlayOffsetX: Number(next.overlayOffsetX.toFixed(1)),
-        overlayOffsetY: Number(next.overlayOffsetY.toFixed(1)),
-      });
-    },
-  );
+  const persistDraftFromEditor = () => {
+    updateDraft(editorDraftRef.current);
+  };
 
   const editorGesture = useMemo(() => Gesture.Simultaneous(
     Gesture.Pan()
@@ -114,12 +106,24 @@ export default function RideShareEditorScreen() {
       })
       .onUpdate((event) => {
         if (adjustModeValue.value === 0) {
-          draftPhotoOffsetX.value = gestureStartX.value + event.translationX;
-          draftPhotoOffsetY.value = gestureStartY.value + event.translationY;
+          const nextPhotoOffsetX = gestureStartX.value + event.translationX;
+          const nextPhotoOffsetY = gestureStartY.value + event.translationY;
+          draftPhotoOffsetX.value = nextPhotoOffsetX;
+          draftPhotoOffsetY.value = nextPhotoOffsetY;
+          runOnJS(updateEditorDraft)({
+            photoOffsetX: Number(nextPhotoOffsetX.toFixed(1)),
+            photoOffsetY: Number(nextPhotoOffsetY.toFixed(1)),
+          });
           return;
         }
-        draftOverlayOffsetX.value = gestureStartX.value + event.translationX;
-        draftOverlayOffsetY.value = gestureStartY.value + event.translationY;
+        const nextOverlayOffsetX = gestureStartX.value + event.translationX;
+        const nextOverlayOffsetY = gestureStartY.value + event.translationY;
+        draftOverlayOffsetX.value = nextOverlayOffsetX;
+        draftOverlayOffsetY.value = nextOverlayOffsetY;
+        runOnJS(updateEditorDraft)({
+          overlayOffsetX: Number(nextOverlayOffsetX.toFixed(1)),
+          overlayOffsetY: Number(nextOverlayOffsetY.toFixed(1)),
+        });
       }),
     Gesture.Pinch()
       .onBegin(() => {
@@ -129,9 +133,11 @@ export default function RideShareEditorScreen() {
         const nextScale = Math.max(0.6, Math.min(3, gestureStartScale.value * event.scale));
         if (adjustModeValue.value === 0) {
           draftPhotoScale.value = nextScale;
+          runOnJS(updateEditorDraft)({ photoScale: Number(nextScale.toFixed(3)) });
           return;
         }
         draftOverlayScale.value = nextScale;
+        runOnJS(updateEditorDraft)({ overlayScale: Number(nextScale.toFixed(3)) });
       }),
   ), [
     adjustModeValue,
@@ -144,6 +150,7 @@ export default function RideShareEditorScreen() {
     gestureStartScale,
     gestureStartX,
     gestureStartY,
+    updateEditorDraft,
   ]);
 
   const handleChoosePhoto = async () => {
@@ -151,7 +158,10 @@ export default function RideShareEditorScreen() {
       triggerLightHaptic();
       const pickerResult = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
       if (pickerResult.canceled || !pickerResult.assets?.length) return;
-      updateDraft({
+      draftPhotoScale.value = 1.3;
+      draftPhotoOffsetX.value = 0;
+      draftPhotoOffsetY.value = -40;
+      updateEditorDraft({
         photoUri: pickerResult.assets[0].uri,
         photoScale: 1.3,
         photoOffsetX: 0,
@@ -175,6 +185,7 @@ export default function RideShareEditorScreen() {
           hitSlop={10}
           onPress={() => {
             triggerLightHaptic();
+            persistDraftFromEditor();
             router.back();
           }}>
           <AppText variant="button" style={{ color: palette.textSecondary }}>
@@ -186,6 +197,7 @@ export default function RideShareEditorScreen() {
           hitSlop={10}
           onPress={() => {
             triggerSuccessHaptic();
+            persistDraftFromEditor();
             router.back();
           }}>
           <AppText variant="button" style={{ color: palette.danger }}>
@@ -235,15 +247,15 @@ export default function RideShareEditorScreen() {
             <View style={{ alignItems: 'center' }}>
               <IgStoryCanvas
                 ride={ride}
-                photoUri={draft.photoUri}
-                templateId={draft.templateId}
+                photoUri={editorDraft.photoUri}
+                templateId={editorDraft.templateId}
                 fuelPricePerLiter={latestFuelPrice}
-                photoScale={draft.photoScale}
-                photoOffsetX={draft.photoOffsetX}
-                photoOffsetY={draft.photoOffsetY}
-                overlayScale={draft.overlayScale}
-                overlayOffsetX={draft.overlayOffsetX}
-                overlayOffsetY={draft.overlayOffsetY}
+                photoScale={editorDraft.photoScale}
+                photoOffsetX={editorDraft.photoOffsetX}
+                photoOffsetY={editorDraft.photoOffsetY}
+                overlayScale={editorDraft.overlayScale}
+                overlayOffsetX={editorDraft.overlayOffsetX}
+                overlayOffsetY={editorDraft.overlayOffsetY}
                 width={300}
               />
             </View>
@@ -262,6 +274,25 @@ export default function RideShareEditorScreen() {
               onPress={() => {
                 triggerLightHaptic();
                 resetActiveMode(adjustMode);
+                if (adjustMode === 'photo') {
+                  draftPhotoScale.value = 1.3;
+                  draftPhotoOffsetX.value = 0;
+                  draftPhotoOffsetY.value = -40;
+                  updateEditorDraft({
+                    photoScale: 1.3,
+                    photoOffsetX: 0,
+                    photoOffsetY: -40,
+                  });
+                  return;
+                }
+                draftOverlayScale.value = 1;
+                draftOverlayOffsetX.value = 0;
+                draftOverlayOffsetY.value = 0;
+                updateEditorDraft({
+                  overlayScale: 1,
+                  overlayOffsetX: 0,
+                  overlayOffsetY: 0,
+                });
               }}
             />
           </View>
