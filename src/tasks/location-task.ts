@@ -8,6 +8,7 @@ import {
   getRidePointCount,
   getRidePoints,
   initializeRidePointStorage,
+  updateStoredRideSessionLastPointTimestamp,
 } from '@/lib/ride-point-storage';
 import type { RidePoint } from '@/types/domain';
 
@@ -32,7 +33,14 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
     altitude: loc.coords.altitude ?? 0,
   }));
 
-  await appendRidePoints(rideId, points).catch(() => undefined);
+  await appendRidePoints(rideId, points)
+    .then(async () => {
+      const lastPointTimestamp = points[points.length - 1]?.timestamp;
+      if (lastPointTimestamp) {
+        await updateStoredRideSessionLastPointTimestamp(lastPointTimestamp);
+      }
+    })
+    .catch(() => undefined);
 });
 
 export async function primeRidePointStorage() {

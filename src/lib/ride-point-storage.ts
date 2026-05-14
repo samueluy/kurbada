@@ -3,6 +3,17 @@ import * as SQLite from 'expo-sqlite';
 
 import type { RidePoint } from '@/types/domain';
 
+export type StoredRideSession = {
+  rideId: string;
+  bikeId: string;
+  startedAt: number;
+  fuelPricePerLiter: number;
+  fuelRateKmPerLiter: number;
+  mode: 'hustle' | 'weekend';
+  startingAltitude: number | null;
+  lastPointTimestamp: number | null;
+};
+
 type RidePointRow = {
   ride_id: string;
   latitude: number;
@@ -76,6 +87,9 @@ function fromRow(row: RidePointRow): RidePoint {
   };
 }
 
+const ACTIVE_RIDE_ID_KEY = 'active_ride_id';
+const ACTIVE_RIDE_SESSION_KEY = 'active_ride_session';
+
 export async function initializeRidePointStorage() {
   getDatabase();
 }
@@ -85,7 +99,7 @@ export async function setActiveRidePointSession(rideId: string) {
   if (!database) return;
   await database.runAsync(
     'insert into ride_session_meta (key, value) values (?, ?) on conflict(key) do update set value = excluded.value',
-    ['active_ride_id', rideId],
+    [ACTIVE_RIDE_ID_KEY, rideId],
   );
 }
 
@@ -94,7 +108,7 @@ export async function getActiveRidePointSession() {
   if (!database) return null;
   const row = await database.getFirstAsync<{ value: string }>(
     'select value from ride_session_meta where key = ?',
-    ['active_ride_id'],
+    [ACTIVE_RIDE_ID_KEY],
   );
   return row?.value ?? null;
 }
@@ -102,7 +116,58 @@ export async function getActiveRidePointSession() {
 export async function clearActiveRidePointSession() {
   const database = getDatabase();
   if (!database) return;
-  await database.runAsync('delete from ride_session_meta where key = ?', ['active_ride_id']);
+  await database.withExclusiveTransactionAsync(async (txn) => {
+    await txn.runAsync('delete from ride_session_meta where key = ?', [ACTIVE_RIDE_ID_KEY]);
+    await txn.runAsync('delete from ride_session_meta where key = ?', [ACTIVE_RIDE_SESSION_KEY]);
+  });
+}
+
+export async function setStoredRideSession(session: StoredRideSession) {
+  const database = getDatabase();
+  if (!database) return;
+
+  const serialized = JSON.stringify(session);
+  await database.withExclusiveTransactionAsync(async (txn) => {
+    await txn.runAsync(
+      'insert into ride_session_meta (key, value) values (?, ?) on conflict(key) do update set value = excluded.value',
+      [ACTIVE_RIDE_ID_KEY, session.rideId],
+    );
+    await txn.runAsync(
+      'insert into ride_session_meta (key, value) values (?, ?) on conflict(key) do update set value = excluded.value',
+      [ACTIVE_RIDE_SESSION_KEY, serialized],
+    );
+  });
+}
+
+export async function getStoredRideSession() {
+  const database = getDatabase();
+  if (!database) return null as StoredRideSession | null;
+
+  const row = await database.getFirstAsync<{ value: string }>(
+    'select value from ride_session_meta where key = ?',
+    [ACTIVE_RIDE_SESSION_KEY],
+  );
+  if (!row?.value) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(row.value) as StoredRideSession;
+  } catch {
+    return null;
+  }
+}
+
+export async function updateStoredRideSessionLastPointTimestamp(lastPointTimestamp: number) {
+  const currentSession = await getStoredRideSession();
+  if (!currentSession) {
+    return;
+  }
+
+  await setStoredRideSession({
+    ...currentSession,
+    lastPointTimestamp,
+  });
 }
 
 export async function clearRidePoints(rideId: string) {

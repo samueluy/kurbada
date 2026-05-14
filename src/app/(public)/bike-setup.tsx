@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScreen, AppScrollScreen } from '@/components/ui/app-screen';
@@ -9,6 +9,8 @@ import { GlassCard } from '@/components/ui/glass-card';
 import { palette } from '@/constants/theme';
 import { OnboardingHeader } from '@/components/ui/onboarding-header';
 import { BikeIdentityForm, BIKE_IDENTITY_EMPTY, resolveBikeIdentity, type BikeIdentityDraft } from '@/features/garage/components/bike-identity-form';
+import { useAuth } from '@/hooks/use-auth';
+import { useBikeMutations } from '@/hooks/use-kurbada-data';
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { bikeBrands, getModelsForBrand, inferBikeCategory } from '@/lib/bike-models';
 import { getOnboardingRoute } from '@/lib/onboarding-flow';
@@ -18,14 +20,19 @@ import type { RideMode } from '@/types/domain';
 
 export default function BikeSetupScreen() {
   const params = useLocalSearchParams<{ flow?: string }>();
+  const { session } = useAuth();
   const setOnboardingStep = useAppStore((state) => state.setOnboardingStep);
   const setPreferredMode = useAppStore((state) => state.setPreferredMode);
   const setOnboardingData = useAppStore((state) => state.setOnboardingData);
   const clearAnonymousOnboardingDraft = useAppStore((state) => state.clearAnonymousOnboardingDraft);
   const completeOnboarding = useAppStore((state) => state.completeOnboarding);
+  const completeBikeSetup = useAppStore((state) => state.completeBikeSetup);
+  const setActiveBikeId = useAppStore((state) => state.setActiveBikeId);
   const onboardingData = useAppStore((state) => state.onboardingData);
+  const { saveBikeSetup } = useBikeMutations(session?.user.id);
   const isOnboarding = params.flow === 'onboarding';
   const keyboardInset = useKeyboardInset();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const initialBrand = onboardingData.bikeBrand && !bikeBrands.includes(onboardingData.bikeBrand) ? 'Other' : onboardingData.bikeBrand || '';
   const initialModels = initialBrand && initialBrand !== 'Other' ? getModelsForBrand(initialBrand) : [];
@@ -48,6 +55,10 @@ export default function BikeSetupScreen() {
   };
 
   useEffect(() => {
+    if (!isOnboarding) {
+      return;
+    }
+
     const resolved = resolveBikeIdentity(draft);
     setOnboardingData({
       bikeBrand: resolved.finalBrand,
@@ -69,23 +80,49 @@ export default function BikeSetupScreen() {
     }
 
     triggerLightHaptic();
-    setOnboardingData({
-      bikeBrand: finalBrand,
-      bikeModel: finalModel,
-      bikeYear: finalYear,
-      bikeEngineCc: finalCc,
-      bikeOdometerKm: finalOdometer,
-      bikeCategory: inferBikeCategory({ model: finalModel, cc: finalCc }),
-      ridingStyle: draft.ridingStyle,
-    });
-    setPreferredMode(draft.ridingStyle);
 
     if (isOnboarding) {
+      setOnboardingData({
+        bikeBrand: finalBrand,
+        bikeModel: finalModel,
+        bikeYear: finalYear,
+        bikeEngineCc: finalCc,
+        bikeOdometerKm: finalOdometer,
+        bikeCategory: inferBikeCategory({ model: finalModel, cc: finalCc }),
+        ridingStyle: draft.ridingStyle,
+      });
+      setPreferredMode(draft.ridingStyle);
       setOnboardingStep(2);
       router.push(getOnboardingRoute(2) as any);
-    } else {
-      router.replace('/(app)/(tabs)/ride');
+      return;
     }
+
+    if (!session?.user.id) {
+      router.replace('/(app)/(tabs)/ride');
+      return;
+    }
+
+    setIsSubmitting(true);
+    void saveBikeSetup.mutateAsync({
+      make: finalBrand,
+      model: finalModel,
+      nickname: null,
+      year: Number(finalYear),
+      engine_cc: Number(finalCc),
+      current_odometer_km: Number(finalOdometer),
+      category: inferBikeCategory({ model: finalModel, cc: finalCc }),
+    }).then((bike) => {
+      completeBikeSetup();
+      setActiveBikeId(bike.id);
+      router.replace('/(app)/(tabs)/ride');
+    }).catch((error) => {
+      Alert.alert(
+        'Could not save bike',
+        error instanceof Error ? error.message : 'Please try again.',
+      );
+    }).finally(() => {
+      setIsSubmitting(false);
+    });
   };
 
   const content = (
@@ -119,7 +156,11 @@ export default function BikeSetupScreen() {
               {content}
             </ScrollView>
             <View style={{ gap: 10 }}>
-              <Button title="Next →" onPress={handleNext} disabled={!isValid} />
+              <Button
+                title={isOnboarding ? 'Next →' : isSubmitting ? 'Saving...' : 'Save Bike'}
+                onPress={handleNext}
+                disabled={!isValid || isSubmitting}
+              />
               <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                 <AppText variant="meta" style={{ color: palette.textSecondary }}>
                   Already have an account?
@@ -150,7 +191,11 @@ export default function BikeSetupScreen() {
       contentContainerStyle={{ flexGrow: 1 }}>
       <GlassCard style={{ gap: 18, padding: 22 }}>
         {content}
-        <Button title="Next →" onPress={handleNext} disabled={!isValid} />
+        <Button
+          title={isOnboarding ? 'Next →' : isSubmitting ? 'Saving...' : 'Save Bike'}
+          onPress={handleNext}
+          disabled={!isValid || isSubmitting}
+        />
       </GlassCard>
     </AppScrollScreen>
   );

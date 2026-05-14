@@ -54,7 +54,7 @@ export default function ActiveRideScreen() {
     }
   };
 
-  const displaySpeed = Math.round(ride.telemetry.speedKmh);
+  const displaySpeed = Math.round(ride.telemetry.displaySpeedKmh);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000000' }}>
@@ -132,7 +132,7 @@ export default function ActiveRideScreen() {
             </Pressable>
           </LinearGradient>
           <AppText variant="meta" style={{ color: palette.textTertiary, textAlign: 'center', fontSize: 11 }}>
-            Ride will auto-save when you tap End.
+            If the app is interrupted, Kurbada will offer to recover this ride on next launch.
           </AppText>
         </View>
       ) : null}

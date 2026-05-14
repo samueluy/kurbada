@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, Pressable, ScrollView, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -10,6 +10,7 @@ import { KeyboardSheet } from "@/components/ui/keyboard-sheet";
 import { Colors, palette, radius } from "@/constants/theme";
 import { useAuth } from "@/hooks/use-auth";
 import { useReferralMutations } from "@/hooks/use-kurbada-data";
+import { useRevenueCatStatus } from "@/hooks/use-revenuecat-status";
 import { useUserAccess, useUserProfile } from "@/hooks/use-user-access";
 import { triggerLightHaptic, triggerSuccessHaptic } from "@/lib/haptics";
 import { env } from "@/lib/env";
@@ -45,6 +46,7 @@ export default function PaywallScreen() {
   const { session, isFreshSignupSession } = useAuth();
   const profile = useUserProfile(session?.user.id);
   const access = useUserAccess(session?.user.id);
+  const revenueCatStatus = useRevenueCatStatus();
   const { applyReferralCode } = useReferralMutations(session?.user.id);
   const setOnboardingStep = useAppStore((state) => state.setOnboardingStep);
   const setPurchaseCompleted = useAppStore(
@@ -74,13 +76,40 @@ export default function PaywallScreen() {
     !env.revenueCatEnabled,
   );
   const [purchaseError, setPurchaseError] = useState("");
-  const [isPurchasing, setIsPurchasing] = useState(false);
+  const [purchaseSession, setPurchaseSession] = useState<
+    "idle" | "launching_sheet" | "awaiting_entitlement" | "failed"
+  >("idle");
   const isOnboardingPaywall = params.context === "onboarding";
   const isGraceStatusVisible =
     Boolean(session?.user.id)
     && isOnboardingPaywall
     && access.data.reason === "grace";
   const ctaScale = useRef(new Animated.Value(1)).current;
+  const purchaseResolvedRef = useRef(false);
+  const purchaseWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearPurchaseWatchdog = useCallback(() => {
+    if (purchaseWatchdogRef.current) {
+      clearTimeout(purchaseWatchdogRef.current);
+      purchaseWatchdogRef.current = null;
+    }
+  }, []);
+
+  const finalizePremiumUnlock = useCallback((source: string) => {
+    if (purchaseResolvedRef.current) {
+      return;
+    }
+
+    purchaseResolvedRef.current = true;
+    clearPurchaseWatchdog();
+    setPurchaseSession("idle");
+    setPurchaseError("");
+    console.info(`[bootstrap] paywall_premium_unlocked source=${source}`);
+    triggerSuccessHaptic();
+    setPurchaseCompleted(true);
+    setOnboardingStep(7);
+    router.replace("/(public)/success" as any);
+  }, [clearPurchaseWatchdog, setOnboardingStep, setPurchaseCompleted]);
 
   useEffect(() => {
     if (session && !hasCompletedOnboarding && !isOnboardingPaywall) {
@@ -170,24 +199,75 @@ export default function PaywallScreen() {
     };
   }, [isFreshSignupSession, isOnboardingPaywall]);
 
+  useEffect(() => {
+    if (purchaseSession === "idle") {
+      purchaseResolvedRef.current = false;
+      clearPurchaseWatchdog();
+      return;
+    }
+
+    const hasPremiumFromStatus = revenueCatStatus.hasPremium;
+    const hasPremiumFromAccess = access.data.reason === "premium";
+
+    if (hasPremiumFromStatus || hasPremiumFromAccess) {
+      console.info(
+        `[bootstrap] paywall_premium_observed status=${hasPremiumFromStatus} access=${hasPremiumFromAccess}`,
+      );
+      finalizePremiumUnlock(
+        hasPremiumFromStatus ? "customer_info_listener" : "access_query",
+      );
+    }
+  }, [
+    access.data.reason,
+    clearPurchaseWatchdog,
+    finalizePremiumUnlock,
+    purchaseSession,
+    revenueCatStatus.hasPremium,
+  ]);
+
+  useEffect(() => clearPurchaseWatchdog, [clearPurchaseWatchdog]);
+
   const runPurchaseFlow = async () => {
     setPurchaseError("");
-    setIsPurchasing(true);
+    purchaseResolvedRef.current = false;
+    clearPurchaseWatchdog();
+    setPurchaseSession("launching_sheet");
+    console.info("[bootstrap] paywall_purchase_session_entered state=launching_sheet");
+    purchaseWatchdogRef.current = setTimeout(() => {
+      if (purchaseResolvedRef.current) {
+        return;
+      }
+      console.warn("[bootstrap] paywall_purchase_sheet_timeout");
+      setPurchaseSession("failed");
+      setPurchaseError(
+        "We’re still checking your trial access. If billing already completed, tap Restore Purchase or try again in a moment.",
+      );
+    }, 12000);
+
     try {
-      const result = await purchasePremium();
+      const purchasePromise = purchasePremium();
+      setPurchaseSession("awaiting_entitlement");
+      console.info("[bootstrap] paywall_purchase_session_entered state=awaiting_entitlement");
+      const result = await purchasePromise;
+      clearPurchaseWatchdog();
+
+      if (purchaseResolvedRef.current) {
+        return;
+      }
+
       if (result.success) {
-        triggerSuccessHaptic();
-        setPurchaseCompleted(true);
-        setOnboardingStep(7);
-        router.replace("/(public)/success" as any);
+        finalizePremiumUnlock("purchase_result");
         return;
       }
 
       if (!result.cancelled) {
+        setPurchaseSession("failed");
         setPurchaseError(result.reason);
+      } else {
+        setPurchaseSession("idle");
       }
     } finally {
-      setIsPurchasing(false);
+      clearPurchaseWatchdog();
     }
   };
 
@@ -206,14 +286,11 @@ export default function PaywallScreen() {
     }
 
     if (!env.revenueCatEnabled) {
-      triggerSuccessHaptic();
-      setPurchaseCompleted(true);
-      setOnboardingStep(7);
-      router.replace("/(public)/success" as any);
+      finalizePremiumUnlock("dev_bypass");
       return;
     }
 
-    await runPurchaseFlow();
+    void runPurchaseFlow();
   };
 
   const handleValidateReferral = async () => {
@@ -261,17 +338,18 @@ export default function PaywallScreen() {
   const handleRestore = async () => {
     const result = await restorePremiumPurchases();
     if (result.success && result.hasPremium) {
-      triggerSuccessHaptic();
-      setPurchaseCompleted(true);
-      setOnboardingStep(7);
-      router.replace("/(public)/success" as any);
+      finalizePremiumUnlock("restore");
     } else if (!result.success) {
       setPurchaseError(result.reason);
     }
   };
 
-  const buttonTitle = isPurchasing
+  const isPurchasing =
+    purchaseSession === "launching_sheet" || purchaseSession === "awaiting_entitlement";
+  const buttonTitle = purchaseSession === "launching_sheet"
     ? "Opening payment sheet…"
+    : purchaseSession === "awaiting_entitlement"
+      ? "Waiting for trial access…"
     : env.revenueCatEnabled
       ? session?.user.id
         ? billingAvailable

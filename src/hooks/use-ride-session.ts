@@ -3,14 +3,18 @@ import * as Linking from 'expo-linking';
 import * as Location from 'expo-location';
 import { Accelerometer } from 'expo-sensors';
 import { useEffect, useMemo, useRef } from 'react';
-import { PermissionsAndroid, Platform } from 'react-native';
+import { AppState, PermissionsAndroid, Platform } from 'react-native';
 
 import { createId } from '@/lib/id';
+import { queryClient } from '@/lib/query-client';
 import {
   appendRidePoints,
+  type StoredRideSession,
   clearActiveRidePointSession,
   clearRidePoints,
+  getStoredRideSession,
   initializeRidePointStorage,
+  setStoredRideSession,
   setActiveRidePointSession,
 } from '@/lib/ride-point-storage';
 import { buildRouteGeoJson, computeRouteBounds, haversineDistanceKm, simplifyRoute } from '@/lib/route';
@@ -24,15 +28,17 @@ import type { RidePoint } from '@/types/domain';
 
 Accelerometer.setUpdateInterval(100);
 
-const SPEEDOMETER_EGO_BOOST = 1.08;
+const DISPLAY_SPEEDOMETER_BOOST = 1.03;
 const LOW_GRAVITY_THRESHOLD_G = 0.45;
 const IMPACT_THRESHOLD_G = 3.15;
 const SEVERE_IMPACT_THRESHOLD_G = 5.25;
 const IMPACT_SEQUENCE_WINDOW_MS = 1800;
 const CRASH_TRIGGER_HOLD_MS = 120;
+const MAX_REASONABLE_SPEED_KMH = 280;
+const MAX_SPEED_DELTA_PER_SECOND_KMH = 36;
 
-function applySpeedometerBoost(speedKmh: number) {
-  return Number((Math.max(0, speedKmh) * SPEEDOMETER_EGO_BOOST).toFixed(1));
+function toDisplaySpeedKmh(speedKmh: number) {
+  return Number((Math.max(0, speedKmh) * DISPLAY_SPEEDOMETER_BOOST).toFixed(1));
 }
 
 export function useRideSession() {
@@ -62,6 +68,7 @@ export function useRideSession() {
   };
   const telemetry = useMemo(() => ({
     speedKmh: rideSpeedKmh,
+    displaySpeedKmh: toDisplaySpeedKmh(rideSpeedKmh),
     distanceKm: rideDistanceKm,
     durationSeconds: rideDurationSeconds,
     maxSpeedKmh: useRideStore.getState().maxSpeedKmh,
@@ -104,9 +111,134 @@ export function useRideSession() {
   const lastGForcePublishAtRef = useRef(0);
   const getRideState = useRideStore.getState;
 
+  const invalidateRecoveryQuery = () => {
+    void queryClient.invalidateQueries({ queryKey: ['unfinished-ride-recovery'] });
+  };
+
+  const persistRideSessionSnapshot = async (overrides?: Partial<StoredRideSession>) => {
+    const rideId = overrides?.rideId ?? rideIdRef.current;
+    const currentStore = getRideState();
+
+    if (!rideId || !currentStore.bikeId || !currentStore.startedAt) {
+      return;
+    }
+
+    await setStoredRideSession({
+      rideId,
+      bikeId: overrides?.bikeId ?? currentStore.bikeId,
+      startedAt: overrides?.startedAt ?? currentStore.startedAt,
+      fuelPricePerLiter: overrides?.fuelPricePerLiter ?? currentStore.fuelPricePerLiter,
+      fuelRateKmPerLiter: overrides?.fuelRateKmPerLiter ?? currentStore.fuelRateKmPerLiter,
+      mode: overrides?.mode ?? 'hustle',
+      startingAltitude: overrides?.startingAltitude ?? startingAltitudeRef.current,
+      lastPointTimestamp:
+        overrides?.lastPointTimestamp
+        ?? foregroundPointsRef.current[foregroundPointsRef.current.length - 1]?.timestamp
+        ?? null,
+    });
+    invalidateRecoveryQuery();
+  };
+
   useEffect(() => {
     void initializeRidePointStorage();
   }, []);
+
+  const buildTelemetryFromPoints = (
+    points: RidePoint[],
+    sessionMeta: StoredRideSession,
+  ) => {
+    const normalizedPoints = normalizeRidePoints(points);
+    const totalDistance = normalizedPoints.reduce((sum, p, index) => {
+      if (index === 0) return 0;
+      return sum + haversineDistanceKm(normalizedPoints[index - 1], p);
+    }, 0);
+    const maxSpeed = normalizedPoints.reduce((max, point) => Math.max(max, point.speedKmh), 0);
+    const latestPoint = normalizedPoints[normalizedPoints.length - 1];
+
+    let elevationGain = 0;
+    normalizedPoints.forEach((point, index) => {
+      if (index === 0) return;
+      const previous = normalizedPoints[index - 1];
+      if (previous.altitude == null || point.altitude == null) {
+        return;
+      }
+      const delta = point.altitude - previous.altitude;
+      if (delta > 3) {
+        elevationGain += delta;
+      }
+    });
+
+    const relativeAltitude =
+      latestPoint?.altitude != null && sessionMeta.startingAltitude != null
+        ? latestPoint.altitude - sessionMeta.startingAltitude
+        : 0;
+    const durationSeconds = Math.max(
+      0,
+      Math.floor(((latestPoint?.timestamp ?? Date.now()) - sessionMeta.startedAt) / 1000),
+    );
+    const averageSpeed =
+      durationSeconds > 0 ? Number((totalDistance / (durationSeconds / 3600)).toFixed(1)) : 0;
+    const fuelRate = Math.max(sessionMeta.fuelRateKmPerLiter, 0.1);
+    const estimatedFuelLiters = totalDistance / fuelRate;
+    const estimatedFuelCost = estimatedFuelLiters * sessionMeta.fuelPricePerLiter;
+
+    return {
+      normalizedPoints,
+      totalDistance,
+      maxSpeed,
+      averageSpeed,
+      elevationGain,
+      relativeAltitude,
+      durationSeconds,
+      estimatedFuelLiters,
+      estimatedFuelCost,
+    };
+  };
+
+  const buildRideRecord = (
+    sessionMeta: StoredRideSession,
+    points: RidePoint[],
+  ) => {
+    const {
+      normalizedPoints,
+      totalDistance,
+      maxSpeed,
+      averageSpeed,
+      elevationGain,
+      estimatedFuelLiters,
+    } = buildTelemetryFromPoints(points, sessionMeta);
+    const fullRoutePoints = simplifyRoute(normalizedPoints, 6);
+    const previewRoutePoints = simplifyRoute(normalizedPoints, 40);
+    const routeGeoJson = buildRouteGeoJson(fullRoutePoints);
+    const routePreviewGeoJson = buildRouteGeoJson(
+      previewRoutePoints.length ? previewRoutePoints : fullRoutePoints,
+    );
+    const bounds = computeRouteBounds(fullRoutePoints.length ? fullRoutePoints : normalizedPoints);
+    const endedAt = new Date(
+      normalizedPoints[normalizedPoints.length - 1]?.timestamp ?? Date.now(),
+    ).toISOString();
+
+    return {
+      id: sessionMeta.rideId,
+      bike_id: sessionMeta.bikeId,
+      user_id: session?.user.id,
+      mode: sessionMeta.mode,
+      started_at: new Date(sessionMeta.startedAt).toISOString(),
+      ended_at: endedAt,
+      distance_km: Number(totalDistance.toFixed(1)),
+      max_speed_kmh: Number(maxSpeed.toFixed(1)),
+      avg_speed_kmh: Number(averageSpeed.toFixed(1)),
+      max_lean_angle_deg: null,
+      fuel_used_liters: Number(estimatedFuelLiters.toFixed(2)),
+      elevation_gain_m: Number(elevationGain.toFixed(1)),
+      mood: null,
+      route_geojson: routeGeoJson,
+      route_preview_geojson: routePreviewGeoJson,
+      route_point_count_raw: normalizedPoints.length,
+      route_point_count_simplified: fullRoutePoints.length,
+      route_bounds: bounds,
+    };
+  };
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -169,6 +301,21 @@ export function useRideSession() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rideState.state]);
 
+  useEffect(() => {
+    if (rideState.state !== 'active') {
+      return;
+    }
+
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState !== 'active') {
+        void flushPendingPoints().then(() => persistRideSessionSnapshot()).catch(() => undefined);
+      }
+    });
+
+    return () => subscription.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rideState.state]);
+
   const startRide = async (bikeId: string, fuelPricePerLiter: number, fuelRateKmPerLiter: number) => {
     rideActions.resetRide();
     foregroundPointsRef.current = [];
@@ -205,6 +352,16 @@ export function useRideSession() {
 
     await clearRidePoints(rideIdRef.current);
     await setActiveRidePointSession(rideIdRef.current);
+    await persistRideSessionSnapshot({
+      rideId: rideIdRef.current,
+      bikeId,
+      startedAt: rideStartedAtRef.current,
+      fuelPricePerLiter,
+      fuelRateKmPerLiter,
+      mode: 'hustle',
+      startingAltitude: null,
+      lastPointTimestamp: null,
+    });
 
     await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
       accuracy: Location.Accuracy.BestForNavigation,
@@ -227,7 +384,6 @@ export function useRideSession() {
       rideActions.setStartedAt(Date.now() - rideState.telemetry.durationSeconds * 1000);
     }
 
-    const startedAt = rideState.startedAt ?? getRideState().startedAt!;
     const rideId = rideIdRef.current;
 
     if (!rideState.bikeId || !rideId) {
@@ -246,51 +402,27 @@ export function useRideSession() {
     }
 
     const allPoints = await getStoredCoords(rideId);
-
-    const normalizedPoints = normalizeRidePoints(allPoints);
-    const fullRoutePoints = simplifyRoute(normalizedPoints, 6);
-    const previewRoutePoints = simplifyRoute(normalizedPoints, 40);
-    const routeGeoJson = buildRouteGeoJson(fullRoutePoints);
-    const routePreviewGeoJson = buildRouteGeoJson(
-      previewRoutePoints.length ? previewRoutePoints : fullRoutePoints,
+    const sessionMeta = await getStoredRideSession();
+    const ride = buildRideRecord(
+      sessionMeta ?? {
+        rideId,
+        bikeId: rideState.bikeId,
+        startedAt: rideState.startedAt ?? Date.now(),
+        fuelPricePerLiter: getRideState().fuelPricePerLiter,
+        fuelRateKmPerLiter: getRideState().fuelRateKmPerLiter,
+        mode: 'hustle',
+        startingAltitude: startingAltitudeRef.current,
+        lastPointTimestamp: allPoints[allPoints.length - 1]?.timestamp ?? null,
+      },
+      allPoints,
     );
-    const bounds = computeRouteBounds(fullRoutePoints.length ? fullRoutePoints : normalizedPoints);
-
-    const totalDistance = normalizedPoints.reduce((sum, p, i) => {
-      if (i === 0) return 0;
-      return sum + haversineDistanceKm(normalizedPoints[i - 1], p);
-    }, 0);
-
-    const maxSpeed = normalizedPoints.reduce((m, p) => Math.max(m, p.speedKmh), 0);
-    const rawAverageSpeed = startedAt > 0
-      ? Number((totalDistance / ((Date.now() - startedAt) / 3_600_000)).toFixed(1))
-      : 0;
-    const ride = {
-      id: rideId,
-      bike_id: rideState.bikeId,
-      user_id: session?.user.id,
-      mode: 'hustle' as const, // kept for DB backwards compat; UI no longer branches
-      started_at: new Date(startedAt).toISOString(),
-      ended_at: new Date().toISOString(),
-      distance_km: Number(totalDistance.toFixed(1)),
-      max_speed_kmh: applySpeedometerBoost(maxSpeed),
-      avg_speed_kmh: applySpeedometerBoost(rawAverageSpeed),
-      max_lean_angle_deg: null,
-      fuel_used_liters: Number(rideState.telemetry.estimatedFuelLiters.toFixed(2)),
-      elevation_gain_m: Number(rideState.telemetry.elevationGainM.toFixed(1)),
-      mood: null,
-      route_geojson: routeGeoJson,
-      route_preview_geojson: routePreviewGeoJson,
-      route_point_count_raw: normalizedPoints.length,
-      route_point_count_simplified: fullRoutePoints.length,
-      route_bounds: bounds,
-    };
 
     rideActions.setState('saving');
     try {
       const savedRide = await saveRide.mutateAsync(ride);
       await clearStoredCoords(rideId);
       await clearActiveRidePointSession();
+      invalidateRecoveryQuery();
       rideStartedAtRef.current = null;
       rideIdRef.current = null;
       startingAltitudeRef.current = null;
@@ -300,6 +432,111 @@ export function useRideSession() {
       rideActions.setState('active');
       throw new Error('Failed to save ride. Please try again.');
     }
+  };
+
+  const resumeRecoveredRide = async () => {
+    const storedSession = await getStoredRideSession();
+    if (!storedSession) {
+      throw new Error('No unfinished ride was found.');
+    }
+
+    const storedPoints = await getStoredCoords(storedSession.rideId);
+    const {
+      normalizedPoints,
+      totalDistance,
+      maxSpeed,
+      elevationGain,
+      relativeAltitude,
+      durationSeconds,
+      estimatedFuelLiters,
+      estimatedFuelCost,
+    } = buildTelemetryFromPoints(storedPoints, storedSession);
+    const latestPoint = normalizedPoints[normalizedPoints.length - 1];
+
+    rideActions.resetRide();
+    foregroundPointsRef.current = normalizedPoints;
+    pendingPersistPointsRef.current = [];
+    recentGForcesRef.current = [];
+    recentSpeedsRef.current = normalizedPoints.slice(-4).map((point) => point.speedKmh);
+    crashThresholdSinceRef.current = null;
+    lowGravitySinceRef.current = null;
+    rideIdRef.current = storedSession.rideId;
+    rideStartedAtRef.current = storedSession.startedAt;
+    startingAltitudeRef.current = storedSession.startingAltitude;
+    rideActions.setBikeId(storedSession.bikeId);
+    rideActions.setFuelPricePerLiter(storedSession.fuelPricePerLiter);
+    rideActions.setFuelRateKmPerLiter(storedSession.fuelRateKmPerLiter);
+    rideActions.setStartedAt(storedSession.startedAt);
+    getRideState().updateTelemetry({
+      speedKmh: latestPoint?.speedKmh ?? 0,
+      distanceKm: totalDistance,
+      durationSeconds,
+      maxSpeedKmh: maxSpeed,
+      altitudeMeters: relativeAltitude,
+      elevationGainM: elevationGain,
+      estimatedFuelLiters,
+      estimatedFuelCost,
+      heading: 0,
+    });
+    rideActions.setState('active');
+    await setActiveRidePointSession(storedSession.rideId);
+    await persistRideSessionSnapshot({
+      ...storedSession,
+      lastPointTimestamp: latestPoint?.timestamp ?? storedSession.lastPointTimestamp,
+    });
+  };
+
+  const saveRecoveredRide = async () => {
+    const storedSession = await getStoredRideSession();
+    if (!storedSession) {
+      throw new Error('No unfinished ride was found.');
+    }
+
+    try {
+      await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => undefined);
+    } catch {
+      // ignore
+    }
+
+    const storedPoints = await getStoredCoords(storedSession.rideId);
+    if (storedPoints.length === 0) {
+      await clearActiveRidePointSession();
+      invalidateRecoveryQuery();
+      throw new Error('No stored ride points were found for that unfinished ride.');
+    }
+
+    const ride = buildRideRecord(storedSession, storedPoints);
+    const savedRide = await saveRide.mutateAsync(ride);
+    await clearStoredCoords(storedSession.rideId);
+    await clearActiveRidePointSession();
+    invalidateRecoveryQuery();
+    rideActions.resetRide();
+    foregroundPointsRef.current = [];
+    pendingPersistPointsRef.current = [];
+    rideStartedAtRef.current = null;
+    rideIdRef.current = null;
+    startingAltitudeRef.current = null;
+    return savedRide;
+  };
+
+  const discardRecoveredRide = async () => {
+    const storedSession = await getStoredRideSession();
+    try {
+      await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => undefined);
+    } catch {
+      // ignore
+    }
+    if (storedSession?.rideId) {
+      await clearStoredCoords(storedSession.rideId);
+    }
+    await clearActiveRidePointSession();
+    invalidateRecoveryQuery();
+    foregroundPointsRef.current = [];
+    pendingPersistPointsRef.current = [];
+    rideStartedAtRef.current = null;
+    rideIdRef.current = null;
+    startingAltitudeRef.current = null;
+    rideActions.resetRide();
   };
 
   const dismissCrashAlert = () => {
@@ -371,6 +608,10 @@ export function useRideSession() {
       (location) => {
         if (startingAltitudeRef.current == null && location.coords.altitude != null) {
           startingAltitudeRef.current = location.coords.altitude;
+          void persistRideSessionSnapshot({
+            startingAltitude: location.coords.altitude,
+            lastPointTimestamp: location.timestamp,
+          });
         }
 
         const point: RidePoint = {
@@ -391,7 +632,7 @@ export function useRideSession() {
           previousFilteredSpeedKmh: getRideState().speedKmh,
           distanceDeltaKm: distanceDelta,
         });
-        point.speedKmh = applySpeedometerBoost(filteredSpeedKmh);
+        point.speedKmh = filteredSpeedKmh;
         // Positive altitude deltas only; ignore small GPS jitter (<3m) to keep the total clean.
         let elevationDelta = 0;
         if (previous && previous.altitude != null && point.altitude != null) {
@@ -424,6 +665,7 @@ export function useRideSession() {
           estimatedFuelCost: fuelCost,
           heading: heading || currentStore.heading,
         });
+        void persistRideSessionSnapshot({ lastPointTimestamp: point.timestamp });
       },
     );
   }
@@ -464,9 +706,11 @@ export function useRideSession() {
 
     const batch = pendingPersistPointsRef.current;
     pendingPersistPointsRef.current = [];
-    await appendRidePoints(rideIdRef.current, batch).catch(() => {
-      pendingPersistPointsRef.current = [...batch, ...pendingPersistPointsRef.current];
-    });
+    await appendRidePoints(rideIdRef.current, batch)
+      .then(() => persistRideSessionSnapshot({ lastPointTimestamp: batch[batch.length - 1]?.timestamp ?? null }))
+      .catch(() => {
+        pendingPersistPointsRef.current = [...batch, ...pendingPersistPointsRef.current];
+      });
   }
 
   function normalizeRidePoints(points: RidePoint[]) {
@@ -525,7 +769,10 @@ export function useRideSession() {
     distanceDeltaKm: number;
     speedWindow: number[];
   }) {
-    const rawGpsSpeedKmh = Math.max(0, nextPoint.rawSpeedKmh ?? nextPoint.speedKmh ?? 0);
+    const rawGpsSpeedKmh = Math.min(
+      MAX_REASONABLE_SPEED_KMH,
+      Math.max(0, nextPoint.rawSpeedKmh ?? nextPoint.speedKmh ?? 0),
+    );
     const accuracyM = nextPoint.locationAccuracyM ?? 999;
     const secondsDelta = previousPoint ? Math.max(0, (nextPoint.timestamp - previousPoint.timestamp) / 1000) : 0;
     const deltaSpeedKmh = secondsDelta >= 0.8 && secondsDelta <= 12
@@ -534,16 +781,25 @@ export function useRideSession() {
 
     let candidateSpeedKmh = rawGpsSpeedKmh;
 
+    if (
+      previousFilteredSpeedKmh < 6
+      && distanceDeltaKm < 0.015
+      && (accuracyM > 18 || rawGpsSpeedKmh > 22)
+    ) {
+      candidateSpeedKmh = 0;
+    }
+
     if (deltaSpeedKmh != null && Number.isFinite(deltaSpeedKmh)) {
+      const boundedDeltaSpeedKmh = Math.min(MAX_REASONABLE_SPEED_KMH, Math.max(0, deltaSpeedKmh));
       if (accuracyM > 35) {
-        candidateSpeedKmh = deltaSpeedKmh;
+        candidateSpeedKmh = boundedDeltaSpeedKmh;
       } else {
-        const closeEnough = Math.abs(rawGpsSpeedKmh - deltaSpeedKmh) <= 18;
+        const closeEnough = Math.abs(rawGpsSpeedKmh - boundedDeltaSpeedKmh) <= 18;
         candidateSpeedKmh = closeEnough
-          ? rawGpsSpeedKmh * 0.55 + deltaSpeedKmh * 0.45
+          ? rawGpsSpeedKmh * 0.55 + boundedDeltaSpeedKmh * 0.45
           : rawGpsSpeedKmh < 12
-            ? deltaSpeedKmh * 0.65 + rawGpsSpeedKmh * 0.35
-            : rawGpsSpeedKmh * 0.35 + deltaSpeedKmh * 0.65;
+            ? boundedDeltaSpeedKmh * 0.65 + rawGpsSpeedKmh * 0.35
+            : rawGpsSpeedKmh * 0.35 + boundedDeltaSpeedKmh * 0.65;
       }
     }
 
@@ -551,8 +807,21 @@ export function useRideSession() {
       candidateSpeedKmh = previousFilteredSpeedKmh * 0.8;
     }
 
+    if (secondsDelta > 0 && previousFilteredSpeedKmh > 0) {
+      const maxAllowedDelta = Math.max(22, secondsDelta * MAX_SPEED_DELTA_PER_SECOND_KMH);
+      if (Math.abs(candidateSpeedKmh - previousFilteredSpeedKmh) > maxAllowedDelta) {
+        candidateSpeedKmh =
+          previousFilteredSpeedKmh
+          + Math.sign(candidateSpeedKmh - previousFilteredSpeedKmh) * maxAllowedDelta;
+      }
+    }
+
     if (previousFilteredSpeedKmh > 0 && Math.abs(candidateSpeedKmh - previousFilteredSpeedKmh) > 55 && accuracyM > 18) {
       candidateSpeedKmh = previousFilteredSpeedKmh + Math.sign(candidateSpeedKmh - previousFilteredSpeedKmh) * 18;
+    }
+
+    if (candidateSpeedKmh > MAX_REASONABLE_SPEED_KMH) {
+      candidateSpeedKmh = MAX_REASONABLE_SPEED_KMH;
     }
 
     const alpha = candidateSpeedKmh > previousFilteredSpeedKmh
@@ -566,13 +835,20 @@ export function useRideSession() {
     const nextWindow = [...speedWindow.slice(-3), smoothedSpeedKmh];
     const averagedSpeedKmh = nextWindow.reduce((sum, value) => sum + value, 0) / nextWindow.length;
 
-    return averagedSpeedKmh < 2 && accuracyM > 20 ? 0 : Number(averagedSpeedKmh.toFixed(1));
+    if (averagedSpeedKmh < 3 && accuracyM > 14) {
+      return 0;
+    }
+
+    return Number(Math.min(MAX_REASONABLE_SPEED_KMH, averagedSpeedKmh).toFixed(1));
   }
 
   return {
     ...rideState,
     startRide,
     stopRide,
+    resumeRecoveredRide,
+    saveRecoveredRide,
+    discardRecoveredRide,
     dismissCrashAlert,
     requestHelp,
     dismissFatiguePrompt,

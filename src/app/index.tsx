@@ -7,9 +7,11 @@ import { AppScreen } from '@/components/ui/app-screen';
 import { env } from '@/lib/env';
 import { useAuth } from '@/hooks/use-auth';
 import { useBikes } from '@/hooks/use-kurbada-data';
+import { useUnfinishedRideRecovery } from '@/hooks/use-unfinished-ride-recovery';
 import { useUserAccess } from '@/hooks/use-user-access';
 import { palette } from '@/constants/theme';
 import { getOnboardingRoute } from '@/lib/onboarding-flow';
+import { hasFailedOnboardingSyncForUser, hasPendingOnboardingSyncForUser } from '@/lib/onboarding-sync';
 import { useAppStore } from '@/store/app-store';
 
 export default function IndexScreen() {
@@ -19,8 +21,13 @@ export default function IndexScreen() {
   const hasCompletedBikeSetup = useAppStore((state) => state.hasCompletedBikeSetup);
   const onboardingStep = useAppStore((state) => state.onboardingStep);
   const purchaseCompleted = useAppStore((state) => state.purchaseCompleted);
+  const onboardingDraftScope = useAppStore((state) => state.onboardingDraftScope);
+  const onboardingDraftTargetMode = useAppStore((state) => state.onboardingDraftTargetMode);
+  const onboardingDraftTargetEmail = useAppStore((state) => state.onboardingDraftTargetEmail);
+  const onboardingSyncStatus = useAppStore((state) => state.onboardingSyncStatus);
   const access = useUserAccess(session?.user.id);
   const remoteBikes = useBikes(session?.user.id);
+  const unfinishedRide = useUnfinishedRideRecovery(Boolean(session?.user.id));
   const bypassGate = env.devBypassAppGate;
   const didSignOut = useAppStore((state) => state.didSignOut);
   const completeOnboarding = useAppStore((state) => state.completeOnboarding);
@@ -28,6 +35,20 @@ export default function IndexScreen() {
   const hasRemoteBike = (remoteBikes.data?.length ?? 0) > 0;
   const bikesResolved = !remoteBikes.isLoading;
   const bikesFailed = Boolean(remoteBikes.error);
+  const hasPendingOnboardingSync = hasPendingOnboardingSyncForUser({
+    scope: onboardingDraftScope,
+    targetMode: onboardingDraftTargetMode,
+    targetEmail: onboardingDraftTargetEmail,
+    status: onboardingSyncStatus,
+    userEmail: session?.user.email,
+  });
+  const hasFailedOnboardingSync = hasFailedOnboardingSyncForUser({
+    scope: onboardingDraftScope,
+    targetMode: onboardingDraftTargetMode,
+    targetEmail: onboardingDraftTargetEmail,
+    status: onboardingSyncStatus,
+    userEmail: session?.user.email,
+  });
   const bootstrapStartedAtRef = useRef(Date.now());
   const [bootstrapTimedOut, setBootstrapTimedOut] = useState(false);
   const hasLoggedInteractiveRef = useRef(false);
@@ -87,8 +108,13 @@ export default function IndexScreen() {
   const shouldShowBootstrapLoader = useMemo(() => (
     Boolean(session?.user.id)
     && !bootstrapTimedOut
-    && (bootstrapPhase === 'booting' || remoteBikes.isLoading)
-  ), [bootstrapPhase, bootstrapTimedOut, remoteBikes.isLoading, session?.user.id]);
+    && (
+      bootstrapPhase === 'booting'
+      || remoteBikes.isLoading
+      || hasPendingOnboardingSync
+      || unfinishedRide.isLoading
+    )
+  ), [bootstrapPhase, bootstrapTimedOut, hasPendingOnboardingSync, remoteBikes.isLoading, session?.user.id, unfinishedRide.isLoading]);
 
   if (signingOut) {
     return <Redirect href="/(public)/auth/sign-in" />;
@@ -125,6 +151,27 @@ export default function IndexScreen() {
 
     if (access.shouldRequirePaywall) {
       return <Redirect href="/(public)/paywall" />;
+    }
+
+    if (unfinishedRide.data?.session) {
+      return <Redirect href={'/(app)/ride/recover' as any} />;
+    }
+
+    if (purchaseCompleted && onboardingStep === 7 && !hasRemoteBike && (hasPendingOnboardingSync || hasFailedOnboardingSync)) {
+      return <Redirect href={'/(public)/success' as any} />;
+    }
+
+    if (hasPendingOnboardingSync && !hasRemoteBike) {
+      return (
+        <AppScreen style={{ justifyContent: 'center', alignItems: 'center' }} showWordmark={false}>
+          <View style={{ alignItems: 'center', gap: 12 }}>
+            <ActivityIndicator size="small" color={palette.textSecondary} />
+            <AppText variant="meta" style={{ color: palette.textSecondary }}>
+              Finishing your garage…
+            </AppText>
+          </View>
+        </AppScreen>
+      );
     }
 
     if (bikesResolved && !bikesFailed && !hasRemoteBike) {

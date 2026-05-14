@@ -1329,13 +1329,16 @@ export function useOnboardingSync(userId?: string, userEmail?: string | null) {
     enabled:
       canSyncDraftToUser
       && needsSync
-      && onboardingSyncStatus !== 'syncing'
+      && onboardingSyncStatus === 'pending'
       && (hasBikeDraft || hasEmergencyMinimum)
       && !bikes.isLoading
       && !emergency.isLoading,
     retry: false,
     queryFn: async () => {
       markOnboardingSyncing();
+      console.info(
+        `[bootstrap] onboarding_sync_started user=${userId ?? 'none'} bike_draft=${hasBikeDraft} emergency_draft=${hasEmergencyMinimum}`,
+      );
 
       let syncedBikeId: string | null = null;
       let syncedEmergencyId: string | null = null;
@@ -1366,6 +1369,7 @@ export function useOnboardingSync(userId?: string, userEmail?: string | null) {
           });
 
           syncedBikeId = bike.id;
+          console.info(`[bootstrap] onboarding_sync_bike_saved bike=${bike.id}`);
           completeBikeSetup();
         }
 
@@ -1382,6 +1386,7 @@ export function useOnboardingSync(userId?: string, userEmail?: string | null) {
             contact2_phone: emergency.data?.contact2_phone ?? '',
           });
           syncedEmergencyId = savedEmergency.id;
+          console.info(`[bootstrap] onboarding_sync_emergency_saved emergency=${savedEmergency.id}`);
         }
 
         markOnboardingSyncComplete({
@@ -1398,7 +1403,11 @@ export function useOnboardingSync(userId?: string, userEmail?: string | null) {
         return { syncedBikeId, syncedEmergencyId };
       } catch (error) {
         markOnboardingSyncFailed();
-        console.warn('Onboarding sync failed:', error);
+        console.warn(
+          `[bootstrap] onboarding_sync_failed user=${userId ?? 'none'} message=${
+            error instanceof Error ? error.message : 'unknown'
+          }`,
+        );
         Alert.alert(
           'Setup sync failed',
           error instanceof Error
