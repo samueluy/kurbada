@@ -82,6 +82,8 @@ type AppStore = {
   comebackNudgesEnabled: boolean;
   lobbyRemindersEnabled: boolean;
   acknowledgedBikeMilestones: Record<string, number[]>; // bikeId -> list of odo km thresholds
+  freshSignupEmail: string | null;
+  freshSignupStartedAt: number | null;
   setHasSeenSplash: () => void;
   completeOnboarding: () => void;
   completeBikeSetup: () => void;
@@ -111,6 +113,8 @@ type AppStore = {
   setComebackNudgesEnabled: (value: boolean) => void;
   setLobbyRemindersEnabled: (value: boolean) => void;
   acknowledgeBikeMilestone: (bikeId: string, milestoneKm: number) => void;
+  markFreshSignupSession: (email: string) => void;
+  clearFreshSignupSession: () => void;
   resetForSignOut: () => void;
   markOnboardingSyncing: () => void;
   markOnboardingSyncComplete: (payload: { userId: string; bikeId?: string | null; emergencyId?: string | null }) => void;
@@ -179,6 +183,8 @@ export const useAppStore = create<AppStore>()(
       comebackNudgesEnabled: true,
       lobbyRemindersEnabled: true,
       acknowledgedBikeMilestones: {},
+      freshSignupEmail: null,
+      freshSignupStartedAt: null,
       setHasSeenSplash: () => set({ hasSeenSplash: true }),
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
       completeBikeSetup: () => set({ hasCompletedBikeSetup: true }),
@@ -245,6 +251,16 @@ export const useAppStore = create<AppStore>()(
             },
           };
         }),
+      markFreshSignupSession: (email) =>
+        set({
+          freshSignupEmail: email.trim().toLowerCase() || null,
+          freshSignupStartedAt: Date.now(),
+        }),
+      clearFreshSignupSession: () =>
+        set({
+          freshSignupEmail: null,
+          freshSignupStartedAt: null,
+        }),
       resetForSignOut: () => {
         useLocalAppStore.getState().resetLocalStore();
         return set({
@@ -263,6 +279,8 @@ export const useAppStore = create<AppStore>()(
           onboardingSyncedEmergencyId: null,
           didSignOut: true,
           activeBikeId: null,
+          freshSignupEmail: null,
+          freshSignupStartedAt: null,
         });
       },
       markOnboardingSyncing: () => set({ onboardingSyncStatus: 'syncing' }),
@@ -320,6 +338,8 @@ export const useAppStore = create<AppStore>()(
                 : null,
             comebackNudgesEnabled: persisted.comebackNudgesEnabled ?? true,
             lobbyRemindersEnabled: persisted.lobbyRemindersEnabled ?? true,
+            freshSignupEmail: null,
+            freshSignupStartedAt: null,
           };
         }
 
@@ -343,6 +363,8 @@ export const useAppStore = create<AppStore>()(
           onboardingDraftTargetEmail: persisted.onboardingDraftTargetEmail ?? null,
           didSignOut: false,
           authSigningOut: false,
+          freshSignupEmail: null,
+          freshSignupStartedAt: null,
         };
       },
       partialize: (state) => ({

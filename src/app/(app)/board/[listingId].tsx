@@ -16,6 +16,7 @@ import { RideListingCard } from '@/features/board/components/ride-listing-card';
 import { Colors, palette } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useBoardFeed, useBoardMutations, useRideListingRsvps, useRsvpMutations } from '@/hooks/use-kurbada-data';
+import { useUserProfile } from '@/hooks/use-user-access';
 import { useBlockedUsersStore } from '@/store/blocked-users-store';
 
 function formattedRideDate(iso: string) {
@@ -25,6 +26,7 @@ function formattedRideDate(iso: string) {
 
 export default function LobbyDetailScreen() {
   const { session } = useAuth();
+  const profile = useUserProfile(session?.user.id);
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ listingId?: string }>();
   const listingId = Array.isArray(params.listingId) ? params.listingId[0] : params.listingId;
@@ -153,7 +155,7 @@ export default function LobbyDetailScreen() {
               await setRsvp.mutateAsync({
                 listingId: listing.id,
                 status: 'going',
-                displayName: session.user.user_metadata.display_name ?? 'Kurbada Rider',
+                displayName: profile.data?.display_name ?? 'Kurbada Rider',
               }).catch((error) => {
                 Alert.alert('RSVP failed', error instanceof Error ? error.message : 'Please try again.');
               });

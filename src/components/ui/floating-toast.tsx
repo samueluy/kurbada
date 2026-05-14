@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Animated, View } from 'react-native';
+import { Animated, Modal, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/app-text';
@@ -31,36 +31,37 @@ export function FloatingToast({ message, anchor = 'safe' }: FloatingToastProps) 
 
   const bottomOffset =
     anchor === 'tabs'
-      ? layout.tabBarHeight + Math.max(insets.bottom, 10) + 12
+      ? layout.tabBarHeight + Math.max(insets.bottom, 10) + 8
       : insets.bottom + 16;
 
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={{
-        position: 'absolute',
-        left: 20,
-        right: 20,
-        bottom: bottomOffset,
-        opacity,
-        transform: [{ translateY }],
-        zIndex: 200,
-      }}>
-      <View
+    <Modal transparent visible animationType="none" onRequestClose={() => undefined}>
+      <Animated.View
+        pointerEvents="none"
         style={{
-          backgroundColor: Colors.s2,
-          borderRadius: radius.md,
-          borderLeftWidth: 3,
-          borderLeftColor: Colors.green,
-          paddingHorizontal: 16,
-          paddingVertical: 12,
-          borderWidth: 0.5,
-          borderColor: palette.border,
+          flex: 1,
+          justifyContent: 'flex-end',
+          paddingHorizontal: 20,
+          paddingBottom: bottomOffset,
+          opacity,
+          transform: [{ translateY }],
         }}>
-        <AppText variant="bodyBold" style={{ fontSize: 13 }}>
-          {message}
-        </AppText>
-      </View>
-    </Animated.View>
+        <View
+          style={{
+            backgroundColor: Colors.s2,
+            borderRadius: radius.md,
+            borderLeftWidth: 3,
+            borderLeftColor: Colors.green,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderWidth: 0.5,
+            borderColor: palette.border,
+          }}>
+          <AppText variant="bodyBold" style={{ fontSize: 13 }}>
+            {message}
+          </AppText>
+        </View>
+      </Animated.View>
+    </Modal>
   );
 }

@@ -4,6 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { layout, palette, spacing } from '@/constants/theme';
 import { AppText } from '@/components/ui/app-text';
+import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 
 function Wordmark() {
   return (
@@ -37,6 +38,7 @@ function useMountFade() {
 export function AppScreen({ style, children, showWordmark = true, ...rest }: ViewProps & { showWordmark?: boolean }) {
   const { opacity, translateY } = useMountFade();
   const insets = useSafeAreaInsets();
+  const keyboardInset = useKeyboardInset();
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
       <KeyboardAvoidingView
@@ -44,7 +46,15 @@ export function AppScreen({ style, children, showWordmark = true, ...rest }: Vie
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 8 : 0}>
         <Animated.View style={{ flex: 1, opacity, transform: [{ translateY }] }}>
-          <View {...rest} style={[{ flex: 1, paddingHorizontal: layout.screenPadding, paddingTop: spacing.md, backgroundColor: palette.background }, style]}>
+          <View
+            {...rest}
+            style={[{
+              flex: 1,
+              paddingHorizontal: layout.screenPadding,
+              paddingTop: spacing.md,
+              paddingBottom: Math.max(keyboardInset, 0),
+              backgroundColor: palette.background,
+            }, style]}>
             {showWordmark ? <Wordmark /> : null}
             {children}
           </View>
@@ -57,6 +67,7 @@ export function AppScreen({ style, children, showWordmark = true, ...rest }: Vie
 export function AppScrollScreen({ contentContainerStyle, style, children, showWordmark = true, refreshing, onRefresh, ...rest }: ScrollViewProps & { showWordmark?: boolean; refreshing?: boolean; onRefresh?: () => void }) {
   const { opacity, translateY } = useMountFade();
   const insets = useSafeAreaInsets();
+  const keyboardInset = useKeyboardInset();
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
       <KeyboardAvoidingView
@@ -71,9 +82,14 @@ export function AppScrollScreen({ contentContainerStyle, style, children, showWo
           keyboardShouldPersistTaps="always"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           contentInsetAdjustmentBehavior="always"
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
           refreshControl={onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} tintColor={palette.text} colors={[palette.danger]} progressBackgroundColor={palette.surfaceStrong} /> : undefined}
           style={[{ flex: 1, backgroundColor: palette.background }, style]}
-          contentContainerStyle={[{ paddingHorizontal: layout.screenPadding, paddingTop: spacing.md, paddingBottom: 120 + insets.bottom }, contentContainerStyle]}>
+          contentContainerStyle={[{
+            paddingHorizontal: layout.screenPadding,
+            paddingTop: spacing.md,
+            paddingBottom: 120 + insets.bottom + keyboardInset,
+          }, contentContainerStyle]}>
           <Animated.View style={{ opacity, transform: [{ translateY }], gap: spacing.section }}>
             {showWordmark ? <Wordmark /> : null}
             {children}

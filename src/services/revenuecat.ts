@@ -117,7 +117,9 @@ export async function canMakeRevenueCatPurchases() {
   }
 
   await configureRevenueCat();
-  return Purchases.canMakePayments();
+  const canMakePayments = await Purchases.canMakePayments();
+  console.info(`[bootstrap] revenuecat_can_make_payments available=${canMakePayments}`);
+  return canMakePayments;
 }
 
 export async function syncRevenueCatIdentity(userId: string | null) {
@@ -126,6 +128,7 @@ export async function syncRevenueCatIdentity(userId: string | null) {
   }
 
   await configureRevenueCat();
+  console.info(`[bootstrap] revenuecat_identity_sync_start user=${userId ?? 'none'}`);
 
   if (!userId) {
     if (currentAppUserId === null) {
@@ -135,16 +138,19 @@ export async function syncRevenueCatIdentity(userId: string | null) {
     const customerInfo = await Purchases.logOut();
     currentAppUserId = null;
     handleCustomerInfoUpdate(customerInfo);
+    console.info('[bootstrap] revenuecat_identity_sync_complete user=none');
     return;
   }
 
   if (currentAppUserId === userId) {
+    console.info(`[bootstrap] revenuecat_identity_sync_skipped user=${userId}`);
     return;
   }
 
   const { customerInfo } = await Purchases.logIn(userId);
   currentAppUserId = userId;
   handleCustomerInfoUpdate(customerInfo);
+  console.info(`[bootstrap] revenuecat_identity_sync_complete user=${userId}`);
 }
 
 export function subscribeToCustomerInfo(listener: (customerInfo: CustomerInfo) => void) {
@@ -197,7 +203,9 @@ export async function getCurrentOfferingPackage(forceRefresh = false) {
 
 export async function getPremiumAccessState() {
   const customerInfo = await getCustomerInfo();
-  return Boolean(customerInfo?.entitlements.active.premium);
+  const hasPremium = Boolean(customerInfo?.entitlements.active.premium);
+  console.info(`[bootstrap] revenuecat_entitlement_active premium=${hasPremium}`);
+  return hasPremium;
 }
 
 export async function getRevenueCatSubscriptionSummary() {

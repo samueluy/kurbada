@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { useLocalAppStore } from '@/store/local-app-store';
+import { useUserProfile } from '@/hooks/use-user-access';
 import type { LeaderboardWeeklyKmRow, RideRecord } from '@/types/domain';
 
 export type LeaderboardEntry = {
@@ -24,6 +25,7 @@ function getWeekStart(): Date {
 export function useLeaderboard(): LeaderboardEntry[] {
   const { session } = useAuth();
   const currentUserId = session?.user.id;
+  const profile = useUserProfile(currentUserId);
   const localRides = useLocalAppStore((state) => state.rides);
   const useRemote = Boolean(currentUserId) && isSupabaseConfigured;
 
@@ -46,7 +48,7 @@ export function useLeaderboard(): LeaderboardEntry[] {
       return (query.data ?? []).map((entry) => ({
         userId: entry.user_id,
         displayName: currentUserId && entry.user_id === currentUserId
-          ? session?.user.user_metadata.display_name ?? entry.display_name
+          ? profile.data?.display_name ?? entry.display_name
           : entry.display_name,
         totalKm: Number(Number(entry.total_km).toFixed(1)),
         rank: entry.rank,
@@ -75,5 +77,5 @@ export function useLeaderboard(): LeaderboardEntry[] {
       }))
       .sort((a, b) => b.totalKm - a.totalKm)
       .map((entry, index) => ({ ...entry, rank: index + 1 }));
-  }, [currentUserId, localRides, query.data, session?.user.user_metadata.display_name, useRemote]);
+  }, [currentUserId, localRides, profile.data?.display_name, query.data, useRemote]);
 }

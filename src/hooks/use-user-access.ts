@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { useAuth } from '@/hooks/use-auth';
 import { getUserAccess } from '@/lib/access';
 import { sampleProfile } from '@/lib/mock-data';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { useAppStore } from '@/store/app-store';
 import { useLocalAppStore } from '@/store/local-app-store';
 
 export function useUserProfile(userId?: string) {
@@ -42,14 +44,20 @@ export function useUserProfile(userId?: string) {
 }
 
 export function useUserAccess(userId?: string) {
+  const { isFreshSignupSession } = useAuth();
+  const hasCompletedOnboarding = useAppStore((state) => state.hasCompletedOnboarding);
   const profileQuery = useUserProfile(userId);
+  const allowOnboardingGrace =
+    Boolean(userId)
+    && isFreshSignupSession
+    && !hasCompletedOnboarding;
   const needsPremiumResolution =
     Boolean(userId)
     && profileQuery.data?.access_override === 'none';
   const accessQuery = useQuery({
-    queryKey: ['access', userId ?? 'local', profileQuery.data?.access_override, profileQuery.data?.subscription_status],
+    queryKey: ['access', userId ?? 'local', profileQuery.data?.access_override, profileQuery.data?.subscription_status, allowOnboardingGrace],
     enabled: Boolean(userId) && !profileQuery.isLoading,
-    queryFn: () => getUserAccess(profileQuery.data),
+    queryFn: () => getUserAccess(profileQuery.data, { allowOnboardingGrace }),
     staleTime: 2 * 60_000,
     gcTime: 10 * 60_000,
   });
@@ -71,6 +79,7 @@ export function useUserAccess(userId?: string) {
     data: accessData,
     hasResolvedAccess,
     shouldRequirePaywall,
+    allowOnboardingGrace,
     isLoading: Boolean(userId) && profileQuery.isLoading,
     isRefreshingPremium: Boolean(userId) && !profileQuery.isLoading && accessQuery.isFetching,
   };

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { Dimensions, Modal, Pressable, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { palette } from '@/constants/theme';
@@ -13,6 +13,32 @@ function formatTime(iso: string) {
 
 export function WeatherWidget({ weather, isError }: { weather?: WeatherData | null; isError?: boolean }) {
   const [expanded, setExpanded] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 56, left: Math.max(16, Dimensions.get('window').width - 196) });
+  const triggerRef = useRef<View>(null);
+
+  const toggleExpanded = useCallback(() => {
+    if (expanded) {
+      setExpanded(false);
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      triggerRef.current?.measureInWindow((x, y, width, height) => {
+        const screenWidth = Dimensions.get('window').width;
+        const cardWidth = 180;
+        const left = Math.min(
+          Math.max(16, x + width - cardWidth),
+          Math.max(16, screenWidth - cardWidth - 16),
+        );
+
+        setMenuPosition({
+          top: y + height + 8,
+          left,
+        });
+        setExpanded(true);
+      });
+    });
+  }, [expanded]);
 
   if (isError) {
     return (
@@ -34,35 +60,38 @@ export function WeatherWidget({ weather, isError }: { weather?: WeatherData | nu
 
   return (
     <View>
-      <Pressable
-        onPress={() => setExpanded((v) => !v)}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <Ionicons name={weather.weatherIcon as any} size={16} color={palette.textSecondary} />
-        <AppText variant="meta" style={{ color: palette.text, fontSize: 14 }}>
-          {weather.temperature}°
-        </AppText>
-        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={12} color={palette.textTertiary} />
-      </Pressable>
+      <View ref={triggerRef} collapsable={false}>
+        <Pressable
+          onPress={toggleExpanded}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name={weather.weatherIcon as any} size={16} color={palette.textSecondary} />
+          <AppText variant="meta" style={{ color: palette.text, fontSize: 14 }}>
+            {weather.temperature}°
+          </AppText>
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={12} color={palette.textTertiary} />
+        </Pressable>
+      </View>
 
-      {expanded ? (
-        <>
+      <Modal
+        visible={expanded}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setExpanded(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.08)' }} onPress={() => setExpanded(false)}>
           <Pressable
-            onPress={() => setExpanded(false)}
-            style={{ position: 'absolute', top: -100, left: -300, right: 0, bottom: -600, zIndex: 99 }}
-          />
-          <View style={{
-            position: 'absolute',
-            top: 36,
-            right: 0,
-            zIndex: 100,
-            width: 180,
-            backgroundColor: '#1E1E1E',
-            borderRadius: 14,
-            borderWidth: 0.5,
-            borderColor: palette.border,
-            padding: 14,
-            gap: 10,
-          }}>
+            onPress={() => undefined}
+            style={{
+              position: 'absolute',
+              top: menuPosition.top,
+              left: menuPosition.left,
+              width: 180,
+              backgroundColor: '#1E1E1E',
+              borderRadius: 14,
+              borderWidth: 0.5,
+              borderColor: palette.border,
+              padding: 14,
+              gap: 10,
+            }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Ionicons name={weather.weatherIcon as any} size={18} color={palette.text} />
               <AppText variant="bodyBold" style={{ fontSize: 14 }}>{weather.weatherLabel}</AppText>
@@ -109,9 +138,9 @@ export function WeatherWidget({ weather, isError }: { weather?: WeatherData | nu
             <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 13, textAlign: 'center' }}>
               {weather.tempMin}° / {weather.tempMax}°
             </AppText>
-          </View>
-        </>
-      ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }

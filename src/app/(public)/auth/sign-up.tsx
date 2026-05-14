@@ -116,7 +116,7 @@ export default function SignUpScreen() {
         <Field
           value={displayName}
           onChangeText={setDisplayName}
-          placeholder="Display name"
+          placeholder="Username"
         />
         <Field
           value={email}

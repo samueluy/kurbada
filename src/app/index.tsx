@@ -78,9 +78,11 @@ export default function IndexScreen() {
 
   useEffect(() => {
     if (access.hasResolvedAccess) {
-      console.info(`[bootstrap] access_ready_ms=${Date.now() - bootstrapStartedAtRef.current}`);
+      console.info(
+        `[bootstrap] access_ready_ms=${Date.now() - bootstrapStartedAtRef.current} reason=${access.data.reason} grace_candidate=${access.allowOnboardingGrace}`,
+      );
     }
-  }, [access.hasResolvedAccess]);
+  }, [access.allowOnboardingGrace, access.data.reason, access.hasResolvedAccess]);
 
   const shouldShowBootstrapLoader = useMemo(() => (
     Boolean(session?.user.id)
@@ -117,6 +119,10 @@ export default function IndexScreen() {
   }
 
   if (!bypassGate && session) {
+    if (access.data.reason === 'grace') {
+      console.info('[bootstrap] allowing_onboarding_grace_access');
+    }
+
     if (access.shouldRequirePaywall) {
       return <Redirect href="/(public)/paywall" />;
     }

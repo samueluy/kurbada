@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { claimPendingReferralForUser } from '@/lib/referrals';
+import { isDisplayNameAvailable, normalizeDisplayName } from '@/lib/display-name';
 import { queryClient } from '@/lib/query-client';
 import { isSupabaseConfigured, supabase, type SupabaseSession } from '@/lib/supabase';
 import { useAppStore } from '@/store/app-store';
@@ -14,6 +15,7 @@ type AuthContextValue = {
   loading: boolean;
   signingOut: boolean;
   bootstrapPhase: AuthBootstrapPhase;
+  isFreshSignupSession: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<{ requiresEmailVerification: boolean }>;
   signOut: () => Promise<void>;
@@ -54,9 +56,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signingOut = useAppStore((state) => state.authSigningOut);
   const clearAnonymousOnboardingDraft = useAppStore((state) => state.clearAnonymousOnboardingDraft);
   const markOnboardingDraftForNewAccount = useAppStore((state) => state.markOnboardingDraftForNewAccount);
+  const markFreshSignupSession = useAppStore((state) => state.markFreshSignupSession);
+  const clearFreshSignupSession = useAppStore((state) => state.clearFreshSignupSession);
+  const freshSignupEmail = useAppStore((state) => state.freshSignupEmail);
+  const freshSignupStartedAt = useAppStore((state) => state.freshSignupStartedAt);
   const resetForSignOut = useAppStore((state) => state.resetForSignOut);
   const setAuthSigningOut = useAppStore((state) => state.setAuthSigningOut);
   const setDidSignOut = useAppStore((state) => state.setDidSignOut);
+  const freshSignupSessionTtlMs = 2 * 60_000;
+  const normalizedSessionEmail = session?.user.email?.trim().toLowerCase() ?? null;
+  const isFreshSignupSession = Boolean(
+    normalizedSessionEmail
+      && freshSignupEmail
+      && normalizedSessionEmail === freshSignupEmail
+      && freshSignupStartedAt
+      && Date.now() - freshSignupStartedAt < freshSignupSessionTtlMs,
+  );
+
+  useEffect(() => {
+    if (!freshSignupEmail || !freshSignupStartedAt || isFreshSignupSession) {
+      return;
+    }
+
+    console.info('[bootstrap] fresh_signup_grace_expired');
+    clearFreshSignupSession();
+  }, [clearFreshSignupSession, freshSignupEmail, freshSignupSessionTtlMs, freshSignupStartedAt, isFreshSignupSession]);
 
   useEffect(() => {
     if (!supabase) {
@@ -72,6 +96,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (data.session?.user?.id) {
           setDidSignOut(false);
           sanitizeAnonymousOnboardingDraft(data.session);
+          console.info(
+            `[bootstrap] session_hydrated user=${data.session.user.id} fresh_signup=${Boolean(
+              freshSignupEmail
+              && data.session.user.email?.trim().toLowerCase() === freshSignupEmail
+              && freshSignupStartedAt
+              && Date.now() - freshSignupStartedAt < freshSignupSessionTtlMs,
+            )}`,
+          );
         }
 
         if (mounted) {
@@ -90,11 +122,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       });
 
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
       setLoading(false);
       setBootstrapPhase('interactive');
-      console.info(`[bootstrap] auth_state_change session=${nextSession?.user?.id ? 'present' : 'none'} ms=${Date.now() - bootstrapStartedAtRef.current}`);
+      const nextEmail = nextSession?.user.email?.trim().toLowerCase() ?? null;
+      const nextIsFreshSignup = Boolean(
+        nextEmail
+        && freshSignupEmail
+        && nextEmail === freshSignupEmail
+        && freshSignupStartedAt
+        && Date.now() - freshSignupStartedAt < freshSignupSessionTtlMs,
+      );
+      console.info(
+        `[bootstrap] auth_state_change event=${event} session=${nextSession?.user?.id ? 'present' : 'none'} fresh_signup=${nextIsFreshSignup} ms=${Date.now() - bootstrapStartedAtRef.current}`,
+      );
 
       if (nextSession?.user?.id) {
         setDidSignOut(false);
@@ -107,6 +149,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!nextSession) {
         setAuthSigningOut(false);
+        clearFreshSignupSession();
       }
     });
 
@@ -114,7 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       data.subscription.unsubscribe();
     };
-  }, [setAuthSigningOut, setDidSignOut]);
+  }, [clearFreshSignupSession, freshSignupEmail, freshSignupSessionTtlMs, freshSignupStartedAt, setAuthSigningOut, setDidSignOut]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     if (!supabase) {
@@ -132,11 +175,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Supabase environment variables are not configured.');
     }
 
+    const normalizedDisplayName = normalizeDisplayName(displayName);
+    if (!normalizedDisplayName) {
+      throw new Error('Username required. Please choose a username.');
+    }
+
+    const available = await isDisplayNameAvailable(normalizedDisplayName);
+    if (!available) {
+      throw new Error('Username already taken. Please choose another one.');
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { display_name: displayName },
+        data: { display_name: normalizedDisplayName },
         emailRedirectTo: Linking.createURL('/auth/confirmed'),
       },
     });
@@ -145,17 +198,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     markOnboardingDraftForNewAccount(email);
+    markFreshSignupSession(email);
+    console.info(
+      `[bootstrap] signup_completed requires_email_verification=${!data.session} email=${email.trim().toLowerCase()}`,
+    );
 
     if (!data.session) {
       return { requiresEmailVerification: true };
     }
 
     return { requiresEmailVerification: false };
-  }, [markOnboardingDraftForNewAccount]);
+  }, [markFreshSignupSession, markOnboardingDraftForNewAccount]);
 
   const signOut = useCallback(async () => {
     setAuthSigningOut(true);
     clearAnonymousOnboardingDraft();
+    clearFreshSignupSession();
     resetForSignOut();
     queryClient.clear();
     setSession(null);
@@ -173,17 +231,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setAuthSigningOut(false);
     }
-  }, [clearAnonymousOnboardingDraft, resetForSignOut, setAuthSigningOut]);
+  }, [clearAnonymousOnboardingDraft, clearFreshSignupSession, resetForSignOut, setAuthSigningOut]);
 
   const value = useMemo<AuthContextValue>(() => ({
     session,
     loading,
     signingOut,
     bootstrapPhase,
+    isFreshSignupSession,
     signIn,
     signUp,
     signOut,
-  }), [bootstrapPhase, loading, session, signIn, signOut, signUp, signingOut]);
+  }), [bootstrapPhase, isFreshSignupSession, loading, session, signIn, signOut, signUp, signingOut]);
 
   return createElement(AuthContext.Provider, { value }, children);
 }

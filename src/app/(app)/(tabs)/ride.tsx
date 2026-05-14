@@ -31,6 +31,7 @@ import { computePersonalRecords } from '@/lib/personal-records';
 import { useAuth } from '@/hooks/use-auth';
 import { useBikes, useRecentRideFeed, useRideDashboardMetrics, useRideMutations, useRides } from '@/hooks/use-kurbada-data';
 import { useCachedLocation } from '@/hooks/use-cached-location';
+import { useUserProfile } from '@/hooks/use-user-access';
 import { useWeather } from '@/hooks/use-weather';
 import { useWeatherWindow } from '@/hooks/use-weather-window';
 import { useAppStore } from '@/store/app-store';
@@ -61,6 +62,7 @@ export default function RideTabScreen() {
   const weather = useWeather({ enabled: secondaryReady });
   const weatherWindow = useWeatherWindow({ enabled: secondaryReady });
   const cachedLocation = useCachedLocation({ enabled: secondaryReady });
+  const profile = useUserProfile(session?.user.id);
   const allBikes = useMemo(() => bikes.data ?? [], [bikes.data]);
   const bikesById = useMemo(() => new Map(allBikes.map((bike) => [bike.id, bike])), [allBikes]);
   const primaryBike = useMemo(
@@ -386,7 +388,7 @@ export default function RideTabScreen() {
       </View>
 
       <View style={{ gap: 6 }}>
-        <AppText variant="eyebrow">{getGreeting()}, {session?.user.user_metadata.display_name ?? 'Rider'}</AppText>
+        <AppText variant="eyebrow">{getGreeting()}, {profile.data?.display_name ?? 'Rider'}</AppText>
         <AppText variant="screenTitle" style={{ fontSize: 34, lineHeight: 38, letterSpacing: -0.8 }}>
           {workMode ? 'Your shift, your numbers.' : 'Ride honest. Ride smart.'}
         </AppText>
@@ -437,7 +439,7 @@ export default function RideTabScreen() {
         </ScrollView>
       ) : null}
     </View>
-  ), [allBikes, primaryBike?.id, secondaryReady, session?.user.user_metadata.display_name, setActiveBikeId, weather.data, weather.isError, workMode]);
+  ), [allBikes, primaryBike?.id, profile.data?.display_name, secondaryReady, setActiveBikeId, weather.data, weather.isError, workMode]);
 
   const renderItem = useCallback(({ item }: { item: RideTabItem }) => {
     if (item.type === 'tile') {

@@ -344,15 +344,17 @@ export default function RideSummaryScreen() {
               variant="secondary"
               onPress={pickStoryPhoto}
             />
-            <Button
-              title="Adjust"
-              variant="secondary"
-              onPress={() => {
-                triggerLightHaptic();
-                updateDraft({ shareMode: 'story' });
-                router.push({ pathname: '/(app)/ride/share-editor' as any, params: { rideId: ride.id } });
-              }}
-            />
+            {draft.photoUri ? (
+              <Button
+                title="Adjust"
+                variant="secondary"
+                onPress={() => {
+                  triggerLightHaptic();
+                  updateDraft({ shareMode: 'story' });
+                  router.push({ pathname: '/(app)/ride/share-editor' as any, params: { rideId: ride.id } });
+                }}
+              />
+            ) : null}
             {draft.photoUri ? (
               <Button
                 title="Use Route Background Instead"

@@ -10,7 +10,9 @@ import { FloatingField } from "@/components/ui/floating-field";
 import { GlassCard } from "@/components/ui/glass-card";
 import { palette, radius } from "@/constants/theme";
 import { useAuth } from "@/hooks/use-auth";
+import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { useBoardMutations, useRideListings } from "@/hooks/use-kurbada-data";
+import { useUserProfile } from "@/hooks/use-user-access";
 import { triggerLightHaptic, triggerSuccessHaptic } from "@/lib/haptics";
 import { env } from "@/lib/env";
 import { getMapboxModule } from "@/lib/mapbox";
@@ -39,6 +41,8 @@ function isValidLobbyUrl(url: string) {
 
 export default function CreateRideScreen() {
   const { session } = useAuth();
+  const keyboardInset = useKeyboardInset();
+  const profile = useUserProfile(session?.user.id);
   const listings = useRideListings(session?.user.id);
   const { createRideListing, updateRideListing } = useBoardMutations(
     session?.user.id,
@@ -187,7 +191,7 @@ export default function CreateRideScreen() {
       pace,
       lobby_platform: lobbyPlatform,
       lobby_link: lobbyPlatform === "none" ? null : lobbyLink.trim(),
-      display_name: session?.user.user_metadata.display_name ?? "Kurbada Rider",
+      display_name: profile.data?.display_name ?? "Kurbada Rider",
       city: city.trim() || null,
     };
 
@@ -206,11 +210,12 @@ export default function CreateRideScreen() {
       <ScrollView
         scrollEnabled={scrollEnabled}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           paddingHorizontal: 16,
           paddingTop: 16,
-          paddingBottom: 40,
+          paddingBottom: 40 + keyboardInset,
           gap: 18,
         }}
       >

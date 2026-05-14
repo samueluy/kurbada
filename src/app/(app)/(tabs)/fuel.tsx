@@ -16,13 +16,14 @@ import { palette, radius } from '@/constants/theme';
 import { formatCurrencyPhp } from '@/lib/format';
 import { triggerLightHaptic, triggerSuccessHaptic, triggerWarningHaptic } from '@/lib/haptics';
 import { useAuth } from '@/hooks/use-auth';
-import { useBikes, useFuelLogs, useFuelMutations } from '@/hooks/use-kurbada-data';
+import { useBikes, useFuelLogs, useFuelMutations, useRides } from '@/hooks/use-kurbada-data';
 import type { FuelLog } from '@/types/domain';
 
 export default function FuelTabScreen() {
   const { session } = useAuth();
   const bikes = useBikes(session?.user.id);
   const fuelLogs = useFuelLogs(session?.user.id);
+  const rides = useRides(session?.user.id);
   const { saveFuelLog, deleteFuelLog } = useFuelMutations(session?.user.id);
   const [showForm, setShowForm] = useState(false);
   const [liters, setLiters] = useState('');
@@ -49,6 +50,22 @@ export default function FuelTabScreen() {
     };
   }, [fuelLogs.data]);
 
+  const efficiencySummary = useMemo(() => {
+    const fueledRides = (rides.data ?? []).filter(
+      (ride) =>
+        typeof ride.fuel_used_liters === 'number'
+        && ride.fuel_used_liters > 0
+        && ride.distance_km > 0,
+    );
+    const distanceKm = fueledRides.reduce((sum, ride) => sum + ride.distance_km, 0);
+    const litersUsed = fueledRides.reduce((sum, ride) => sum + (ride.fuel_used_liters ?? 0), 0);
+
+    return {
+      fueledRideCount: fueledRides.length,
+      kmPerLiter: litersUsed > 0 ? distanceKm / litersUsed : null,
+    };
+  }, [rides.data]);
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -56,12 +73,13 @@ export default function FuelTabScreen() {
       const refetches = [
         (fuelLogs as { refetch?: () => Promise<unknown> }).refetch,
         (bikes as { refetch?: () => Promise<unknown> }).refetch,
+        (rides as { refetch?: () => Promise<unknown> }).refetch,
       ].filter(Boolean) as (() => Promise<unknown>)[];
       await Promise.all(refetches.map((fn) => fn()));
     } finally {
       setIsRefreshing(false);
     }
-  }, [fuelLogs, bikes]);
+  }, [fuelLogs, bikes, rides]);
 
   useEffect(() => {
     Animated.parallel([
@@ -127,8 +145,16 @@ export default function FuelTabScreen() {
         <FuelSummaryCard label="Avg ₱ / L" value={summary.avgPrice.toFixed(0)} caption="Pump average" />
       </View>
       <View style={{ flexDirection: 'row', gap: 12, marginTop: -16 }}>
-        <FuelSummaryCard label="Avg L/100KM" value={summary.litersTotal > 0 ? ((summary.litersTotal / Math.max(1, fuelLogs.data?.length ?? 1)) * 10).toFixed(1) : '0.0'} caption="Consumption trend" />
-        <FuelSummaryCard label="Rides Fueled" value={`${fuelLogs.data?.length ?? 0}`} caption="Logged fill-ups" />
+        <FuelSummaryCard
+          label="Avg km/L"
+          value={efficiencySummary.kmPerLiter ? efficiencySummary.kmPerLiter.toFixed(1) : '--'}
+          caption={
+            efficiencySummary.fueledRideCount
+              ? 'From rides with fuel logged'
+              : 'Log ride fuel to unlock this'
+          }
+        />
+        <FuelSummaryCard label="Rides Fueled" value={`${efficiencySummary.fueledRideCount}`} caption="Rides with fuel data" />
       </View>
 
       <Animated.View

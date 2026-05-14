@@ -11,6 +11,7 @@ import { FloatingField } from '@/components/ui/floating-field';
 import { GlassCard } from '@/components/ui/glass-card';
 import { palette, radius } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
+import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { useEmergencyMutations } from '@/hooks/use-kurbada-data';
 import { triggerLightHaptic, triggerSuccessHaptic } from '@/lib/haptics';
 import { getOnboardingRoute, ONBOARDING_TOTAL_STEPS } from '@/lib/onboarding-flow';
@@ -60,6 +61,7 @@ export default function OnboardingEmergencyScreen() {
   );
   const onboardingScrollRef = useRef<ScrollView>(null);
   const phoneFieldYRef = useRef<number>(0);
+  const keyboardInset = useKeyboardInset();
 
   const qrValue = useMemo(
     () => `EMERGENCY INFO\nName: ${form.full_name}\nBlood: ${form.blood_type || 'Unknown'}\nContact: ${form.contact1_name} (${form.contact1_phone})`,
@@ -198,8 +200,9 @@ export default function OnboardingEmergencyScreen() {
           <GlassCard style={{ flex: 1, borderRadius: 0, padding: 22, gap: 18 }}>
             <ScrollView
               ref={onboardingScrollRef}
-              contentContainerStyle={{ gap: 18, paddingBottom: 140 }}
+              contentContainerStyle={{ gap: 18, paddingBottom: 140 + keyboardInset }}
               showsVerticalScrollIndicator={false}
+              automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
               keyboardShouldPersistTaps="handled">
               {renderContent(true)}
             </ScrollView>

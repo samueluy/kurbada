@@ -1,7 +1,8 @@
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Modal, Platform, Pressable, ScrollView, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { AppScrollScreen } from '@/components/ui/app-screen';
@@ -15,18 +16,9 @@ import { Colors, palette, radius } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useBikeMutations, useBikes, useMaintenanceMutations, useMaintenanceTasks } from '@/hooks/use-kurbada-data';
 import { triggerLightHaptic, triggerSuccessHaptic, triggerWarningHaptic } from '@/lib/haptics';
+import { buildDefaultMaintenanceTasks, resolveMaintenancePresetByTaskName } from '@/lib/maintenance-defaults';
 import { useAppStore } from '@/store/app-store';
 import type { MaintenanceTask } from '@/types/domain';
-
-const defaultIntervals: Record<string, { km: number; days: number | null }> = {
-  'Engine Oil Change': { km: 3000, days: 180 },
-  'Chain Tension & Lube': { km: 600, days: 90 },
-  'Brake Fluid': { km: 12000, days: 730 },
-  'Air Filter': { km: 9000, days: 365 },
-  'Spark Plugs': { km: 12000, days: 730 },
-  'Coolant': { km: 18000, days: 730 },
-  'Tire Pressure Check': { km: 200, days: 14 },
-};
 
 function daysToMonthsLabel(days: number): string {
   if (days < 60) return `${days} days`;
@@ -37,6 +29,23 @@ function daysToMonthsLabel(days: number): string {
   const rem = months % 12;
   if (rem === 0) return `${years} year${years > 1 ? 's' : ''}`;
   return `${years}y ${rem}m`;
+}
+
+function formatDateInput(dateString: string) {
+  if (!dateString) {
+    return '';
+  }
+
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) {
+    return dateString;
+  }
+
+  return date.toLocaleDateString('en-PH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
 export default function BikeProfileScreen() {
@@ -66,21 +75,19 @@ export default function BikeProfileScreen() {
   const [editIntervalKm, setEditIntervalKm] = useState('');
   const [editIntervalMonths, setEditIntervalMonths] = useState('');
   const [editCost, setEditCost] = useState('');
+  const [editLastDoneOdometer, setEditLastDoneOdometer] = useState('');
+  const [editLastDoneDate, setEditLastDoneDate] = useState('');
+  const [showEditDatePicker, setShowEditDatePicker] = useState(false);
   const [menuTask, setMenuTask] = useState<MaintenanceTask | null>(null);
 
   useEffect(() => {
     if (bike && tasks.data && tasks.data.length === 0 && !autoSeededRef.current) {
       autoSeededRef.current = true;
-      const defaults = [
-        { task_name: 'Engine Oil Change', interval_km: 3000, interval_days: 180, cost: 500 },
-        { task_name: 'Chain Tension & Lube', interval_km: 600, interval_days: 90, cost: 150 },
-        { task_name: 'Brake Fluid', interval_km: 12000, interval_days: 730, cost: 300 },
-        { task_name: 'Air Filter', interval_km: 9000, interval_days: 365, cost: 400 },
-        { task_name: 'Spark Plugs', interval_km: 12000, interval_days: 730, cost: 350 },
-        { task_name: 'Coolant', interval_km: 18000, interval_days: 730, cost: 500 },
-        { task_name: 'Tire Pressure Check', interval_km: 200, interval_days: 14, cost: 0 },
-      ];
-      defaults.forEach((tpl) => {
+      buildDefaultMaintenanceTasks({
+        bikeId: bike.id,
+        category: bike.category,
+        currentOdometerKm: bike.current_odometer_km,
+      }).forEach((tpl) => {
         addMaintenanceTask.mutate({
           bike_id: bike.id,
           task_name: tpl.task_name,
@@ -117,19 +124,28 @@ export default function BikeProfileScreen() {
     const newKm = Number(editIntervalKm) || editTask.interval_km;
     const newMonths = editIntervalMonths.trim();
     const newDays = newMonths ? Math.round(Number(newMonths) * 30) : null;
+    const nextLastDoneOdometer = Number(editLastDoneOdometer);
 
     updateMaintenanceTask.mutate({
       ...editTask,
       interval_km: newKm,
       interval_days: newDays,
       cost: editCost.trim() ? Number(editCost) : undefined,
+      last_done_odometer_km:
+        Number.isFinite(nextLastDoneOdometer) && nextLastDoneOdometer >= 0
+          ? nextLastDoneOdometer
+          : editTask.last_done_odometer_km,
+      last_done_date: editLastDoneDate || editTask.last_done_date,
     });
     triggerSuccessHaptic();
     setEditTask(null);
     setEditIntervalKm('');
     setEditIntervalMonths('');
     setEditCost('');
-    setToastMessage('✓ Interval updated');
+    setEditLastDoneOdometer('');
+    setEditLastDoneDate('');
+    setShowEditDatePicker(false);
+    setToastMessage('✓ Task updated');
     setTimeout(() => setToastMessage(null), 2500);
   };
 
@@ -389,7 +405,10 @@ export default function BikeProfileScreen() {
       {/* Edit Interval Modal */}
       <KeyboardSheet
         visible={Boolean(editTask)}
-        onClose={() => setEditTask(null)}
+        onClose={() => {
+          setEditTask(null);
+          setShowEditDatePicker(false);
+        }}
         title={`Edit ${editTask?.task_name ?? 'Task'}`}>
         <FloatingField
           label="INTERVAL (KM)"
@@ -412,8 +431,51 @@ export default function BikeProfileScreen() {
           placeholder={editTask?.cost?.toString() ?? ''}
           keyboardType="number-pad"
         />
+        <FloatingField
+          label="LAST SERVICED ODOMETER (KM)"
+          value={editLastDoneOdometer}
+          onChangeText={setEditLastDoneOdometer}
+          placeholder={editTask?.last_done_odometer_km.toString() ?? ''}
+          keyboardType="number-pad"
+        />
+        <View style={{ gap: 6 }}>
+          <AppText variant="label" style={{ color: palette.textSecondary, fontSize: 12 }}>
+            LAST SERVICED DATE
+          </AppText>
+          <Pressable
+            onPress={() => setShowEditDatePicker(true)}
+            style={{
+              minHeight: 52,
+              borderRadius: radius.md,
+              borderWidth: 1,
+              borderColor: palette.border,
+              backgroundColor: palette.surface,
+              paddingHorizontal: 16,
+              justifyContent: 'center',
+            }}>
+            <AppText variant="body" style={{ color: editLastDoneDate ? palette.text : palette.textTertiary }}>
+              {editLastDoneDate ? formatDateInput(editLastDoneDate) : formatDateInput(editTask?.last_done_date ?? '')}
+            </AppText>
+          </Pressable>
+        </View>
+        {showEditDatePicker ? (
+          <DateTimePicker
+            value={new Date(editLastDoneDate || editTask?.last_done_date || new Date().toISOString())}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={(_, selectedDate) => {
+              if (Platform.OS === 'android') {
+                setShowEditDatePicker(false);
+              }
+
+              if (selectedDate) {
+                setEditLastDoneDate(selectedDate.toISOString().slice(0, 10));
+              }
+            }}
+          />
+        ) : null}
         <AppText variant="meta" style={{ color: palette.textTertiary, fontSize: 11 }}>
-          Leave blank to track by km only.
+          Set the current interval, service cost, and how far into the maintenance cycle this bike already is.
         </AppText>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <View style={{ flex: 1 }}>
@@ -512,6 +574,18 @@ export default function BikeProfileScreen() {
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <View style={{ flex: 1 }}>
             <Button
+              title="Reset Form"
+              variant="ghost"
+              onPress={() => {
+                setCustomTaskName('');
+                setCustomInterval('');
+                setCustomIntervalMonths('');
+                setCustomCost('');
+              }}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button
               title="Cancel"
               variant="ghost"
               onPress={() => {
@@ -523,6 +597,8 @@ export default function BikeProfileScreen() {
               }}
             />
           </View>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
           <View style={{ flex: 1 }}>
             <Button
               title="Save Task"
@@ -569,29 +645,39 @@ export default function BikeProfileScreen() {
                     setEditIntervalKm(t.interval_km.toString());
                     setEditIntervalMonths(t.interval_days ? Math.round(t.interval_days / 30).toString() : '');
                     setEditCost(t.cost?.toString() ?? '');
+                    setEditLastDoneOdometer(t.last_done_odometer_km.toString());
+                    setEditLastDoneDate(t.last_done_date);
+                    setShowEditDatePicker(false);
                   }
                 }}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 8 }}>
                 <Ionicons name="pencil-outline" size={20} color={palette.textSecondary} />
-                <AppText variant="body">Edit Interval</AppText>
+                <AppText variant="body">Edit Task</AppText>
               </Pressable>
 
-              <Pressable
-                onPress={() => {
-                  const t = menuTask;
-                  const def = t ? defaultIntervals[t.task_name] : undefined;
-                  if (t && def) {
-                    triggerSuccessHaptic();
-                    setMenuTask(null);
-                    updateMaintenanceTask.mutate({ ...t, interval_km: def.km, interval_days: def.days });
-                    setToastMessage('✓ Reset to default');
-                    setTimeout(() => setToastMessage(null), 2500);
-                  }
-                }}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 8 }}>
-                <Ionicons name="refresh-outline" size={20} color={palette.textSecondary} />
-                <AppText variant="body">Reset to Default</AppText>
-              </Pressable>
+              {menuTask && resolveMaintenancePresetByTaskName(menuTask.task_name) ? (
+                <Pressable
+                  onPress={() => {
+                    const t = menuTask;
+                    const def = t ? resolveMaintenancePresetByTaskName(t.task_name) : null;
+                    if (t && def) {
+                      triggerSuccessHaptic();
+                      setMenuTask(null);
+                      updateMaintenanceTask.mutate({
+                        ...t,
+                        interval_km: def.intervalKm,
+                        interval_days: def.intervalDays,
+                        cost: def.cost,
+                      });
+                      setToastMessage('✓ Reset to default');
+                      setTimeout(() => setToastMessage(null), 2500);
+                    }
+                  }}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 8 }}>
+                  <Ionicons name="refresh-outline" size={20} color={palette.textSecondary} />
+                  <AppText variant="body">Reset to Default</AppText>
+                </Pressable>
+              ) : null}
 
               <Pressable
                 onPress={() => {
@@ -610,7 +696,7 @@ export default function BikeProfileScreen() {
         </Pressable>
       </Modal>
 
-      {toastMessage ? <FloatingToast message={toastMessage} anchor="safe" /> : null}
+      {toastMessage ? <FloatingToast message={toastMessage} anchor="tabs" /> : null}
     </AppScrollScreen>
   );
 }

@@ -226,6 +226,10 @@ export type Database = {
           rank: number;
         }[];
       };
+      is_display_name_available: {
+        Args: { p_display_name: string; p_exclude_user_id?: string | null };
+        Returns: boolean;
+      };
       user_maintenance_overview: {
         Args: { p_user_id?: string };
         Returns: {

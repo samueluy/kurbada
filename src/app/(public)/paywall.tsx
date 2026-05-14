@@ -10,7 +10,7 @@ import { KeyboardSheet } from "@/components/ui/keyboard-sheet";
 import { Colors, palette, radius } from "@/constants/theme";
 import { useAuth } from "@/hooks/use-auth";
 import { useReferralMutations } from "@/hooks/use-kurbada-data";
-import { useUserProfile } from "@/hooks/use-user-access";
+import { useUserAccess, useUserProfile } from "@/hooks/use-user-access";
 import { triggerLightHaptic, triggerSuccessHaptic } from "@/lib/haptics";
 import { env } from "@/lib/env";
 import { normalizeReferralCode, validateReferralCode } from "@/lib/referrals";
@@ -42,8 +42,9 @@ const features = [
 export default function PaywallScreen() {
   const params = useLocalSearchParams<{ context?: string }>();
   const insets = useSafeAreaInsets();
-  const { session } = useAuth();
+  const { session, isFreshSignupSession } = useAuth();
   const profile = useUserProfile(session?.user.id);
+  const access = useUserAccess(session?.user.id);
   const { applyReferralCode } = useReferralMutations(session?.user.id);
   const setOnboardingStep = useAppStore((state) => state.setOnboardingStep);
   const setPurchaseCompleted = useAppStore(
@@ -75,6 +76,10 @@ export default function PaywallScreen() {
   const [purchaseError, setPurchaseError] = useState("");
   const [isPurchasing, setIsPurchasing] = useState(false);
   const isOnboardingPaywall = params.context === "onboarding";
+  const isGraceStatusVisible =
+    Boolean(session?.user.id)
+    && isOnboardingPaywall
+    && access.data.reason === "grace";
   const ctaScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -105,6 +110,9 @@ export default function PaywallScreen() {
     let cancelled = false;
 
     const loadOffering = async () => {
+      console.info(
+        `[bootstrap] paywall_offering_load_started onboarding=${isOnboardingPaywall} fresh_signup=${isFreshSignupSession}`,
+      );
       setIsLoadingOffering(true);
       setPurchaseError("");
 
@@ -112,10 +120,13 @@ export default function PaywallScreen() {
         const canMakePurchases = await canMakeRevenueCatPurchases();
         if (cancelled) return;
 
+        console.info(
+          `[bootstrap] paywall_can_make_purchases available=${canMakePurchases} onboarding=${isOnboardingPaywall} fresh_signup=${isFreshSignupSession}`,
+        );
         setBillingAvailable(canMakePurchases);
         if (!canMakePurchases) {
           setPurchaseError(
-            "Purchases aren't available on this device right now. Sign in if you already have access, or use a Play-enabled/App Store-capable device to subscribe.",
+            "Purchases aren't available on this device right now. Use a Play-enabled Android device or an App Store-capable iPhone to start Premium.",
           );
           setOfferingPackage(null);
           return;
@@ -127,18 +138,22 @@ export default function PaywallScreen() {
         ]);
         if (cancelled) return;
 
+        console.info(
+          `[bootstrap] paywall_offering_load_finished has_offering=${Boolean(offering)} has_package=${Boolean(selectedPackage)} onboarding=${isOnboardingPaywall} fresh_signup=${isFreshSignupSession}`,
+        );
         setOfferingPackage(selectedPackage);
         if (!offering || !selectedPackage) {
           setPurchaseError(
-            "No monthly Premium package is currently available in RevenueCat.",
+            "We couldn't load the Premium offer right now. Please try again in a moment.",
           );
         }
       } catch (error) {
+        console.warn("[bootstrap] paywall_offering_load_failed", error);
         if (!cancelled) {
           setPurchaseError(
             error instanceof Error
               ? error.message
-              : "Unable to load Premium offering.",
+              : "Unable to load Premium offering right now.",
           );
         }
       } finally {
@@ -153,7 +168,7 @@ export default function PaywallScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isFreshSignupSession, isOnboardingPaywall]);
 
   const runPurchaseFlow = async () => {
     setPurchaseError("");
@@ -177,6 +192,9 @@ export default function PaywallScreen() {
   };
 
   const handleStartTrial = async () => {
+    console.info(
+      `[bootstrap] paywall_start_trial onboarding=${isOnboardingPaywall} fresh_signup=${isFreshSignupSession} signed_in=${Boolean(session?.user.id)}`,
+    );
     setPurchaseError("");
 
     if (!session?.user.id && env.revenueCatEnabled) {
@@ -257,10 +275,15 @@ export default function PaywallScreen() {
     : env.revenueCatEnabled
       ? session?.user.id
         ? billingAvailable
-          ? "Start 7-Day Free Trial"
+          ? isGraceStatusVisible
+            ? "Finishing setup…"
+            : "Start 7-Day Free Trial"
           : "Purchases Unavailable"
         : "Create Account to Start Trial"
       : "Continue (Dev Build)";
+  const paywallStatusMessage = isGraceStatusVisible
+    ? "Checking your trial access and finishing setup in the background. You shouldn't need anyone to manually enable your account."
+    : purchaseError;
 
   const priceValue = offeringPackage?.packageType === "ANNUAL" ? "₱590" : "₱59";
 
@@ -483,13 +506,13 @@ export default function PaywallScreen() {
               </AppText>
             </Pressable>
 
-            {purchaseError ? (
+            {paywallStatusMessage ? (
               <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
                 <AppText
                   variant="meta"
-                  style={{ color: palette.danger, textAlign: "center" }}
+                  style={{ color: isGraceStatusVisible ? Colors.t3 : palette.danger, textAlign: "center" }}
                 >
-                  {purchaseError}
+                  {paywallStatusMessage}
                 </AppText>
               </View>
             ) : null}
@@ -501,10 +524,11 @@ export default function PaywallScreen() {
             <Animated.View style={{ transform: [{ scale: ctaScale }] }}>
               <Pressable
                 disabled={
+                  isGraceStatusVisible ||
                   isPurchasing ||
                   (env.revenueCatEnabled &&
                     Boolean(session?.user.id) &&
-                    (isLoadingOffering || !offeringPackage || !billingAvailable))
+                    ((isLoadingOffering && !isGraceStatusVisible) || (!offeringPackage && !isGraceStatusVisible) || (!billingAvailable && !isGraceStatusVisible)))
                 }
                 onPress={() => {
                   triggerLightHaptic();
@@ -532,10 +556,11 @@ export default function PaywallScreen() {
                   alignItems: "center",
                   justifyContent: "center",
                   opacity:
+                    isGraceStatusVisible ||
                     isPurchasing ||
                     (env.revenueCatEnabled &&
                       Boolean(session?.user.id) &&
-                      (isLoadingOffering || !offeringPackage || !billingAvailable))
+                      ((isLoadingOffering && !isGraceStatusVisible) || (!offeringPackage && !isGraceStatusVisible) || (!billingAvailable && !isGraceStatusVisible)))
                       ? 0.55
                       : 1,
                   shadowColor: Colors.red,

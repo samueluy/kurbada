@@ -9,6 +9,7 @@ import { GlassCard } from '@/components/ui/glass-card';
 import { palette } from '@/constants/theme';
 import { OnboardingHeader } from '@/components/ui/onboarding-header';
 import { BikeIdentityForm, BIKE_IDENTITY_EMPTY, resolveBikeIdentity, type BikeIdentityDraft } from '@/features/garage/components/bike-identity-form';
+import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { bikeBrands, getModelsForBrand, inferBikeCategory } from '@/lib/bike-models';
 import { getOnboardingRoute } from '@/lib/onboarding-flow';
 import { triggerLightHaptic } from '@/lib/haptics';
@@ -24,6 +25,7 @@ export default function BikeSetupScreen() {
   const completeOnboarding = useAppStore((state) => state.completeOnboarding);
   const onboardingData = useAppStore((state) => state.onboardingData);
   const isOnboarding = params.flow === 'onboarding';
+  const keyboardInset = useKeyboardInset();
 
   const initialBrand = onboardingData.bikeBrand && !bikeBrands.includes(onboardingData.bikeBrand) ? 'Other' : onboardingData.bikeBrand || '';
   const initialModels = initialBrand && initialBrand !== 'Other' ? getModelsForBrand(initialBrand) : [];
@@ -110,8 +112,9 @@ export default function BikeSetupScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <GlassCard style={{ flex: 1, borderRadius: 0, padding: 22, gap: 18 }}>
             <ScrollView
-              contentContainerStyle={{ gap: 18, paddingBottom: 24 }}
+              contentContainerStyle={{ gap: 18, paddingBottom: 24 + keyboardInset }}
               showsVerticalScrollIndicator={false}
+              automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
               keyboardShouldPersistTaps="handled">
               {content}
             </ScrollView>

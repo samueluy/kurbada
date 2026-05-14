@@ -20,6 +20,7 @@ import { ListRow } from '@/components/ui/list-row';
 import { SectionHeader } from '@/components/ui/section-header';
 import { palette, radius } from '@/constants/theme';
 import { EmergencyQRCard } from '@/features/profile/components/emergency-qr-card';
+import { isDisplayNameAvailable, isDisplayNameTakenError, normalizeDisplayName } from '@/lib/display-name';
 import { formatCurrencyPhp, formatSubscriptionStatusLabel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/use-auth';
@@ -160,9 +161,9 @@ export default function ProfileTabScreen() {
   }, [referralCode]);
 
   const handleSaveDisplayName = useCallback(async () => {
-    const trimmed = displayNameInput.trim();
+    const trimmed = normalizeDisplayName(displayNameInput);
     if (!trimmed) {
-      Alert.alert('Name required', 'Please enter a display name.');
+      Alert.alert('Username required', 'Please enter a username.');
       return;
     }
     if (!supabase || !session?.user.id) {
@@ -170,6 +171,12 @@ export default function ProfileTabScreen() {
       return;
     }
     try {
+      const available = await isDisplayNameAvailable(trimmed, session.user.id);
+      if (!available) {
+        Alert.alert('Username already taken', 'Please choose another username.');
+        return;
+      }
+
       const client = supabase as any;
       const { data, error } = await client
         .from('profiles')
@@ -178,6 +185,7 @@ export default function ProfileTabScreen() {
         .select()
         .single();
       if (error) throw error;
+
       queryClient.setQueryData(['profile', session.user.id], (current: Profile | undefined) => ({
         ...(current ?? {
           id: session.user.id,
@@ -189,15 +197,21 @@ export default function ProfileTabScreen() {
         display_name: data.display_name ?? trimmed,
       }));
       updateLocalProfile({ display_name: data.display_name ?? trimmed });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['profile', session.user.id] }),
+        queryClient.invalidateQueries({ queryKey: ['board-feed'] }),
+        queryClient.invalidateQueries({ queryKey: ['ride-listing-rsvps'] }),
+        queryClient.invalidateQueries({ queryKey: ['leaderboard-weekly-km'] }),
+      ]);
       setShowEditName(false);
       setToastMessage('✓ Name updated');
       setTimeout(() => setToastMessage(null), 2500);
-      const refetchFn = (profile as { refetch?: () => Promise<unknown> }).refetch;
-      await refetchFn?.();
     } catch (error) {
       Alert.alert(
         'Could not update name',
-        error instanceof Error ? error.message : 'Please try again.',
+        isDisplayNameTakenError(error)
+          ? 'Username already taken. Please choose another username.'
+          : error instanceof Error ? error.message : 'Please try again.',
       );
     }
   }, [displayNameInput, profile, queryClient, session?.user.id, updateLocalProfile]);
@@ -528,10 +542,10 @@ export default function ProfileTabScreen() {
       <KeyboardSheet
         visible={showEditName}
         onClose={() => setShowEditName(false)}
-        title="Edit display name"
-        subtitle="This is shown on shared ride cards, the leaderboard, and lobby posts.">
+        title="Edit username"
+        subtitle="This shows up on your profile, leaderboards, and every lobby you host or join.">
         <FloatingField
-          label="DISPLAY NAME"
+          label="USERNAME"
           value={displayNameInput}
           onChangeText={setDisplayNameInput}
           placeholder="Kurbada Rider"
