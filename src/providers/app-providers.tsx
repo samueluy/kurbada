@@ -31,6 +31,7 @@ import { DailySummaryBridge } from '@/providers/daily-summary-bridge';
 import { EngagementNotificationsBridge } from '@/providers/engagement-notifications-bridge';
 import { PendingRideSyncBridge } from '@/providers/pending-ride-sync-bridge';
 import { configureRevenueCat, subscribeToCustomerInfo, syncRevenueCatIdentity } from '@/services/revenuecat';
+import { ensureRideReminderCategories, handleRideReminderResponse } from '@/lib/ride-reminder-notifications';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
@@ -49,6 +50,17 @@ function RevenueCatIdentityBridge() {
   useEffect(() => {
     void syncRevenueCatIdentity(session?.user.id ?? null);
   }, [session?.user.id]);
+
+  return null;
+}
+
+function RideReminderNotificationBridge() {
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      handleRideReminderResponse(response);
+    });
+    return () => subscription.remove();
+  }, []);
 
   return null;
 }
@@ -76,6 +88,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(palette.background).catch(() => undefined);
     configureRevenueCat().catch(() => undefined);
+    ensureRideReminderCategories().catch(() => undefined);
     if (Platform.OS === 'android') {
       Notifications.setNotificationChannelAsync('kurbada-reminders', {
         name: 'Kurbada Reminders',
@@ -133,6 +146,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
               <StatusBar style="light" translucent backgroundColor="transparent" />
               <ErrorBoundary>
                 <RevenueCatIdentityBridge />
+                <RideReminderNotificationBridge />
                 <OnboardingSyncBridge />
                 <DailySummaryBridge />
                 <EngagementNotificationsBridge />

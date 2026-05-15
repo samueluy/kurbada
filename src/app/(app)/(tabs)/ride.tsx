@@ -1,5 +1,5 @@
 import * as Linking from 'expo-linking';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
@@ -35,6 +35,7 @@ import { useUserProfile } from '@/hooks/use-user-access';
 import { useWeather } from '@/hooks/use-weather';
 import { useWeatherWindow } from '@/hooks/use-weather-window';
 import { useAppStore } from '@/store/app-store';
+import { useMovementDetection } from '@/hooks/use-movement-detection';
 import type { RideFeedRecord } from '@/types/domain';
 
 type RideTabItem =
@@ -63,6 +64,8 @@ export default function RideTabScreen() {
   const weatherWindow = useWeatherWindow({ enabled: secondaryReady });
   const cachedLocation = useCachedLocation({ enabled: secondaryReady });
   const profile = useUserProfile(session?.user.id);
+  const params = useLocalSearchParams<{ autoStart?: string }>();
+  useMovementDetection();
   const allBikes = useMemo(() => bikes.data ?? [], [bikes.data]);
   const bikesById = useMemo(() => new Map(allBikes.map((bike) => [bike.id, bike])), [allBikes]);
   const primaryBike = useMemo(
@@ -81,6 +84,19 @@ export default function RideTabScreen() {
       setSelectedRideBikeId(primaryBike.id);
     }
   }, [primaryBike?.id, selectedRideBikeId]);
+
+  useEffect(() => {
+    if (params.autoStart === 'true' && primaryBike && !showRidePicker) {
+      const fuelRate = estimateFuelRate(primaryBike.engine_cc, primaryBike.category, 'hustle');
+      const fuelPrice = customFuelPricePerLiter ?? dashboardMetrics.data?.latest_fuel_price ?? 65;
+      setActiveBikeId(primaryBike.id);
+      router.push({
+        pathname: '/(app)/ride/active',
+        params: { bikeId: primaryBike.id, fuelPrice, fuelRate },
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [primaryBike]);
 
   useFocusEffect(
     useCallback(() => {

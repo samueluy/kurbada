@@ -24,6 +24,7 @@ import { useRideMutations } from '@/hooks/use-kurbada-data';
 import { useRideStore } from '@/store/ride-store';
 import { clearStoredCoords, getStoredCoords, LOCATION_TASK_NAME } from '@/tasks/location-task';
 import { useAppStore } from '@/store/app-store';
+import { cancelRideReminders, scheduleStopRideReminder } from '@/lib/ride-reminder-notifications';
 import type { RidePoint } from '@/types/domain';
 
 Accelerometer.setUpdateInterval(100);
@@ -109,6 +110,8 @@ export function useRideSession() {
   const rideIdRef = useRef<string | null>(null);
   const startingAltitudeRef = useRef<number | null>(null);
   const lastGForcePublishAtRef = useRef(0);
+  const stationarySinceRef = useRef<number | null>(null);
+  const stopReminderFiredRef = useRef(false);
   const getRideState = useRideStore.getState;
 
   const invalidateRecoveryQuery = () => {
@@ -265,6 +268,32 @@ export function useRideSession() {
           currentStore.setFatiguePromptShown(true);
         }
       }
+
+      // Stationary detection for stop-ride reminder
+      const stopRemindersEnabled = useAppStore.getState().stopRideRemindersEnabled;
+      if (currentStore.state === 'active' && stopRemindersEnabled && !stopReminderFiredRef.current) {
+        const speed = currentStore.speedKmh;
+        if (speed < 3) {
+          if (!stationarySinceRef.current) {
+            stationarySinceRef.current = Date.now();
+          }
+          const stationarySeconds = Math.floor((Date.now() - stationarySinceRef.current) / 1000);
+          currentStore.setStationarySince(stationarySinceRef.current);
+          if (stationarySeconds >= 180 && !stopReminderFiredRef.current) {
+            stopReminderFiredRef.current = true;
+            void scheduleStopRideReminder(Math.round(stationarySeconds / 60));
+          }
+        } else {
+          stationarySinceRef.current = null;
+          currentStore.setStationarySince(null);
+        }
+      }
+
+      // Remote stop trigger from notification tap
+      if (currentStore.stopRideRequested && (currentStore.state === 'active' || currentStore.state === 'starting')) {
+        currentStore.setStopRideRequested(false);
+        void stopRide();
+      }
     }, 1000);
 
     return () => clearInterval(interval);
@@ -318,6 +347,9 @@ export function useRideSession() {
 
   const startRide = async (bikeId: string, fuelPricePerLiter: number, fuelRateKmPerLiter: number) => {
     rideActions.resetRide();
+    stationarySinceRef.current = null;
+    stopReminderFiredRef.current = false;
+    void cancelRideReminders();
     foregroundPointsRef.current = [];
     pendingPersistPointsRef.current = [];
     crashThresholdSinceRef.current = null;
@@ -380,6 +412,10 @@ export function useRideSession() {
   };
 
   const stopRide = async () => {
+    stationarySinceRef.current = null;
+    stopReminderFiredRef.current = false;
+    void cancelRideReminders();
+
     if (!rideState.startedAt) {
       rideActions.setStartedAt(Date.now() - rideState.telemetry.durationSeconds * 1000);
     }

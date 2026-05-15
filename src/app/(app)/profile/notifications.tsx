@@ -27,6 +27,10 @@ export default function NotificationsScreen() {
   const setComebackNudgesEnabled = useAppStore((state) => state.setComebackNudgesEnabled);
   const lobbyRemindersEnabled = useAppStore((state) => state.lobbyRemindersEnabled);
   const setLobbyRemindersEnabled = useAppStore((state) => state.setLobbyRemindersEnabled);
+  const startRideRemindersEnabled = useAppStore((state) => state.startRideRemindersEnabled);
+  const setStartRideRemindersEnabled = useAppStore((state) => state.setStartRideRemindersEnabled);
+  const stopRideRemindersEnabled = useAppStore((state) => state.stopRideRemindersEnabled);
+  const setStopRideRemindersEnabled = useAppStore((state) => state.setStopRideRemindersEnabled);
   const [showAddThreshold, setShowAddThreshold] = useState(false);
   const [newThreshold, setNewThreshold] = useState('');
 
@@ -160,6 +164,40 @@ export default function NotificationsScreen() {
             </ScrollView>
           </View>
         ) : null}
+      </GlassCard>
+
+      <SectionHeader title="Ride Reminders" />
+      <GlassCard style={{ padding: 18, gap: 12 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <AppText variant="bodyBold">Start Ride Reminders</AppText>
+            <AppText variant="meta" style={{ color: palette.textSecondary }}>
+              Reminds you to start tracking when movement is detected outside a ride.
+            </AppText>
+          </View>
+          <Switch
+            value={startRideRemindersEnabled}
+            onValueChange={setStartRideRemindersEnabled}
+            trackColor={{ false: palette.surfaceMuted, true: palette.lime }}
+            thumbColor={startRideRemindersEnabled ? '#FFFFFF' : palette.textTertiary}
+          />
+        </View>
+
+        <View style={{ height: 0.5, backgroundColor: palette.border }} />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <AppText variant="bodyBold">Stop Ride Reminders</AppText>
+            <AppText variant="meta" style={{ color: palette.textSecondary }}>
+              Reminds you to stop tracking after being stationary for several minutes.
+            </AppText>
+          </View>
+          <Switch
+            value={stopRideRemindersEnabled}
+            onValueChange={setStopRideRemindersEnabled}
+            trackColor={{ false: palette.surfaceMuted, true: palette.lime }}
+            thumbColor={stopRideRemindersEnabled ? '#FFFFFF' : palette.textTertiary}
+          />
+        </View>
       </GlassCard>
 
       <SectionHeader title="Maintenance" />

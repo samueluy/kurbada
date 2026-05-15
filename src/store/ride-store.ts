@@ -35,6 +35,8 @@ type RideStore = {
   fatiguePromptShown: boolean;
   fuelPricePerLiter: number;
   fuelRateKmPerLiter: number;
+  stopRideRequested: boolean;
+  stationarySince: number | null;
   setState: (state: RideSessionState) => void;
   setBikeId: (bikeId?: string) => void;
   resetRide: () => void;
@@ -44,6 +46,8 @@ type RideStore = {
   updateTelemetry: (patch: Partial<TelemetrySnapshot>) => void;
   setFuelPricePerLiter: (price: number) => void;
   setFuelRateKmPerLiter: (rate: number) => void;
+  setStopRideRequested: (value: boolean) => void;
+  setStationarySince: (timestamp: number | null) => void;
 };
 
 const initialTelemetry: TelemetrySnapshot = {
@@ -68,6 +72,8 @@ export const useRideStore = create<RideStore>((set) => ({
   fatiguePromptShown: false,
   fuelPricePerLiter: 65,
   fuelRateKmPerLiter: 28,
+  stopRideRequested: false,
+  stationarySince: null,
   setState: (state) => set({ state }),
   setBikeId: (bikeId) => set({ bikeId }),
   setStartedAt: (startedAt) => set({ startedAt }),
@@ -91,6 +97,8 @@ export const useRideStore = create<RideStore>((set) => ({
     }),
   setFuelPricePerLiter: (fuelPricePerLiter) => set({ fuelPricePerLiter }),
   setFuelRateKmPerLiter: (fuelRateKmPerLiter) => set({ fuelRateKmPerLiter }),
+  setStopRideRequested: (stopRideRequested) => set({ stopRideRequested }),
+  setStationarySince: (stationarySince) => set({ stationarySince }),
   resetRide: () =>
     set({
       state: 'idle',
@@ -99,6 +107,8 @@ export const useRideStore = create<RideStore>((set) => ({
       ...initialTelemetry,
       crashCountdown: null,
       fatiguePromptShown: false,
+      stopRideRequested: false,
+      stationarySince: null,
       fuelPricePerLiter: 65,
       fuelRateKmPerLiter: 28,
     }),

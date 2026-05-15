@@ -81,6 +81,8 @@ type AppStore = {
   dailySummaryHour: number; // 0-23, local time
   comebackNudgesEnabled: boolean;
   lobbyRemindersEnabled: boolean;
+  startRideRemindersEnabled: boolean;
+  stopRideRemindersEnabled: boolean;
   acknowledgedBikeMilestones: Record<string, number[]>; // bikeId -> list of odo km thresholds
   freshSignupEmail: string | null;
   freshSignupStartedAt: number | null;
@@ -112,6 +114,8 @@ type AppStore = {
   setDailySummaryHour: (hour: number) => void;
   setComebackNudgesEnabled: (value: boolean) => void;
   setLobbyRemindersEnabled: (value: boolean) => void;
+  setStartRideRemindersEnabled: (value: boolean) => void;
+  setStopRideRemindersEnabled: (value: boolean) => void;
   acknowledgeBikeMilestone: (bikeId: string, milestoneKm: number) => void;
   markFreshSignupSession: (email: string) => void;
   clearFreshSignupSession: () => void;
@@ -182,6 +186,8 @@ export const useAppStore = create<AppStore>()(
       dailySummaryHour: 21,
       comebackNudgesEnabled: true,
       lobbyRemindersEnabled: true,
+      startRideRemindersEnabled: false,
+      stopRideRemindersEnabled: true,
       acknowledgedBikeMilestones: {},
       freshSignupEmail: null,
       freshSignupStartedAt: null,
@@ -240,6 +246,8 @@ export const useAppStore = create<AppStore>()(
       setDailySummaryHour: (dailySummaryHour) => set({ dailySummaryHour }),
       setComebackNudgesEnabled: (comebackNudgesEnabled) => set({ comebackNudgesEnabled }),
       setLobbyRemindersEnabled: (lobbyRemindersEnabled) => set({ lobbyRemindersEnabled }),
+      setStartRideRemindersEnabled: (startRideRemindersEnabled) => set({ startRideRemindersEnabled }),
+      setStopRideRemindersEnabled: (stopRideRemindersEnabled) => set({ stopRideRemindersEnabled }),
       acknowledgeBikeMilestone: (bikeId, milestoneKm) =>
         set((state) => {
           const existing = state.acknowledgedBikeMilestones[bikeId] ?? [];
@@ -399,6 +407,8 @@ export const useAppStore = create<AppStore>()(
           dailySummaryHour: state.dailySummaryHour,
           comebackNudgesEnabled: state.comebackNudgesEnabled,
           lobbyRemindersEnabled: state.lobbyRemindersEnabled,
+          startRideRemindersEnabled: state.startRideRemindersEnabled,
+          stopRideRemindersEnabled: state.stopRideRemindersEnabled,
           acknowledgedBikeMilestones: state.acknowledgedBikeMilestones,
         }),
     },
