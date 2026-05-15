@@ -259,7 +259,7 @@ export default function RideTabScreen() {
           <MaterialCommunityIcons name="motorbike" size={18} color={palette.danger} />
         </View>
         <AppText variant="title" style={{ fontSize: 20 }}>
-          {ridingPersona === 'commute' ? 'Keep the ride efficient.' : 'Ready for the next ride?'}
+          {ridingPersona === 'commute' ? 'Keep it efficient.' : 'Ready to ride?'}
         </AppText>
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <StatCard label="Last Ride" value={latestRide?.distance_km.toFixed(1) ?? '0.0'} unit="km" />
@@ -274,7 +274,7 @@ export default function RideTabScreen() {
   const monthlyCostTile = useMemo(() => (
     <GlassCard style={{ padding: 18, borderRadius: 18, gap: 10 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <AppText variant="eyebrow">THIS MONTH&apos;S TRUE COST</AppText>
+        <AppText variant="eyebrow">THIS MONTH&apos;S COST</AppText>
         <MaterialCommunityIcons name="chart-line" size={18} color={palette.lime} />
       </View>
       <AppText variant="heroMetric" style={{ fontSize: 36, lineHeight: 42, color: palette.text }}>
@@ -297,7 +297,7 @@ export default function RideTabScreen() {
         <MaterialCommunityIcons name="map-marker-radius-outline" size={18} color={palette.textSecondary} />
       </View>
       <AppText variant="body" style={{ color: palette.textSecondary }}>
-        Need a quick stop? Jump straight to gas stations or food nearby in your maps app.
+        Find gas stations or restaurants near you.
       </AppText>
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <View style={{ flex: 1 }}>
@@ -331,7 +331,7 @@ export default function RideTabScreen() {
           <GlassCard style={{ padding: 18, borderRadius: 18, gap: 8 }}>
             <AppText variant="eyebrow">LOADING RIDE INSIGHTS</AppText>
             <AppText variant="body" style={{ color: palette.textSecondary }}>
-              Bringing in your recent rides, weather, and maintenance snapshot.
+              Loading your data…
             </AppText>
           </GlassCard>
         ),
@@ -406,12 +406,12 @@ export default function RideTabScreen() {
       <View style={{ gap: 6 }}>
         <AppText variant="eyebrow">{getGreeting()}, {profile.data?.display_name ?? 'Rider'}</AppText>
         <AppText variant="screenTitle" style={{ fontSize: 34, lineHeight: 38, letterSpacing: -0.8 }}>
-          {workMode ? 'Your shift, your numbers.' : 'Ride honest. Ride smart.'}
+          {workMode ? 'Your shift today.' : 'Ride log and costs.'}
         </AppText>
         <AppText variant="body">
           {workMode
-            ? 'Earnings, fuel, and net income — tracked as you ride.'
-            : 'Your route, fuel cost, and maintenance — the whole truth of owning a motorcycle.'}
+            ? 'Earnings, fuel, and net as you ride.'
+            : 'Log your route, fuel use, and maintenance costs.'}
         </AppText>
       </View>
 
@@ -520,7 +520,7 @@ export default function RideTabScreen() {
           visible={showRidePicker}
           onClose={() => setShowRidePicker(false)}
           title="Choose bike for this ride"
-          subtitle="We’ll log the kilometers and fuel estimate against the motorcycle you pick here.">
+          subtitle="Select which bike to track this ride with.">
           <View style={{ gap: 10 }}>
             {allBikes.map((bike) => {
               const active = bike.id === selectedRideBike?.id;

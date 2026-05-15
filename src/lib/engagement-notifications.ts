@@ -41,8 +41,8 @@ export async function scheduleComebackNudgeNotification(lastRideAt?: string | nu
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'Your bike misses you',
-      body: 'No rides logged recently. A short loop tonight could keep the streak alive.',
+      title: 'Time for a ride?',
+      body: "It's been a while since your last ride. A quick ride could keep your streak going.",
       data: { type: 'comeback_nudge', reminderKey: COMEBACK_NOTIFICATION_KEY },
       sound: true,
     },

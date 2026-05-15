@@ -134,8 +134,8 @@ export default function FuelTabScreen() {
       <AppScrollScreen refreshing={isRefreshing} onRefresh={handleRefresh}>
       <View style={{ gap: 8 }}>
         <AppText variant="eyebrow">Fuel Ledger</AppText>
-        <AppText variant="screenTitle">Ownership has a cost. Own the numbers.</AppText>
-        <AppText variant="body">Track your fill-ups like part of the machine story, not an accounting spreadsheet.</AppText>
+        <AppText variant="screenTitle">Track every fill-up. Know what your bike costs.</AppText>
+        <AppText variant="body">Log fill-ups as you go. Simple numbers, no fluff.</AppText>
       </View>
 
       <SectionHeader title="Fuel Ledger" action={<Button title="+ Log" variant="secondary" onPress={() => setShowForm((value) => !value)} />} />

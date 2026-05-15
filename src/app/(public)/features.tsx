@@ -67,7 +67,7 @@ export default function OnboardingFeaturesScreen() {
               How do you ride?
             </AppText>
             <AppText variant="meta" style={{ textAlign: 'center', color: palette.textSecondary }}>
-              We&apos;ll prioritize the right screens for you. Change it anytime in Profile.
+              We&apos;ll customize the app for how you ride. You can change this later in Profile.
             </AppText>
           </View>
 

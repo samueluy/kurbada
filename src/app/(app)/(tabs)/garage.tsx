@@ -76,7 +76,7 @@ export default function GarageTabScreen() {
         <View style={{ gap: 8 }}>
           <AppText variant="eyebrow">Garage</AppText>
           <AppText variant="screenTitle">Your bikes, your pride.</AppText>
-          <AppText variant="body">Keep your bike setup feeling like a collection.</AppText>
+          <AppText variant="body">          Add your bikes. Track maintenance and costs for each.</AppText>
         </View>
 
         <SectionHeader title="My Garage" action={<Button title={showForm ? 'Close' : '+ Add'} variant="secondary" onPress={() => setShowForm((value) => !value)} style={{ minHeight: 40, borderRadius: 14 }} />} />

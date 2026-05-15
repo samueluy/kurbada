@@ -73,7 +73,7 @@ export function CustomCalendarHeatmap({ rides, numDays = 90 }: { rides: RideReco
         <View style={{ flex: 1, gap: 6 }}>
           <AppText variant="eyebrow">RIDE ACTIVITY</AppText>
           <AppText variant="body" style={{ color: palette.textSecondary }}>
-            Your last 3 weeks at a glance, built for quick mobile scanning instead of a dense grid.
+            Your rides over the last 3 weeks.
           </AppText>
         </View>
         <View style={{ alignItems: 'flex-end', gap: 2 }}>

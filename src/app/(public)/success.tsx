@@ -84,14 +84,14 @@ export default function OnboardingSuccessScreen() {
 
           <View style={{ alignItems: 'center', gap: 16 }}>
             <AppText variant="screenTitle" style={{ textAlign: 'center', fontSize: 34, lineHeight: 42 }}>
-              Ignition On.{'\n'}Premium Unlocked.
+              You&apos;re all set.
             </AppText>
             <AppText variant="meta" style={{ textAlign: 'center', color: palette.textSecondary, lineHeight: 22, maxWidth: 300 }}>
               {isFinishingSetup
-                ? 'Premium is unlocked. We are finishing your garage in the background.'
+                ? 'Setting up your garage. This should only take a moment.'
                 : hasFailedOnboardingSync
-                  ? 'Premium is unlocked, but your bike setup still needs one more step.'
-                  : 'Welcome to the inner circle of data-driven riders.'}
+                  ? 'Almost done. Your bike setup needs one more step.'
+                  : 'Start tracking your rides.'}
             </AppText>
           </View>
 
@@ -102,8 +102,8 @@ export default function OnboardingSuccessScreen() {
                 : hasFailedOnboardingSync
                   ? 'Your trial is active, but your bike did not finish saving yet. Retry setup or add it manually now.'
                   : isWeekend
-                    ? 'Your lean angle sensors are calibrated. Time to conquer the twisties.'
-                    : 'Your fuel ledger is active. Let&apos;s protect your daily earnings.'}
+                    ? 'Your sensors are ready. Enjoy the ride.'
+                    : 'Fuel tracking is on. Your costs are tracked automatically.'}
             </AppText>
           </View>
         </View>

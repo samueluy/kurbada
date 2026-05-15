@@ -72,12 +72,12 @@ export function computeEfficiencyTrend(rides: RideRecord[]): EfficiencyTrend {
 
   const hint = (() => {
     if (direction === 'better') {
-      return `Efficiency up ${Math.abs(percentChange).toFixed(1)}% week over week. Keep that throttle smooth.`;
+      return `Efficiency up ${Math.abs(percentChange).toFixed(1)}% from last week. Smooth riding pays off.`;
     }
     if (direction === 'worse') {
-      return `Efficiency down ${Math.abs(percentChange).toFixed(1)}% week over week. Check tire pressure, air filter, and chain tension.`;
+      return `Efficiency down ${Math.abs(percentChange).toFixed(1)}% from last week. Check tire pressure, air filter, and chain tension.`;
     }
-    return 'Efficiency is holding steady. Consistent habits, consistent ₱/km.';
+    return 'Efficiency is steady. No change from last week.';
   })();
 
   return {

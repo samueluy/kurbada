@@ -35,14 +35,14 @@ export function BikeMilestoneCard({ bike }: { bike: Bike | undefined }) {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Trophy size={20} color={palette.lime} />
           <AppText variant="eyebrow" style={{ color: palette.lime }}>
-            MILESTONE UNLOCKED
+            MILESTONE REACHED
           </AppText>
         </View>
         <AppText variant="title" style={{ fontSize: 22 }}>
           {formatMilestoneLabel(km)} with your {bike.make} {bike.model}
         </AppText>
         <AppText variant="meta" style={{ color: palette.textSecondary }}>
-          That is a real ownership chapter. Log today&apos;s ride to mark it.
+          Nice milestone. Log a ride to record it.
         </AppText>
         <Button
           title="Nice"
@@ -59,10 +59,10 @@ export function BikeMilestoneCard({ bike }: { bike: Bike | undefined }) {
       <GlassCard style={{ padding: 18, borderRadius: 18, gap: 8 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Trophy size={16} color={palette.lime} />
-          <AppText variant="eyebrow">LEGEND STATUS</AppText>
+          <AppText variant="eyebrow">ALL MILESTONES PASSED</AppText>
         </View>
         <AppText variant="meta" style={{ color: palette.textSecondary }}>
-          You have passed every milestone Kurbada tracks. Ride on.
+          You&apos;ve hit every milestone we track. Keep riding.
         </AppText>
       </GlassCard>
     );
@@ -83,7 +83,7 @@ export function BikeMilestoneCard({ bike }: { bike: Bike | undefined }) {
         <AppText variant="meta" style={{ color: palette.textSecondary }}>
           {bike.make} {bike.model}
           {status.yearsOwned != null && status.yearsOwned > 0
-            ? ` · ${status.yearsOwned} year${status.yearsOwned === 1 ? '' : 's'} together`
+            ? ` · ${status.yearsOwned} year${status.yearsOwned === 1 ? '' : 's'} owned`
             : ''}
         </AppText>
         <View style={{ height: 6, borderRadius: 3, backgroundColor: palette.surfaceMuted, overflow: 'hidden' }}>

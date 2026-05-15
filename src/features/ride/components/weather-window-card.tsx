@@ -19,7 +19,7 @@ export function WeatherWindowCard({ window }: { window: RideWindow | null | unde
             {window.startLabel} — {window.endLabel}
           </AppText>
           <AppText variant="meta" style={{ color: palette.textSecondary }}>
-            {window.hours}h of low rain probability. Good time to gear up.
+            {window.hours}h of low rain chance. Good time to ride.
           </AppText>
         </>
       ) : (
