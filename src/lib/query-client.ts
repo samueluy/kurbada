@@ -8,5 +8,10 @@ export const queryClient = new QueryClient({
       retry: 1,
       refetchOnWindowFocus: false,
     },
+    mutations: {
+      retry: 2,
+      retryDelay: (attemptIndex) =>
+        Math.min(1000 * 2 ** attemptIndex + Math.random() * 1000, 15_000),
+    },
   },
 });

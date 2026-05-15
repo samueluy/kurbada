@@ -31,10 +31,10 @@ Accelerometer.setUpdateInterval(100);
 
 const DISPLAY_SPEEDOMETER_BOOST = 1.03;
 const LOW_GRAVITY_THRESHOLD_G = 0.45;
-const IMPACT_THRESHOLD_G = 3.15;
-const SEVERE_IMPACT_THRESHOLD_G = 5.25;
+const IMPACT_THRESHOLD_G = 4.0;
+const SEVERE_IMPACT_THRESHOLD_G = 6.0;
 const IMPACT_SEQUENCE_WINDOW_MS = 1800;
-const CRASH_TRIGGER_HOLD_MS = 120;
+const CRASH_TRIGGER_HOLD_MS = 250;
 const MAX_REASONABLE_SPEED_KMH = 280;
 const MAX_SPEED_DELTA_PER_SECOND_KMH = 36;
 
@@ -609,9 +609,9 @@ export function useRideSession() {
 
     const sawRecentLowGravity = lowGravitySinceRef.current != null
       && now - lowGravitySinceRef.current <= IMPACT_SEQUENCE_WINDOW_MS;
-    const impactDetected = rawGForce >= IMPACT_THRESHOLD_G || smoothedGForce >= 3.6;
+    const impactDetected = rawGForce >= IMPACT_THRESHOLD_G || smoothedGForce >= 4.5;
     const severeImpactDetected = rawGForce >= SEVERE_IMPACT_THRESHOLD_G;
-    const motionTriggeredImpact = impactDetected && (speedKmh >= 8 || sawRecentLowGravity);
+    const motionTriggeredImpact = impactDetected && (speedKmh >= 12 || sawRecentLowGravity);
 
     if (severeImpactDetected || motionTriggeredImpact) {
       if (!crashThresholdSinceRef.current) {

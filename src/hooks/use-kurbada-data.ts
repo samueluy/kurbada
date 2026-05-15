@@ -879,6 +879,9 @@ export function useRideMutations(userId?: string) {
   };
 
   const saveRide = useMutation({
+    retry: 2,
+    retryDelay: (attemptIndex) =>
+      Math.min(2000 * 2 ** attemptIndex + Math.random() * 1000, 20_000),
     mutationFn: async (ride: RideRecord) => {
       const localRide = { ...ride, sync_status: 'synced' as const };
       saveRideLocal(localRide);
@@ -1002,34 +1005,46 @@ export function useRideMutations(userId?: string) {
       if (!supabase || !userId) return [];
 
       const { pendingRides: queuedRides } = useLocalAppStore.getState();
+      if (!queuedRides.length) return [];
+
       const syncedIds: string[] = [];
 
-      for (const ride of queuedRides) {
-        const payload = {
-          id: ride.id,
-          bike_id: ride.bike_id,
-          user_id: userId,
-          mode: ride.mode,
-          started_at: ride.started_at,
-          ended_at: ride.ended_at,
-          distance_km: ride.distance_km,
-          max_speed_kmh: ride.max_speed_kmh,
-          avg_speed_kmh: ride.avg_speed_kmh,
-          max_lean_angle_deg: ride.max_lean_angle_deg ?? null,
-          fuel_used_liters: ride.fuel_used_liters ?? null,
-          elevation_gain_m: ride.elevation_gain_m ?? null,
-          mood: ride.mood ?? null,
-          route_geojson: ride.route_geojson,
-          route_preview_geojson: ride.route_preview_geojson ?? ride.route_geojson,
-          route_point_count_raw: ride.route_point_count_raw,
-          route_point_count_simplified: ride.route_point_count_simplified,
-          route_bounds: ride.route_bounds,
-        };
+      for (let i = 0; i < queuedRides.length; i++) {
+        const ride = queuedRides[i];
 
-        const { error } = await supabase.from('rides').upsert(payload as any, { onConflict: 'id' });
-        if (!error) {
-          removePendingRideLocal(ride.id);
-          syncedIds.push(ride.id);
+        if (i > 0) {
+          await new Promise((resolve) => setTimeout(resolve, 500 + Math.random() * 1500));
+        }
+
+        try {
+          const payload = {
+            id: ride.id,
+            bike_id: ride.bike_id,
+            user_id: userId,
+            mode: ride.mode,
+            started_at: ride.started_at,
+            ended_at: ride.ended_at,
+            distance_km: ride.distance_km,
+            max_speed_kmh: ride.max_speed_kmh,
+            avg_speed_kmh: ride.avg_speed_kmh,
+            max_lean_angle_deg: ride.max_lean_angle_deg ?? null,
+            fuel_used_liters: ride.fuel_used_liters ?? null,
+            elevation_gain_m: ride.elevation_gain_m ?? null,
+            mood: ride.mood ?? null,
+            route_geojson: ride.route_geojson,
+            route_preview_geojson: ride.route_preview_geojson ?? ride.route_geojson,
+            route_point_count_raw: ride.route_point_count_raw,
+            route_point_count_simplified: ride.route_point_count_simplified,
+            route_bounds: ride.route_bounds,
+          };
+
+          const { error } = await supabase.from('rides').upsert(payload as any, { onConflict: 'id' });
+          if (!error) {
+            removePendingRideLocal(ride.id);
+            syncedIds.push(ride.id);
+          }
+        } catch {
+          // Per-ride failure — skip to next, leave this one in pending
         }
       }
 

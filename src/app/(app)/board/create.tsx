@@ -195,10 +195,20 @@ export default function CreateRideScreen() {
       city: city.trim() || null,
     };
 
-    if (existingListing) {
-      await updateRideListing.mutateAsync({ ...existingListing, ...payload });
-    } else {
-      await createRideListing.mutateAsync(payload);
+    try {
+      if (existingListing) {
+        await updateRideListing.mutateAsync({ ...existingListing, ...payload });
+      } else {
+        await createRideListing.mutateAsync(payload);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (message.toLowerCase().includes('policy') || message.includes('42501') || message.includes('row security')) {
+        Alert.alert('Rate limit reached', 'You can create up to 3 rides per hour. Try again later.');
+      } else {
+        Alert.alert('Could not save ride', message || 'Please check your connection and try again.');
+      }
+      return;
     }
 
     triggerSuccessHaptic();
