@@ -22,7 +22,7 @@ export function EmergencyQRCard({
           <View style={{ alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.xs, backgroundColor: 'rgba(192,57,43,0.15)' }}>
             <AppText variant="label" style={{ color: palette.danger, letterSpacing: 0.8 }}>Emergency QR</AppText>
           </View>
-          <AppText variant="h1" numberOfLines={2} ellipsizeMode="tail" style={{ fontSize: 18 }}>Serious when you need it.</AppText>
+          <AppText variant="h1" numberOfLines={2} ellipsizeMode="tail" style={{ fontSize: 18 }}>Emergency info, always ready.</AppText>
           <AppText variant="meta" numberOfLines={3} ellipsizeMode="tail" style={{ color: palette.textTertiary }}>
             {emergency?.full_name
               ? 'Keep your rider info ready on your lock screen for emergency response.'

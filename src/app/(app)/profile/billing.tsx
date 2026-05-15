@@ -71,7 +71,7 @@ export default function BillingScreen() {
     <AppScrollScreen>
       <View style={{ gap: 8 }}>
         <AppText variant="eyebrow">Billing</AppText>
-        <AppText variant="screenTitle">Manage Premium cleanly.</AppText>
+        <AppText variant="screenTitle">Manage your Premium plan.</AppText>
         <AppText variant="body">Check your current access, restore purchases, or jump straight to your store subscription controls.</AppText>
       </View>
 
@@ -80,7 +80,7 @@ export default function BillingScreen() {
           <View style={{ alignItems: 'center', gap: 10, paddingVertical: 16 }}>
             <ActivityIndicator color={palette.text} />
             <AppText variant="meta" style={{ color: palette.textSecondary }}>
-              Loading RevenueCat status…
+              Loading subscription status…
             </AppText>
           </View>
         ) : (

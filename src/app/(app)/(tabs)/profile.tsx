@@ -280,7 +280,7 @@ export default function ProfileTabScreen() {
       <AppScrollScreen refreshing={isRefreshing} onRefresh={handleRefresh}>
         <View style={{ gap: 8 }}>
           <AppText variant="eyebrow">Profile</AppText>
-          <AppText variant="screenTitle">Rider identity, kept tight.</AppText>
+          <AppText variant="screenTitle">Your rider identity, secure and private.</AppText>
           <AppText variant="body">Your stats, emergency identity, and account details live here.</AppText>
         </View>
 

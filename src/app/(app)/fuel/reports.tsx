@@ -24,7 +24,7 @@ export default function FuelReportsScreen() {
     <AppScrollScreen>
       <View style={{ gap: 8 }}>
         <AppText variant="label">Fuel Reports</AppText>
-        <AppText variant="screenTitle">See the cost of keeping the machine moving.</AppText>
+        <AppText variant="screenTitle">See what it costs to keep riding.</AppText>
       </View>
       <SectionHeader title="Fuel Reports" />
       <GlassCard style={{ padding: 18 }}>
@@ -41,7 +41,7 @@ export default function FuelReportsScreen() {
               yAxisTextStyle={{ color: palette.textTertiary, fontSize: 10 }}
             />
         ) : (
-          <AppText variant="meta">Add fuel logs to populate the chart.</AppText>
+          <AppText variant="meta">Add fuel logs to see your spending chart.</AppText>
         )}
       </GlassCard>
 

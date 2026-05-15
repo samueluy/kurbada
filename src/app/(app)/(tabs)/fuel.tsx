@@ -134,7 +134,7 @@ export default function FuelTabScreen() {
       <AppScrollScreen refreshing={isRefreshing} onRefresh={handleRefresh}>
       <View style={{ gap: 8 }}>
         <AppText variant="eyebrow">Fuel Ledger</AppText>
-        <AppText variant="screenTitle">Ownership has a cost. Make it look good.</AppText>
+        <AppText variant="screenTitle">Ownership has a cost. Own the numbers.</AppText>
         <AppText variant="body">Track your fill-ups like part of the machine story, not an accounting spreadsheet.</AppText>
       </View>
 
@@ -247,7 +247,7 @@ export default function FuelTabScreen() {
         </View>
       ) : (
         <GlassCard style={{ padding: 18 }}>
-          <EmptyState icon="water-outline" title="No fuel logs yet" body="Log your first fill-up to start a cleaner machine ledger and unlock spending rhythm." />
+          <EmptyState icon="water-outline" title="No fuel logs yet" body="Log your first fill-up to start tracking fuel spending." />
         </GlassCard>
       )}
     </AppScrollScreen>

@@ -96,7 +96,7 @@ export default function LobbyDetailScreen() {
           <Ionicons name="chevron-back" size={20} color={palette.text} />
         </Pressable>
         <View style={{ flex: 1, gap: 4 }}>
-          <AppText variant="eyebrow">Lobby Detail</AppText>
+          <AppText variant="eyebrow">Ride Details</AppText>
           <AppText variant="screenTitle" style={{ fontSize: 28 }}>
             {listing.title?.trim() || listing.destination}
           </AppText>

@@ -123,7 +123,7 @@ export default function WorkModeScreen() {
               placeholder="1500"
               keyboardType="numeric"
             />
-            <Button title="Save goal" onPress={handleSaveGoal} />
+            <Button title="Save Goal" onPress={handleSaveGoal} />
           </GlassCard>
 
           <GlassCard style={{ padding: 18, gap: 12, borderRadius: radius.lg }}>

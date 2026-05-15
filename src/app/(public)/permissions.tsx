@@ -19,7 +19,7 @@ import { useAppStore } from '@/store/app-store';
 const loadingTexts = [
   'Configuring Garage...',
   'Generating Emergency ID...',
-  'Calibrating Sensors...',
+  'Setting up tracking…',
   'Profile Ready.',
 ];
 
@@ -132,7 +132,7 @@ export default function PermissionsScreen() {
                 </View>
                 <View style={{ alignItems: 'center', gap: 14 }}>
                   <AppText variant="screenTitle" style={{ textAlign: 'center', fontSize: 30, lineHeight: 36 }}>
-                    We need to connect{'\n'}to your sensors.
+                    We need access to{'\n'}your location and motion.
                   </AppText>
                   <AppText variant="meta" style={{ textAlign: 'center', color: palette.textSecondary, lineHeight: 22 }}>
                     To track your max lean angle, route, and detect sudden stops, Kurbada requires GPS and Motion access.
@@ -154,7 +154,7 @@ export default function PermissionsScreen() {
                 <Ionicons name="notifications-outline" size={16} color={palette.textSecondary} />
                 <AppText variant="meta" style={{ color: palette.textTertiary }}>Notifications for maintenance + crash alerts</AppText>
               </View>
-              <Button title="Enable Telemetry" onPress={handleEnableTelemetry} />
+              <Button title="Enable Tracking" onPress={handleEnableTelemetry} />
             </View>
           </ScrollView>
         </GlassCard>

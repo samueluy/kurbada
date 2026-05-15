@@ -75,7 +75,7 @@ export default function GarageTabScreen() {
       <AppScrollScreen refreshing={isRefreshing} onRefresh={handleRefresh}>
         <View style={{ gap: 8 }}>
           <AppText variant="eyebrow">Garage</AppText>
-          <AppText variant="screenTitle">Your machines, not just a list.</AppText>
+          <AppText variant="screenTitle">Your bikes, your pride.</AppText>
           <AppText variant="body">Keep your bike setup feeling like a collection.</AppText>
         </View>
 
@@ -110,7 +110,7 @@ export default function GarageTabScreen() {
           ))
         ) : !showForm ? (
           <GlassCard style={{ padding: 18 }}>
-            <EmptyState icon="bicycle-outline" title="Add your first bike" body="Start your garage with one machine and maintenance tracking will unlock automatically." actionTitle="Add bike" onAction={() => setShowForm(true)} />
+            <EmptyState icon="bicycle-outline" title="Add your first bike" body="Start your garage with one motorcycle and maintenance tracking will unlock automatically." actionTitle="Add Bike" onAction={() => setShowForm(true)} />
           </GlassCard>
         ) : null}
       </AppScrollScreen>

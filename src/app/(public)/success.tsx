@@ -110,7 +110,7 @@ export default function OnboardingSuccessScreen() {
 
         <View style={{ gap: 16 }}>
           <Button
-            title={isFinishingSetup ? 'Finishing your garage…' : hasFailedOnboardingSync ? 'Add Bike Now' : 'Drop into My Garage'}
+            title={isFinishingSetup ? 'Finishing your garage…' : hasFailedOnboardingSync ? 'Add Bike Now' : 'Go to My Garage'}
             onPress={hasFailedOnboardingSync ? () => router.replace('/(public)/bike-setup') : handleDropIn}
             disabled={isFinishingSetup || (!hasFailedOnboardingSync && !isSetupReady && Boolean(session?.user.id))}
             style={{

@@ -72,7 +72,7 @@ export default function SignInScreen() {
 
         {!isSupabaseConfigured ? (
           <AppText variant="meta" style={{ color: palette.danger }}>
-            Supabase env vars are not configured yet. Add them to `.env` before using email auth.
+            Authentication is not configured in this build.
           </AppText>
         ) : null}
 

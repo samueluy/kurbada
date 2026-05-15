@@ -47,7 +47,7 @@ export class ErrorBoundary extends Component<Props, State> {
           </AppText>
         </View>
         <AppText variant="screenTitle" style={{ fontSize: 24, textAlign: 'center' }}>
-          Something broke
+          Something went wrong
         </AppText>
         <AppText variant="meta" style={{ color: palette.textSecondary, textAlign: 'center' }}>
           {this.state.error?.message ?? 'An unexpected error occurred. Try again or restart the app.'}

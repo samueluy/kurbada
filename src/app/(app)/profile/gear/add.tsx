@@ -235,7 +235,7 @@ export default function AddGearScreen() {
         ) : null}
       </GlassCard>
 
-      <Button title={busy ? 'Saving...' : existing ? 'Save changes' : 'Add gear'} disabled={busy} onPress={handleSave} />
+      <Button title={busy ? 'Saving...' : existing ? 'Save Changes' : 'Add Gear'} disabled={busy} onPress={handleSave} />
       <Button title="Cancel" variant="ghost" onPress={() => router.back()} />
     </AppScrollScreen>
   );

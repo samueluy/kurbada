@@ -97,7 +97,7 @@ export default function RideRecoveryScreen() {
     <AppScrollScreen>
       <GlassCard style={{ padding: 22, gap: 14 }}>
         <AppText variant="eyebrow">UNFINISHED RIDE</AppText>
-        <AppText variant="screenTitle">We found your interrupted ride.</AppText>
+        <AppText variant="screenTitle">We recovered your unfinished ride.</AppText>
         <AppText variant="meta" style={{ color: palette.textSecondary, lineHeight: 22 }}>
           {recovery.data.isStale
             ? 'The app was interrupted and this ride has been idle for a while. You can save what was recorded or resume it if you are still riding.'

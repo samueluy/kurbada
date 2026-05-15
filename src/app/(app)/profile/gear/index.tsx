@@ -123,7 +123,7 @@ export default function GearScreen() {
       </View>
 
       <Button
-        title="+ Add gear"
+        title="+ Add Gear"
         variant="secondary"
         onPress={() => router.push('/(app)/profile/gear/add' as any)}
       />
@@ -134,7 +134,7 @@ export default function GearScreen() {
             icon="shirt-outline"
             title="No gear tracked yet"
             body="Start with your helmet. The 5-year replacement rule is built in."
-            actionTitle="Add your first item"
+            actionTitle="Add Your First Item"
             onAction={() => router.push('/(app)/profile/gear/add' as any)}
           />
         </GlassCard>

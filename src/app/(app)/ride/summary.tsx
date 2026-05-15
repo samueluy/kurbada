@@ -168,7 +168,7 @@ export default function RideSummaryScreen() {
             <AppText variant="label">Ride not found</AppText>
             <AppText variant="title">This ride is no longer available.</AppText>
             <AppText variant="meta" style={{ color: palette.textSecondary }}>
-              The summary could not find a saved ride for that link.
+              No saved ride found.
             </AppText>
             <Button title="Back to rides" variant="secondary" onPress={() => router.replace('/(app)/(tabs)/ride')} />
           </GlassCard>
@@ -371,7 +371,7 @@ export default function RideSummaryScreen() {
               style={{ backgroundColor: palette.danger }}
             />
             <Button
-              title="Export Route Replay"
+              title="Export Route Video"
               variant="secondary"
               onPress={() => {
                 triggerLightHaptic();
