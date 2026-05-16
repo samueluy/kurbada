@@ -820,7 +820,7 @@ export function useRideSession() {
     if (
       previousFilteredSpeedKmh < 6
       && distanceDeltaKm < 0.015
-      && (accuracyM > 18 || rawGpsSpeedKmh > 22)
+      && (accuracyM > 30 || (rawGpsSpeedKmh > 30 && accuracyM > 18))
     ) {
       candidateSpeedKmh = 0;
     }
@@ -852,8 +852,8 @@ export function useRideSession() {
       }
     }
 
-    if (previousFilteredSpeedKmh > 0 && Math.abs(candidateSpeedKmh - previousFilteredSpeedKmh) > 55 && accuracyM > 18) {
-      candidateSpeedKmh = previousFilteredSpeedKmh + Math.sign(candidateSpeedKmh - previousFilteredSpeedKmh) * 18;
+    if (previousFilteredSpeedKmh > 0 && Math.abs(candidateSpeedKmh - previousFilteredSpeedKmh) > 60 && accuracyM > 30) {
+      candidateSpeedKmh = previousFilteredSpeedKmh + Math.sign(candidateSpeedKmh - previousFilteredSpeedKmh) * 28;
     }
 
     if (candidateSpeedKmh > MAX_REASONABLE_SPEED_KMH) {
@@ -861,17 +861,17 @@ export function useRideSession() {
     }
 
     const alpha = candidateSpeedKmh > previousFilteredSpeedKmh
-      ? (candidateSpeedKmh < 15 || accuracyM > 25 ? 0.28 : 0.58)
-      : (candidateSpeedKmh < 15 || accuracyM > 25 ? 0.22 : 0.4);
+      ? (candidateSpeedKmh < 15 || accuracyM > 25 ? 0.4 : 0.65)
+      : (candidateSpeedKmh < 15 || accuracyM > 25 ? 0.3 : 0.5);
 
     const smoothedSpeedKmh = Math.max(
       0,
       previousFilteredSpeedKmh + (candidateSpeedKmh - previousFilteredSpeedKmh) * alpha,
     );
-    const nextWindow = [...speedWindow.slice(-3), smoothedSpeedKmh];
+    const nextWindow = [...speedWindow.slice(-2), smoothedSpeedKmh];
     const averagedSpeedKmh = nextWindow.reduce((sum, value) => sum + value, 0) / nextWindow.length;
 
-    if (averagedSpeedKmh < 3 && accuracyM > 14) {
+    if (averagedSpeedKmh < 2 && accuracyM > 25) {
       return 0;
     }
 
